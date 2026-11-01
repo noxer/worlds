@@ -9,7 +9,8 @@ generator: grassland
 tilesets:
   - tilesets/tinytown.tsj
   - tilesets/tinybattle.tsj
-  - tilesets/worlds.tsj   # the project's own tiles: deep water, bicycle, scooter
+  - tilesets/water.tsj    # animated water, generated from Tiny Battle (tools: see ARCHITECTURE.md)
+  - tilesets/worlds.tsj   # the project's own tiles: bicycle, scooter
 # Hand-made patches placed on the main map. Open this file in Tiled to edit
 # the patches in context. The town straddles the east-west wrap seam.
 patches: maps/patches/main.world

@@ -127,3 +127,28 @@ func TestMultiTileObjects(t *testing.T) {
 		check(world.Pos{Map: world.Main, X: ch[0] * world.ChunkSize, Y: ch[1] * world.ChunkSize}, 2*world.ChunkSize, 2*world.ChunkSize)
 	}
 }
+
+// TestAnimationFramesMatch checks that every frame of an animated tile has
+// the same collision and terrain as the tile itself, so placing a frame
+// tile directly in a map behaves the same as placing the animated tile.
+func TestAnimationFramesMatch(t *testing.T) {
+	c := load(t)
+	n := 0
+	for _, set := range c.World.Tilesets().All() {
+		for i := 0; i < set.TileCount; i++ {
+			a := set.Animation(i)
+			if a == nil {
+				continue
+			}
+			n++
+			for _, f := range a.Frames {
+				if set.Solid(f) != set.Solid(i) || set.Terrain(f) != set.Terrain(i) {
+					t.Errorf("%s tile %d: frame %d has different solid/terrain", set.Name, i, f)
+				}
+			}
+		}
+	}
+	if n == 0 {
+		t.Fatal("expected animated tiles (water)")
+	}
+}

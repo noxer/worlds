@@ -1,6 +1,7 @@
 package world_test
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -194,5 +195,93 @@ func TestMultiTileValidation(t *testing.T) {
 				t.Fatalf("error = %v, want one naming room.tmj and containing %q", err, c.err)
 			}
 		})
+	}
+}
+
+// animatedConfig loads the default test world whose tileset animates the floor
+// tile (0) through tiles 0, 4, 5 with the given phase property.
+func animatedConfig(t *testing.T, phase string, frames string) (world.Config, *world.World, error) {
+	t.Helper()
+	fsys, cfg := worldtest.Spec{Details: []worldtest.Map{{Name: "room", Rows: []string{"...."}}}}.Config()
+	var ts map[string]any
+	if err := json.Unmarshal(fsys["tilesets/test.tsj"].Data, &ts); err != nil {
+		t.Fatal(err)
+	}
+	var anim []any
+	if err := json.Unmarshal([]byte(frames), &anim); err != nil {
+		t.Fatal(err)
+	}
+	entry := map[string]any{"id": 0, "animation": anim}
+	if phase != "" {
+		entry["properties"] = []any{map[string]any{"name": "phase", "type": "string", "value": phase}}
+	}
+	ts["tiles"] = append(ts["tiles"].([]any), entry)
+	b, _ := json.Marshal(ts)
+	fsys["tilesets/test.tsj"].Data = b
+	w, err := world.Load(fsys, cfg)
+	return cfg, w, err
+}
+
+func TestTileAnimation(t *testing.T) {
+	_, w, err := animatedConfig(t, "", `[{"tileid":0,"duration":100},{"tileid":4,"duration":200},{"tileid":5,"duration":100}]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := w.Tilesets()
+	floor := w.Tile(pos("room", 0, 0), world.LayerGround)
+	cases := []struct {
+		ms   int64
+		want int
+	}{{0, 0}, {99, 0}, {100, 4}, {299, 4}, {300, 5}, {399, 5}, {400, 0}, {1300, 4}}
+	for _, c := range cases {
+		if got := ts.Frame(floor, c.ms, 0, 0).Index(); got != c.want {
+			t.Errorf("frame at %d ms = %d, want %d", c.ms, got, c.want)
+		}
+	}
+	// Synchronised: every cell shows the same frame.
+	if ts.Frame(floor, 150, 0, 0) != ts.Frame(floor, 150, 3, 7) {
+		t.Error("unphased animation differs between cells")
+	}
+	// Frames don't change what the cell is: still walkable floor.
+	if w.Solid(pos("room", 0, 0)) || w.Terrain(pos("room", 0, 0)) != world.Land {
+		t.Error("animation changed collision or terrain")
+	}
+	// Non-animated tiles are returned unchanged.
+	wall, _ := ts.Tile("test", 1)
+	if ts.Frame(wall, 150, 0, 0) != wall {
+		t.Error("static tile changed")
+	}
+}
+
+func TestPhasedAnimation(t *testing.T) {
+	_, w, err := animatedConfig(t, "random", `[{"tileid":0,"duration":100},{"tileid":4,"duration":100}]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := w.Tilesets()
+	floor := w.Tile(pos("room", 0, 0), world.LayerGround)
+	differ := false
+	for x := int64(0); x < 20; x++ {
+		if ts.Frame(floor, 0, x, 0) != ts.Frame(floor, 0, 0, 0) {
+			differ = true
+		}
+	}
+	if !differ {
+		t.Error("random phase: all cells show the same frame")
+	}
+	if ts.Frame(floor, 0, 5, 9) != ts.Frame(floor, 0, 5, 9) {
+		t.Error("phase must be deterministic")
+	}
+}
+
+func TestAnimationValidation(t *testing.T) {
+	if _, _, err := animatedConfig(t, "", `[{"tileid":0,"duration":100},{"tileid":99,"duration":100}]`); err == nil || !strings.Contains(err.Error(), "not a tile of this set") {
+		t.Errorf("frame out of range: err = %v", err)
+	}
+	if _, _, err := animatedConfig(t, "", `[{"tileid":0,"duration":0}]`); err == nil || !strings.Contains(err.Error(), "no duration") {
+		t.Errorf("zero duration: err = %v", err)
+	}
+	if _, _, err := animatedConfig(t, "sometimes", `[{"tileid":0,"duration":100}]`); err == nil || !strings.Contains(err.Error(), "phase") {
+		t.Errorf("bad phase: err = %v", err)
 	}
 }

@@ -1,0 +1,1409 @@
+{
+ "type": "tileset",
+ "version": "1.10",
+ "tiledversion": "1.11.0",
+ "name": "water",
+ "tilewidth": 16,
+ "tileheight": 16,
+ "tilecount": 96,
+ "columns": 4,
+ "image": "../tiles/water.png",
+ "imagewidth": 64,
+ "imageheight": 384,
+ "margin": 0,
+ "spacing": 0,
+ "tiles": [
+  {
+   "id": 0,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 0,
+     "duration": 350
+    },
+    {
+     "tileid": 1,
+     "duration": 350
+    },
+    {
+     "tileid": 2,
+     "duration": 350
+    },
+    {
+     "tileid": 3,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 1,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 4,
+     "duration": 350
+    },
+    {
+     "tileid": 5,
+     "duration": 350
+    },
+    {
+     "tileid": 6,
+     "duration": 350
+    },
+    {
+     "tileid": 7,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 8,
+     "duration": 350
+    },
+    {
+     "tileid": 9,
+     "duration": 350
+    },
+    {
+     "tileid": 10,
+     "duration": 350
+    },
+    {
+     "tileid": 11,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 12,
+     "duration": 350
+    },
+    {
+     "tileid": 13,
+     "duration": 350
+    },
+    {
+     "tileid": 14,
+     "duration": 350
+    },
+    {
+     "tileid": 15,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 13,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 16,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 16,
+     "duration": 350
+    },
+    {
+     "tileid": 17,
+     "duration": 350
+    },
+    {
+     "tileid": 18,
+     "duration": 350
+    },
+    {
+     "tileid": 19,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 17,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 18,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 19,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 20,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 20,
+     "duration": 350
+    },
+    {
+     "tileid": 21,
+     "duration": 350
+    },
+    {
+     "tileid": 22,
+     "duration": 350
+    },
+    {
+     "tileid": 23,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 21,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 22,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 23,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 24,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 24,
+     "duration": 350
+    },
+    {
+     "tileid": 25,
+     "duration": 350
+    },
+    {
+     "tileid": 26,
+     "duration": 350
+    },
+    {
+     "tileid": 27,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 25,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 26,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 27,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 28,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 28,
+     "duration": 350
+    },
+    {
+     "tileid": 29,
+     "duration": 350
+    },
+    {
+     "tileid": 30,
+     "duration": 350
+    },
+    {
+     "tileid": 31,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 29,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 30,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 31,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 32,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 32,
+     "duration": 350
+    },
+    {
+     "tileid": 33,
+     "duration": 350
+    },
+    {
+     "tileid": 34,
+     "duration": 350
+    },
+    {
+     "tileid": 35,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 33,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 34,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 35,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 36,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 36,
+     "duration": 350
+    },
+    {
+     "tileid": 37,
+     "duration": 350
+    },
+    {
+     "tileid": 38,
+     "duration": 350
+    },
+    {
+     "tileid": 39,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 37,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 38,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 39,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 40,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 40,
+     "duration": 350
+    },
+    {
+     "tileid": 41,
+     "duration": 350
+    },
+    {
+     "tileid": 42,
+     "duration": 350
+    },
+    {
+     "tileid": 43,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 41,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 42,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 43,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 44,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 44,
+     "duration": 350
+    },
+    {
+     "tileid": 45,
+     "duration": 350
+    },
+    {
+     "tileid": 46,
+     "duration": 350
+    },
+    {
+     "tileid": 47,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 45,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 46,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 47,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 48,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 48,
+     "duration": 350
+    },
+    {
+     "tileid": 49,
+     "duration": 350
+    },
+    {
+     "tileid": 50,
+     "duration": 350
+    },
+    {
+     "tileid": 51,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 49,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 50,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 51,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 52,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 52,
+     "duration": 350
+    },
+    {
+     "tileid": 53,
+     "duration": 350
+    },
+    {
+     "tileid": 54,
+     "duration": 350
+    },
+    {
+     "tileid": 55,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 53,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 54,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 55,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 56,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 56,
+     "duration": 350
+    },
+    {
+     "tileid": 57,
+     "duration": 350
+    },
+    {
+     "tileid": 58,
+     "duration": 350
+    },
+    {
+     "tileid": 59,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 57,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 58,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 59,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 60,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 60,
+     "duration": 350
+    },
+    {
+     "tileid": 61,
+     "duration": 350
+    },
+    {
+     "tileid": 62,
+     "duration": 350
+    },
+    {
+     "tileid": 63,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 61,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 62,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 63,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 64,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 64,
+     "duration": 350
+    },
+    {
+     "tileid": 65,
+     "duration": 350
+    },
+    {
+     "tileid": 66,
+     "duration": 350
+    },
+    {
+     "tileid": 67,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 65,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 66,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 67,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 68,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 68,
+     "duration": 350
+    },
+    {
+     "tileid": 69,
+     "duration": 350
+    },
+    {
+     "tileid": 70,
+     "duration": 350
+    },
+    {
+     "tileid": 71,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 69,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 70,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 71,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 72,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 72,
+     "duration": 350
+    },
+    {
+     "tileid": 73,
+     "duration": 350
+    },
+    {
+     "tileid": 74,
+     "duration": 350
+    },
+    {
+     "tileid": 75,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 73,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 74,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 75,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 76,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 76,
+     "duration": 350
+    },
+    {
+     "tileid": 77,
+     "duration": 350
+    },
+    {
+     "tileid": 78,
+     "duration": 350
+    },
+    {
+     "tileid": 79,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 77,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 78,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 79,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 80,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 80,
+     "duration": 350
+    },
+    {
+     "tileid": 81,
+     "duration": 350
+    },
+    {
+     "tileid": 82,
+     "duration": 350
+    },
+    {
+     "tileid": 83,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 81,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 82,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 83,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 84,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 84,
+     "duration": 350
+    },
+    {
+     "tileid": 85,
+     "duration": 350
+    },
+    {
+     "tileid": 86,
+     "duration": 350
+    },
+    {
+     "tileid": 87,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 85,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 86,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 87,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 88,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 88,
+     "duration": 350
+    },
+    {
+     "tileid": 89,
+     "duration": 350
+    },
+    {
+     "tileid": 90,
+     "duration": 350
+    },
+    {
+     "tileid": 91,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 89,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 90,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 91,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 92,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "deep"
+    }
+   ],
+   "animation": [
+    {
+     "tileid": 92,
+     "duration": 350
+    },
+    {
+     "tileid": 93,
+     "duration": 350
+    },
+    {
+     "tileid": 94,
+     "duration": 350
+    },
+    {
+     "tileid": 95,
+     "duration": 350
+    }
+   ]
+  },
+  {
+   "id": 93,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "deep"
+    }
+   ]
+  },
+  {
+   "id": 94,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "deep"
+    }
+   ]
+  },
+  {
+   "id": 95,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "deep"
+    }
+   ]
+  }
+ ]
+}

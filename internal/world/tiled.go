@@ -76,6 +76,10 @@ type tiledTileset struct {
 	Tiles      []struct {
 		ID         int             `json:"id"`
 		Properties []tiledProperty `json:"properties"`
+		Animation  []struct {
+			TileID   int `json:"tileid"`
+			Duration int `json:"duration"` // milliseconds
+		} `json:"animation"`
 	} `json:"tiles"`
 }
 

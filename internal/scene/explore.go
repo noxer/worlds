@@ -537,6 +537,11 @@ func (e *Explore) Draw(dst *ebiten.Image) {
 	}
 }
 
+// animationClock is the time in milliseconds that tile animations follow. It
+// counts game ticks, so animations keep running while a dialog is open and
+// stay in step with the simulation (60 ticks per second).
+func animationClock() int64 { return int64(ebiten.Tick()) * 1000 / 60 }
+
 // drawLayers draws the visible tiles. Tile coordinates are iterated in
 // camera space and normalised per tile, so the seam needs no special case.
 func (e *Explore) drawLayers(dst *ebiten.Image, m world.MapRef, overhead bool) {
@@ -544,6 +549,7 @@ func (e *Explore) drawLayers(dst *ebiten.Image, m world.MapRef, overhead bool) {
 	x0, y0 := geom.FloorDiv(e.camX, tile), geom.FloorDiv(e.camY, tile)
 	x1, y1 := geom.FloorDiv(e.camX+sw-1, tile), geom.FloorDiv(e.camY+sh-1, tile)
 	sets := e.w.Tilesets()
+	ms := animationClock()
 	for ty := y0; ty <= y1; ty++ {
 		for tx := x0; tx <= x1; tx++ {
 			p, ok := e.w.Normalize(world.Pos{Map: m, X: tx, Y: ty})
@@ -555,7 +561,7 @@ func (e *Explore) drawLayers(dst *ebiten.Image, m world.MapRef, overhead bool) {
 				if (l == world.LayerOverhead) != overhead {
 					continue
 				}
-				t := e.w.Tile(p, l)
+				t := sets.Frame(e.w.Tile(p, l), ms, p.X, p.Y)
 				if t.Empty() {
 					continue
 				}
@@ -587,14 +593,14 @@ type drawable struct {
 	x, y     int // screen position
 	priority int
 	swimming bool
-	vehicle  int // tile of the bicycle or scooter in the "worlds" sheet; 0 = none
+	vehicle  *ebiten.Image // bicycle or scooter, if riding
 }
 
 // Tiles of the project's own sheet (assets/tiles/worlds.png).
 const (
 	sheetWorlds = "worlds"
-	tileBicycle = 1
-	tileScooter = 2
+	tileBicycle = 0
+	tileScooter = 1
 	waterline   = 11 // rows of a swimmer's sprite that show above the water
 	riderRaise  = 2  // riders sit a little higher, on the saddle
 	vehicleDrop = 3  // and the vehicle shows below them
@@ -605,14 +611,14 @@ var colorRipple = color.RGBA{0xd8, 0xf4, 0xff, 0xff}
 func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
 	sw, sh := dst.Bounds().Dx(), dst.Bounds().Dy()
 	var ds []drawable
-	add := func(a *entity.Actor, priority, vehicle int) {
+	add := func(a *entity.Actor, priority int, vehicle *ebiten.Image) {
 		if a.Pos.Map != m {
 			return
 		}
 		d := drawable{a: a, priority: priority}
 		d.swimming = e.w.Terrain(a.Pos) == world.Shallow
 		hop := a.Hop()
-		if vehicle != 0 && !d.swimming {
+		if vehicle != nil && !d.swimming {
 			d.vehicle, hop = vehicle, 0 // riding is smooth
 		}
 		px, py := e.pixel(a)
@@ -623,14 +629,14 @@ func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
 		ds = append(ds, d)
 	}
 	for _, n := range e.npcs {
-		add(&n.Actor, 0, 0)
+		add(&n.Actor, 0, nil)
 	}
 	for i, a := range e.party.Members {
-		vehicle := 0
+		var vehicle *ebiten.Image
 		if e.riding {
-			vehicle = tileBicycle
+			vehicle = e.sheets.Tile(sheetWorlds, tileBicycle)
 			if i%2 == 1 {
-				vehicle = tileScooter
+				vehicle = e.sheets.Tile(sheetWorlds, tileScooter)
 			}
 		}
 		add(a, len(e.party.Members)-i, vehicle) // leader on top when stacked after a warp
@@ -652,9 +658,9 @@ func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
 			e.drawTile(dst, top, d.x, d.y+1, flip, false)
 			phase := int(ebiten.Tick()/12) % 2
 			gfx.FillRect(dst, image.Rect(d.x+2+phase, d.y+waterline+1, d.x+14-phase, d.y+waterline+2), colorRipple)
-		case d.vehicle != 0:
+		case d.vehicle != nil:
 			e.drawTile(dst, img, d.x, d.y-riderRaise, flip, false)
-			e.drawTile(dst, e.sheets.Tile(sheetWorlds, d.vehicle), d.x, d.y+vehicleDrop, flip, false)
+			e.drawTile(dst, d.vehicle, d.x, d.y+vehicleDrop, flip, false)
 		default:
 			e.drawTile(dst, img, d.x, d.y, flip, false)
 		}

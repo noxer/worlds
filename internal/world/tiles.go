@@ -18,6 +18,7 @@ type Tileset struct {
 	above     []int  // index of the tile that belongs one tile above, or -1
 	isTop     []bool // tile is the upper part of a multi-tile object
 	terrain   []Terrain
+	anims     map[int]*Animation
 }
 
 // Terrain returns the terrain of tile i (property "terrain"; default land).
@@ -187,6 +188,7 @@ func (ts *Tilesets) load(fsys fs.FS, name string) (int, error) {
 		above:     make([]int, tt.TileCount),
 		isTop:     make([]bool, tt.TileCount),
 		terrain:   make([]Terrain, tt.TileCount),
+		anims:     map[int]*Animation{},
 	}
 	for i := range set.above {
 		set.above[i] = -1
@@ -208,6 +210,28 @@ func (ts *Tilesets) load(fsys fs.FS, name string) (int, error) {
 			}
 			set.above[t.ID] = a
 			set.isTop[a] = true
+		}
+		if len(t.Animation) > 0 {
+			a := &Animation{}
+			switch ph := props.String("phase"); ph {
+			case "", "sync":
+			case "random":
+				a.Phased = true
+			default:
+				return 0, fmt.Errorf("%s: tile %d: phase must be \"sync\" or \"random\", not %q", name, t.ID, ph)
+			}
+			for _, f := range t.Animation {
+				if f.TileID < 0 || f.TileID >= tt.TileCount {
+					return 0, fmt.Errorf("%s: tile %d: animation frame %d is not a tile of this set", name, t.ID, f.TileID)
+				}
+				if f.Duration <= 0 {
+					return 0, fmt.Errorf("%s: tile %d: animation frame %d has no duration", name, t.ID, f.TileID)
+				}
+				a.Frames = append(a.Frames, f.TileID)
+				a.Durations = append(a.Durations, f.Duration)
+				a.total += int64(f.Duration)
+			}
+			set.anims[t.ID] = a
 		}
 	}
 	i := len(ts.list)
