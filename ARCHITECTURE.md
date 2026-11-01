@@ -2,183 +2,370 @@
 
 A single-player 2D open-world RPG focused on exploration, puzzles, dialog
 and quests, with turn-based tactical combat (movement and action points).
-Built with Go and [Ebitengine](https://ebitengine.org), pixel art from
-[Kenney](https://kenney.nl) (Tiny Town and Tiny Dungeon, CC0). It targets
-desktop and browser (WASM); mobile comes later.
+The world is planet-sized: a wrapping main map of millions of tiles, mixing
+hand-made and procedurally generated content. It is built with Go and
+[Ebitengine](https://ebitengine.org), with pixel art from
+[Kenney](https://kenney.nl) (CC0). It targets desktop and browser (WASM);
+mobile comes later.
+
+> **Status.** The first playable version implements an earlier model:
+> finite Tiled maps grouped into *regions*. This document describes the target
+> design. Section [Migration](#migration) lists the steps from here to there.
 
 ## Ground rules
 
-- **Tile grid, 4 directions, everywhere.** Exploration and combat use the same
-  16×16 grid and only up/down/left/right movement.
-- **Logic is separate from rendering.** `world`, `nav`, `entity`, `dialog` (and
-  later `combat`, `quest`) don't import Ebitengine, so they are unit-tested
-  headless. Scenes are tested by driving `Update` tick by tick with injected
-  input (`input.Frame`).
-- **Fixed timestep.** Ebitengine calls `Update` 60 times per second. Movement
-  is 1 px per tick (16 ticks per tile), so there's no delta time anywhere.
-- **Content is data.** Maps are authored in [Tiled](https://www.mapeditor.org),
-  and dialogs (later also quests) are YAML. Everything is embedded with
-  `go:embed`, so desktop and web builds are identical single files.
+- **Tile grid, 4 directions, everywhere.** 16×16 tiles. Exploration and
+  combat use only up/down/left/right movement.
+- **Logic is separate from rendering.** World, generation, navigation,
+  entities, dialog, quests and combat don't import Ebitengine, so they are
+  unit-tested headless. Scenes are tested by driving `Update` tick by tick
+  with injected input (`input.Frame`).
+- **Fixed timestep.** 60 ticks per second; 1 px per tick when walking.
+- **Content is data.** Maps and patches are authored in
+  [Tiled](https://www.mapeditor.org), and dialogs and quests in YAML.
+  Everything is embedded with `go:embed`.
+- **One world for everybody.** The world seed is fixed. The same game version
+  generates the same world on every platform (see
+  [Determinism](#determinism)).
+- **Big coordinates.** Tile and pixel coordinates in the world are `int64`.
+  Rendering is always relative to the camera, so values sent to the GPU stay
+  small (float32 is only exact up to about 16.7 million).
 
-## Packages
+## Maps
+
+There are two kinds of maps. Both are built from **chunks** of 32×32 tiles.
+
+**The main map** is the open world.
+- It has a fixed size `W×H` tiles (multiples of the chunk size) and **wraps on
+  both axes** (a torus). Walking off the east edge arrives in the west, and
+  likewise north/south.
+- All coordinate maths goes through one wrap helper:
+  - positions are normalised to `[0,W)×[0,H)`;
+  - distances and deltas use the shortest wrapped difference;
+  - chunk coordinates wrap too.
+
+**Detail maps** are the small places reached through warps: building
+interiors, caves, dungeons, and vehicle interiors.
+- They are bounded and don't wrap.
+- They use the same chunk storage and code paths, but are fully loaded while
+  in use.
+- A detail map is a **template**. It can have several **instances** (every
+  ship of one class shares an interior layout; procedural dungeons are
+  instances of a generator). Each instance has its own state.
+
+```go
+type MapRef struct { Template MapID; Instance uint64 } // Instance 0 for singletons
+type Pos    struct { Map MapRef; X, Y int64 }          // main map: Map.Template == "main"
+```
+
+**Anchor.** Every detail-map instance is anchored at a main-map position: a
+building's entrance, a cave's mouth, or a vehicle's current position (which
+moves). The anchor of wherever the party is decides what part of the main
+map is streamed and simulated, and where the party appears on the world map.
+
+### Chunk resolution
+
+Each main-map chunk is produced by the same pipeline, which runs lazily and
+is cached:
 
 ```
-cmd/worlds/          entry point (window setup)
-assets/              embedded content + content validation test
-  tiles/             Kenney sheets (packed, no spacing)
-  tilesets/*.tsj     Tiled tilesets; per-tile property `solid`
-  maps/*.tmj         Tiled maps; maps/*.world places maps into regions
-  dialog/*.yaml      dialog trees
-internal/
-  world/             Tiled loading, maps, regions, warps, spawns, collision
-  world/worldtest/   builds test worlds from ASCII art
-  nav/               hierarchical pathfinding across edges and warps
-  entity/            actors (grid movement) and the party
-  dialog/            dialog trees and runner
-  input/             keyboard/gamepad/mouse/touch -> actions
-  gfx/               tile sheets, text, UI boxes
-  scene/             scene stack, exploration scene, dialog box
-  game/              wiring, ebiten.Game, screen layout
-web/                 index.html for the WASM build
+chunk(cx, cy) = generate(worldSeed, cx, cy)  // procedural base
+              ← patches                      // hand-made tiles win, cell by cell
+              ← save deltas                  // opened chests, cut trees, moved blocks
 ```
 
-Planned: `combat/`, `quest/`, `script/` (commands, flags, event bus),
-`save/`, `platform/` (file vs. localStorage saves, audio unlock).
+- A chunk fully covered by patches skips generation.
+- A chunk with no patch is purely procedural.
+- Most interesting chunks are mixed, for example a hand-drawn coastline with
+  generated ocean around it.
 
-## World model
+The result of resolving a chunk:
+- **Tile layers:** ground, decoration, and overhead (drawn above characters,
+  no collision).
+- **Terrain grid:** one terrain type per cell (deep water, shallow water,
+  sand, grass, rock, rail, …), used for movement rules.
+- **Objects:** spawns, warps, NPCs, signs, puzzle objects.
+- **Portals:** the chunk's border entry/exit points for long-distance
+  navigation.
 
-**Positions.** `world.Pos{Map, X, Y}` is a tile on a map.
+### Hand-made content: patches
 
-**Regions.** Maps placed in a Tiled `.world` file form a *region* and share one
-coordinate space (the outdoors is region `overworld`). Walking off a map edge
-continues on the neighbouring map: `World.Neighbor(pos, dir)` resolves edges.
-Edge connections can be partial and offset. Overlapping maps are a load error.
-Every map not in a `.world` file (house interiors, caves) is its own region.
+- **What a patch is:** a Tiled map covering part of the main map (a town, an
+  island, an oasis, a coastline). Patches are placed through `.world` files at
+  any tile offset. They don't need to align to chunks and may straddle the
+  wrap seam.
+- **Painted cells override generated ones.** An empty cell in a patch means
+  "generated". A special *void* tile means "explicitly nothing generated
+  here".
+- **Patches declare their terrain**, via per-tile terrain properties in the
+  tileset. The generator treats that terrain as a fixed constraint and blends
+  into it over a strip a few tiles wide, so coastlines and roads continue
+  across the seam.
+- **Patch objects:**
 
-**Warps.** A `warp` object (a rectangle of one or more tiles) has `to_map` and
-`to_spawn`. Stepping onto it moves the party to that spawn after a fade. The
-loader validates targets: the spawn must exist, and neither the trigger tile
-nor the destination may be solid or another warp.
+  | Object type | Meaning |
+  |---|---|
+  | `spawn`, `warp`, `npc`, `sign` | as in detail maps |
+  | `reserve` | the generator places no features here |
+  | `pool` | an area where pool patches (below) may be placed |
 
-**Collision** has two layers:
-1. Static: tiles whose tileset marks them `solid`. Layers with the property
-   `overhead: true` (roof ridges, tree tops) are drawn above characters and
-   ignored for collision.
-2. Dynamic: `World.SetBlocked` (objects with `solid: true`, and later doors,
-   pushed blocks and other puzzle state). Each change bumps `World.Version()`.
+- **Pool patches:** generic hand-made pieces (small islands, ruins, oases)
+  that the generator places randomly inside `pool` areas or matching biomes.
+  It keeps a minimum distance between them and uses the world seed.
 
-Actors (NPCs, later enemies) block movement but are not part of the world;
-they are passed to the planner as a `Blocked` callback.
+### Procedural content: generation levels
 
-### Tiled conventions
+Each level is a pure function of the world seed and coordinates, so nothing
+is computed for the whole planet up front.
 
-| Object type | Fields / properties | Meaning |
-|---|---|---|
-| `spawn` | name, `facing` | arrival / start point |
-| `warp` | `to_map`, `to_spawn` | door, stairs, cave mouth |
-| `npc` | tile object (sprite), name, `dialog`, `facing` | character |
-| `sign` | `dialog`, optional `solid` | interactable object |
+1. **World level** (one cell spans many chunks): elevation, temperature,
+   moisture, and from those the biome.
+   - It uses **tileable noise**, periodic in `W` and `H`, so the wrap is
+     seamless.
+   - It can be evaluated for any location in O(1).
+   - The world map is rendered from this level.
+2. **Area level** (blocks of 64×64 chunks, generated on demand and cached):
+   anything that needs a view wider than one chunk.
+   - Rivers, roads, rail lines and sea lanes.
+   - Placing pool patches.
+   - Reserving space around fixed patches, so a generated continent never runs
+     into a hand-made island.
+   - Checking that every entrance and island can be reached; the generator
+     clears obstacles where a check fails.
+3. **Chunk level:** tile detail.
+   - Terrain from levels 1 and 2 plus the patch constraints.
+   - Coastline and other edge tiles chosen by an *autotiler* from the terrain
+     sets defined on the tileset (Tiled "Wang sets"), so swapping the art
+     doesn't touch the generator.
+   - Decorations scattered with an even-spacing algorithm (Poisson disk).
+   - A chunk reads only levels 1–2 and the patches, so chunks can be
+     generated in any order, in the background.
 
-Tile layers must use CSV encoding and external `.tsj` tilesets.
-`assets/assets_test.go` checks that the content loads, that every referenced
-dialog exists, and that every map is reachable from the start.
+Generators are registered per biome (`ocean`, `desert`, `forest`, …). Each is a
+small Go type with tests for determinism, connectivity, and "never overwrites
+patch cells".
 
-## Navigation (`nav`)
+### Determinism
+
+Changing a generator changes the world. So each release ships fingerprints
+(hashes) of a set of generated chunks, and CI fails when they change
+unintentionally.
+
+The same seed must also give the same world on every platform. Rules:
+- **Random numbers:** only use seeded generators derived from (world seed,
+  level, coordinates) via a hash. Never use the global random source or any
+  iteration order that isn't stable.
+- **Noise:** use integer or fixed-point arithmetic, or force float rounding
+  with explicit conversions. On ARM (Apple Silicon, phones), Go may fuse
+  `x*y+z` into one FMA instruction, which rounds differently than x86.
+  Fingerprint tests run on both amd64 and arm64.
+
+### Saving
+
+- Main-map changes are stored sparsely per chunk.
+- Detail-map instance state is stored per instance.
+- Flags, quests, party, inventory and vehicle states are stored globally.
+
+Untouched chunks cost nothing, because they are regenerated from the seed.
+
+## Terrain and movement
+
+**Movement modes.** Passability depends on the terrain of a cell and the
+movement mode of the mover:
+
+| Mode | Can enter |
+|---|---|
+| walk | land terrain |
+| swim | shallow water (open question: deep water, stamina) |
+| ship / boat | water; docks connect to land |
+| train | rail tiles only, along routes |
+| aircraft | airfields; flies along routes |
+
+**Blockers.** Static collision comes from tiles. Dynamic blockers (doors,
+pushed blocks, NPCs) come on top. Passability changes bump a version counter
+for the affected chunk, which clears navigation caches for that chunk only.
+
+## Vehicles
+
+A vehicle has two representations:
+
+- **Exterior:** a small entity on the main map, for example a 2×1-tile boat, a
+  few train cars, or a plane sprite. It moves along routes (train lines, sea
+  lanes, flight paths) or is steered by the player (boats and ships). It
+  occupies tiles and blocks other movers.
+- **Interior:** a detail-map instance, much larger than the exterior (like a
+  TARDIS). The party walks around inside, talks to passengers, fights on deck,
+  and solves puzzles while the vehicle travels. The interior's anchor is the
+  exterior position, so it moves.
+
+**Boarding and leaving** use dynamic warps: warps attached to an entity rather
+than a fixed tile.
+- **Boarding:** stepping onto the exterior's door or gangway while the vehicle
+  is docked or stopped warps the party into the interior.
+- **Leaving:** the interior's exit warps to the exterior's current door
+  position.
+- **In transit:** doors are closed, unless a mode allows jumping off, for
+  example swimming from a ship.
+
+**Window view.** While inside, the main map scrolls past the vehicle:
+- Cells marked as *exterior view* (a layer property, used for windows, the
+  open sides of a deck, or the void around a small boat) show the main map as
+  a backdrop.
+- The backdrop camera follows the exterior position, smoothed per pixel. Its
+  scroll direction is mapped through the interior's `forward` property: a
+  train whose interior is drawn left-to-right shows the landscape sliding
+  left, whichever way the train actually travels.
+- Aircraft render the backdrop at a reduced scale with cloud layers.
+- Interior and exterior sizes are not consistent on purpose: the backdrop is
+  a view, not geometry.
+
+**Simulation.**
+- Vehicles move in the world simulation, independent of the current scene.
+- Time passes while the party walks around inside.
+- Arrival raises events (doors open, announcements).
+- Streaming follows the anchor, so the landscape outside is always loaded.
+
+**Control.** Player-steered vessels have a helm. Using it switches to steering
+mode, which shows the exterior on the main map and moves it with the movement
+input; leaving the helm returns to walking inside. Route-bound vehicles
+(trains, airliners) run on schedules.
+
+## Streaming and simulation
+
+- **Loaded chunks:** the chunks within a radius around the current anchor are
+  resolved and kept. Chunks ahead of the direction of travel are generated in
+  the background. Distant chunks are evicted (least recently used). Detail
+  maps in use are fully loaded.
+- **Full simulation** (actors moving tile by tile) runs only in loaded chunks
+  and the current detail map.
+- **Elsewhere, entities are simulated abstractly:** NPC schedules and vehicles
+  on routes compute their position from time, and become concrete actors when
+  their chunk loads.
+
+## Navigation
 
 Every mover uses the same rules: the keyboard, click/tap-to-move, followers,
-and later NPC schedules and combat.
+NPC schedules, vehicles, and combat.
 
-1. **Inside a region:** A* on the tile grid in region coordinates, so routes
-   cross map edges freely. Warp tiles count as walls unless they are the
-   target, so a path never teleports by accident.
-2. **Across regions:** Dijkstra over a small graph of warp entries and exits.
-   The weight of an edge within a region is the static A* distance, computed
-   lazily and cached until `World.Version()` changes. Using a warp costs
-   `WarpCost` steps, so short walks beat detours through buildings.
-3. **Only the current leg is turned into moves:** up to the first warp, or to
-   the goal. That leg avoids dynamic blockers. After a warp the mover plans
-   again, so plans stay valid while the world changes. If an NPC steps into
-   the way, the mover waits briefly and replans.
+1. **Local:** A* on tiles over loaded chunks, with a wrap-aware heuristic and
+   the mover's movement mode. Warp tiles count as walls unless they are the
+   target.
+2. **Main map, long range:** a graph of chunk portals. When a chunk is
+   resolved, it records its border portals and the costs between them inside
+   the chunk. A* runs on the portal graph first, then the current stretch is
+   refined tile by tile. Chunks that aren't resolved yet use estimates from
+   the world level (biome passability) and are resolved as the route reaches
+   them.
+3. **Across maps:** a graph of warp entries and exits, including dynamic
+   vehicle warps when the vehicle is docked. Routes can include transport
+   (ferry and train routes) later.
+4. **Only the current leg becomes concrete moves.** After a warp, a chunk
+   change or a blocker, the mover plans again.
 
-Scaling notes for later: precompute warp-to-warp distances per region at load
-time, and add region-level chunk abstraction if regions grow very large.
+Earth-scale trips use vehicles, fast travel or the world map; click-to-move
+is meant for what's on screen.
 
 ## Party
 
-The leader plus up to `entity.MaxFollowers` (5) companions. When the leader
-starts a step, each follower walks onto the tile the member in front of it
-just left (a snake). This works across map edges. After a warp everyone
-stands on the arrival tile and the queue unfolds as the leader walks on.
-Followers don't block the leader (turning back swaps places). The drawing
-order puts the leader on top when members share a tile.
+The leader plus up to 5 companions, queued up behind the leader like a snake.
+Each follower steps onto the tile the member in front of it just left; this
+works across chunk borders and the wrap seam. After a warp everyone stands on
+the arrival tile and the queue unfolds again. Followers don't block the leader.
+In steering mode the whole party is inside the vehicle.
 
 ## Scenes
 
-A stack: only the top scene updates, but all scenes draw. So a `DialogBox`
-pushed over `Explore` freezes the world while it stays visible. Planned
-scenes: menu, inventory, quest journal, save/load, title.
-
-**Explore** (real time):
-- Holding a direction walks. Tapping a direction only turns.
-- Confirm interacts with the tile in front.
-- A click or tap walks there via `nav`. Clicking an NPC or sign walks next to
-  it and talks.
-- `goTo(pos)` accepts any tile in the world, which quest markers or scripted
-  travel can reuse.
-- F3 toggles a debug overlay (position, region, planned path).
+A stack: only the top scene updates, but all scenes draw. Exploration (real
+time) and combat (turn based) share one scene on the same map; a fight swaps
+the real-time controller for a turn controller. Overlays: dialog, menu,
+inventory, quest journal, world map, save/load.
 
 ### Combat (planned)
 
-Combat happens on the exploration map itself, with no battle screen. When a
-fight starts, Explore swaps its real-time controller for a turn controller:
-
-- **Turns:** initiative order. Each combatant has movement points (tiles) and
-  action points per turn.
-- **Movement:** reachable tiles come from a cost-limited flood fill in `nav`,
-  using the same passability rules as exploration (4 directions).
+- **Turns:** initiative order. Each combatant has movement points and action
+  points per turn.
+- **Movement:** reachable tiles come from a cost-limited flood fill in
+  navigation, with the same passability rules as exploration (4 directions).
 - **Abilities are data:** AP cost, range, area shape, line of sight
   (straight-line ray on the grid), and effects (damage, status, push and
-  pull). Push and pull work on puzzle objects too, so fights and puzzles share
-  one mechanic set.
+  pull). Push and pull also work on puzzle objects.
 - **Testable rules:** the `combat` package has no Ebitengine dependency and
   uses a seeded RNG, so fights are deterministic in tests and replays.
 - **AI:** scores (move target, ability) pairs over the reachable tiles.
-- **Scope:** combat is bounded to the current region, and warps are locked
-  during a fight. Party members fight; companions are AI-controlled or
-  player-controlled (to be decided).
+- **Scope:** warps are locked during a fight. Fights also work inside vehicle
+  interiors.
 
-## Dialog, quests, scripting
+## Dialog, quests, scripting, puzzles
 
-- **Dialog trees (implemented):** nodes have a speaker, lines, and either
-  choices or `next`. They are validated at load. Next: conditions (flags,
-  quest stage, items, party members, skill checks with dice) and effects.
-- **Scripting (planned):** effects are commands for a small command runner
-  (`Say`, `Move`, `Face`, `Wait`, `SetFlag`, `GiveItem`, `Warp`, `StartQuest`,
-  …) that runs over several ticks. Story state is a set of named flags.
-- **Quests (planned):** defined in YAML, with stages and objectives.
-  Objectives complete by listening to game events (`ItemAcquired`,
-  `TalkedTo`, `EnteredArea`, `EnemyDefeated`, `FlagSet`). There will be a
-  journal scene and quest markers (using `nav` for direction across maps).
-- **Puzzles (planned):** objects like levers, plates, push blocks, doors and
-  keys, wired in Tiled (`target=door_3`). Their state lives in
-  `WorldState[map][objectID]` and affects passability through `SetBlocked`.
-- **Saving:** everything that needs saving lives in one serializable game
-  state (party, inventory, flags, quests, object states).
+- **Dialog trees (implemented):** nodes have a speaker, lines, and choices or
+  `next`, and are validated at load. Planned: conditions (flags, quest stage,
+  items, party members, skill checks with dice) and effects.
+- **Scripting:** a command runner (`Say`, `Move`, `Face`, `Wait`, `SetFlag`,
+  `GiveItem`, `Warp`, `StartQuest`, …) that runs over several ticks. Story
+  state is a set of named flags. Game events go through an event bus.
+- **Quests:** YAML stages and objectives, completed by events (`ItemAcquired`,
+  `TalkedTo`, `EnteredArea`, `EnemyDefeated`, `FlagSet`). A journal and quest
+  markers, with direction from navigation even across maps and the wrap
+  seam.
+- **Puzzles:** objects such as levers, plates, push blocks, doors and keys,
+  wired in Tiled (`target=door_3`). State lives in chunk or instance deltas
+  and drives the dynamic blockers.
+
+## Packages (target)
+
+```
+cmd/worlds/          entry point
+assets/              embedded content: tiles, tilesets, patches, detail maps,
+                     dialogs, quests; content validation test
+internal/
+  geom/              int64 positions, wrap maths, chunk coordinates
+  world/             main map, detail maps, chunk storage and cache,
+                     terrain, warps (static and dynamic), anchors
+  tiled/             Tiled loading (maps, tilesets, Wang sets, .world)
+  gen/               generation levels, biome generators, autotiler, noise
+  nav/               local A*, chunk portal graph, warp graph
+  entity/            actors, party, vehicles
+  sim/               world clock, abstract simulation, streaming
+  dialog/ quest/ script/ combat/ save/
+  input/ gfx/ scene/ game/ platform/
+```
 
 ## Platforms and screen
 
-**Screen size:** the logical screen is at least 240×180. It is scaled by the
-largest integer factor that fits, and leftover space shows more of the world
-(320×180 at 1280×720 and 1920×1080). Pixels stay crisp, and odd aspect ratios
-(browsers, phones) work.
+**Screen size:** the logical screen is at least 240×180 pixels. It is scaled
+by the largest whole-number factor that fits, and leftover space shows more of
+the world (320×180 at 1280×720 and 1920×1080).
 
 **Input:** keyboard, standard-layout gamepads, mouse and touch all map to
-actions plus a tap position. Tap-to-move and tap-to-advance dialogs already
-cover touch.
+actions plus a tap position.
 
-**Web:** `make web` produces `build/web`, a static site.
+**Web:** `make web` builds the browser version into `build/web`.
 
-**Mobile (later):**
-- Ebitengine `ebitenmobile` bindings.
-- An on-screen d-pad, if tap-to-move isn't enough.
-- Safe-area insets.
+**Mobile (later):** `ebitenmobile`, plus on-screen controls if tap-to-move
+isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
+
+## Migration
+
+The first playable version has finite maps, regions stitched together by
+`.world` files, and `int` coordinates. The steps to the target design:
+
+1. `geom` with `int64` and wrap maths. Chunked storage for main and detail
+   maps. The main map is assembled from patches (town, meadow) plus a stub
+   generator (grass and trees). The smithy becomes a detail map. Navigation is
+   ported to chunks and the wrap. Rendering becomes camera-relative. All
+   current behaviour and tests keep working.
+2. Terrain types and movement modes. Swimming.
+3. Generation levels 1–3, tileable noise, autotiler, fingerprint tests. The
+   first ocean biome, with a fixed and a pool island. Needs water art (a
+   placeholder sheet until a pack is chosen).
+4. Streaming in the background, the chunk portal graph, abstract simulation.
+5. Vehicles: dynamic warps, interiors as instances, window view, helm
+   steering, routes.
+
+## Open questions
+
+- Swimming: shallow water only, or deep water with stamina?
+- Which vehicles are player-steered (boats, ships) and which are route-bound
+  (trains, airliners)? Can the player own and steer an aircraft?
+- World size: concrete `W×H`, for example 2²⁰ × 2¹⁹ tiles.
+- Art for water, coastlines, rails and vehicles.
