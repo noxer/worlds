@@ -107,6 +107,7 @@ The result of resolving a chunk:
   | Object type | Meaning |
   |---|---|
   | `spawn`, `warp`, `npc`, `sign` | as in detail maps |
+  | any object with `bump: <dialog>` | walking into it shows that dialog's first line as a passive notice: no confirmation, it disappears when the party moves or turns away (e.g. a locked door) |
   | `reserve` | the generator places no features here |
   | `pool` | an area where pool patches (below) may be placed |
 

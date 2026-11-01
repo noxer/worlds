@@ -254,3 +254,49 @@ func TestEnterBuildingThroughDoor(t *testing.T) {
 	h.e.goTo(goal)
 	h.runUntil("arrival in the smithy", 3000, func() bool { return h.idle() && h.leader().Pos == goal })
 }
+
+// TestBumpShowsPassiveNotice walks into the locked door: a message appears
+// without opening a dialog, input keeps working, and it goes away when the
+// party walks off.
+func TestBumpShowsPassiveNotice(t *testing.T) {
+	h := newHarness(t)
+	town, _ := h.w.PatchOrigin("town")
+	door, _ := h.w.Offset(town, 22, 5)
+	below, _ := h.w.Offset(door, 0, 1)
+	h.e.party.PlaceAll(below, world.Up)
+
+	h.hold(input.Up, 5)
+	if h.e.notice == nil || h.e.notice.text != "The door is locked." {
+		t.Fatalf("expected the locked-door notice, got %+v", h.e.notice)
+	}
+	if h.top() != Scene(h.e) {
+		t.Fatal("bumping must not open a modal dialog")
+	}
+	if h.leader().Pos != below {
+		t.Fatal("walked into the locked door")
+	}
+	// It stays while the party stands still.
+	for i := 0; i < 120; i++ {
+		h.tick(input.Frame{})
+	}
+	if h.e.notice == nil {
+		t.Fatal("notice vanished without moving")
+	}
+	// Walking away clears it straight away, no confirmation needed.
+	var f input.Frame
+	f.Held[input.Down] = true
+	h.tick(f)
+	for i := 0; i < turnDelay+2 && h.e.notice != nil; i++ {
+		h.tick(f)
+	}
+	if h.e.notice != nil {
+		t.Fatal("notice should disappear when walking away")
+	}
+
+	// Facing the door and pressing confirm still opens the full dialog.
+	h.e.party.PlaceAll(below, world.Up)
+	h.press(input.Confirm)
+	if _, ok := h.top().(*DialogBox); !ok {
+		t.Fatal("confirm at the door should open the dialog")
+	}
+}

@@ -46,6 +46,11 @@ type Explore struct {
 	party *entity.Party
 	npcs  []*NPC
 	signs map[world.Pos]string // interactable objects -> dialog id
+	bumps map[world.Pos]string // walking into these shows a passive message (dialog id)
+
+	// notice is a passive message (e.g. "The door is locked."). It does not
+	// block input and disappears when the leader moves or turns away.
+	notice *notice
 
 	// Click/tap-to-move state.
 	path     []nav.Move
@@ -83,6 +88,7 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		dialogs: cfg.Dialogs,
 		party:   cfg.Party,
 		signs:   map[world.Pos]string{},
+		bumps:   map[world.Pos]string{},
 	}
 	for _, o := range e.w.Objects() {
 		switch o.Type {
@@ -98,6 +104,18 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 			e.npcs = append(e.npcs, n)
 		case "sign":
 			e.signs[o.Pos] = o.Props.String("dialog")
+		}
+		if id := o.Props.String("bump"); id != "" {
+			if e.dialogs[id] == nil {
+				return nil, fmt.Errorf("%v: object %q: unknown bump dialog %q", o.Pos, o.Name, id)
+			}
+			for y := int64(0); y < o.H; y++ {
+				for x := int64(0); x < o.W; x++ {
+					if p, ok := e.w.Offset(o.Pos, x, y); ok {
+						e.bumps[p] = id
+					}
+				}
+			}
 		}
 	}
 	facing := world.Down
@@ -151,7 +169,31 @@ func (e *Explore) Update(ctx *Context) {
 	if !leader.Moving() {
 		e.control(ctx, arrived)
 	}
+	if n := e.notice; n != nil && (leader.Moving() || leader.Pos != n.at || leader.Facing != n.facing) {
+		e.notice = nil
+	}
 	e.updateCamera(ctx)
+}
+
+// notice is a passive message shown while the leader stays put.
+type notice struct {
+	speaker, text string
+	at            world.Pos
+	facing        world.Dir
+}
+
+// bump shows the bump message of the object at p, if it has one.
+func (e *Explore) bump(p world.Pos) {
+	id, ok := e.bumps[p]
+	if !ok {
+		return
+	}
+	l := e.party.Leader()
+	if e.notice != nil && e.notice.at == l.Pos && e.notice.facing == l.Facing {
+		return // already showing
+	}
+	start := e.dialogs[id].Nodes[e.dialogs[id].Start]
+	e.notice = &notice{speaker: start.Speaker, text: start.Lines[0], at: l.Pos, facing: l.Facing}
 }
 
 func (e *Explore) updateFade() {
@@ -207,6 +249,9 @@ func (e *Explore) tryStep(d world.Dir) bool {
 	leader.Facing = d
 	to, ok := e.w.Neighbor(leader.Pos, d)
 	if !ok || !e.walkable(to) {
+		if ok {
+			e.bump(to)
+		}
 		return false
 	}
 	e.party.Step(e.w, d, to)
@@ -321,6 +366,7 @@ func (e *Explore) talk(ctx *Context, p world.Pos) {
 	if d == nil {
 		return
 	}
+	e.notice = nil
 	ctx.Push(NewDialogBox(dialog.NewRunner(d), nil))
 }
 
@@ -369,6 +415,9 @@ func (e *Explore) Draw(dst *ebiten.Image) {
 	e.drawLayers(dst, m, false)
 	e.drawActors(dst, m)
 	e.drawLayers(dst, m, true)
+	if e.notice != nil {
+		e.drawNotice(dst)
+	}
 	if e.debug {
 		e.drawDebug(dst)
 	}
@@ -461,6 +510,25 @@ func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
 	for _, d := range ds {
 		img := e.sheets.Tile(d.a.Sprite.Sheet, d.a.Sprite.Index)
 		e.drawTile(dst, img, d.x, d.y, d.a.Facing == world.Left, false)
+	}
+}
+
+// drawNotice draws the passive message in the dialog box position, sized to
+// its text. It has no "more" marker because it needs no confirmation.
+func (e *Explore) drawNotice(dst *ebiten.Image) {
+	sw, sh := dst.Bounds().Dx(), dst.Bounds().Dy()
+	rows := gfx.Wrap(e.notice.text, sw-2*boxMargin-2*boxPad)
+	h := len(rows)*gfx.LineHeight + 2*boxPad
+	box := image.Rect(boxMargin, sh-boxMargin-h, sw-boxMargin, sh-boxMargin)
+	gfx.Box(dst, box)
+	if sp := e.notice.speaker; sp != "" {
+		tw := gfx.TextWidth(sp) + 2*boxPad
+		tag := image.Rect(box.Min.X+4, box.Min.Y-gfx.LineHeight-4, box.Min.X+4+tw, box.Min.Y+1)
+		gfx.Box(dst, tag)
+		gfx.Text(dst, sp, tag.Min.X+boxPad, tag.Min.Y+1, gfx.ColorAccent)
+	}
+	for i, row := range rows {
+		gfx.Text(dst, row, box.Min.X+boxPad, box.Min.Y+boxPad-1+i*gfx.LineHeight, gfx.ColorInk)
 	}
 }
 
