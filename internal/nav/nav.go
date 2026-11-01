@@ -60,8 +60,10 @@ type Planner struct {
 	WarpCost int
 	MaxRange int64
 
-	version uint64
-	cache   map[distKey]int
+	version  uint64
+	cache    map[distKey]int
+	costs    map[costKey]costEntry // chunk costs for long-distance corridors
+	badEdges map[edgeKey]bool      // chunk steps found to be dead ends
 }
 
 type distKey struct {
@@ -72,7 +74,8 @@ type distKey struct {
 // NewPlanner creates a planner for w.
 func NewPlanner(w *world.World) *Planner {
 	return &Planner{w: w, WarpCost: DefaultWarpCost, MaxRange: DefaultMaxRange,
-		cache: map[distKey]int{}, version: w.Version()}
+		cache: map[distKey]int{}, version: w.Version(),
+		costs: map[costKey]costEntry{}, badEdges: map[edgeKey]bool{}}
 }
 
 // Plan returns the moves of the current leg from `from` towards goal, for a
@@ -94,10 +97,24 @@ func (p *Planner) Plan(from, goal world.Pos, m Mode, blocked Blocked) (moves []M
 	m = effective(from, m)
 	if p.version != p.w.Version() || len(p.cache) > maxCache {
 		clear(p.cache)
+		clear(p.badEdges)
+		clear(p.costs)
 		p.version = p.w.Version()
+	}
+	if from.Map.IsMain() && goal.Map.IsMain() && !p.inRange(from, goal) {
+		dx, dy, _ := p.w.Delta(from, goal)
+		if geom.Abs(dx)+geom.Abs(dy) > MaxFarRange {
+			return nil, false
+		}
+		return p.planFar(from, goal, m, blocked)
 	}
 	target, warp, ok := p.firstLeg(from, goal, m)
 	if !ok {
+		if from.Map.IsMain() && goal.Map.IsMain() {
+			// Near, but the detour doesn't fit the local search window
+			// (a lake, a long fence): route through the chunk corridor.
+			return p.planFar(from, goal, m, blocked)
+		}
 		return nil, false
 	}
 	moves, _, ok = p.local(from, target, m, blocked)
@@ -228,11 +245,19 @@ func (p *Planner) local(from, to world.Pos, m Mode, blocked Blocked) ([]Move, in
 	if from == to {
 		return nil, 0, true
 	}
-	tx, ty, ok := p.w.Delta(from, to)
-	if !ok || geom.Abs(tx)+geom.Abs(ty) > p.MaxRange {
+	if _, ok := StepTicks(p.w, to, m); !ok {
 		return nil, 0, false
 	}
-	if _, ok := StepTicks(p.w, to, m); !ok {
+	return p.search(from, to, func(q world.Pos) bool { return q == to }, m, blocked)
+}
+
+// search runs A* from `from` to the first cell satisfying goal. aim is a
+// representative goal position: the search window is the box around from
+// and aim plus a margin, and the heuristic estimates the distance to aim.
+// Goal cells may be warp tiles; other warp tiles are impassable.
+func (p *Planner) search(from, aim world.Pos, goal func(world.Pos) bool, m Mode, blocked Blocked) ([]Move, int, bool) {
+	tx, ty, ok := p.w.Delta(from, aim)
+	if !ok || geom.Abs(tx)+geom.Abs(ty) > p.MaxRange {
 		return nil, 0, false
 	}
 	// Window in offsets relative to from.
@@ -263,19 +288,23 @@ func (p *Planner) local(from, to world.Pos, m Mode, blocked Blocked) ([]Move, in
 	unit := int64(m.minTicks())
 	h := func(x, y int64) int { return int((geom.Abs(x-tx) + geom.Abs(y-ty)) * unit) }
 
-	si, ti := idx(0, 0), idx(tx, ty)
+	si := idx(0, 0)
 	g[si] = 0
 	parent[si] = -1
+	found := -1
 	open := &nodeHeap{{n: si, d: h(0, 0)}}
 	for open.Len() > 0 {
 		cur := heap.Pop(open).(nodeItem)
-		if cur.n == ti {
-			break
-		}
 		cx, cy := int64(cur.n)%ww+minX, int64(cur.n)/ww+minY
 		cg := g[cur.n]
 		if int(cg)+h(cx, cy) < cur.d {
 			continue // stale entry
+		}
+		if cur.n != si {
+			if cp, _ := p.w.Offset(from, cx, cy); goal(cp) {
+				found = cur.n
+				break
+			}
 		}
 		for _, d := range world.Dirs {
 			dx, dy := d.Delta()
@@ -296,7 +325,7 @@ func (p *Planner) local(from, to world.Pos, m Mode, blocked Blocked) ([]Move, in
 			if g[ni] >= 0 && g[ni] <= ng {
 				continue
 			}
-			if ni != ti && p.w.WarpAt(np) != nil {
+			if p.w.WarpAt(np) != nil && !goal(np) {
 				continue
 			}
 			if blocked != nil && blocked(np) {
@@ -308,11 +337,11 @@ func (p *Planner) local(from, to world.Pos, m Mode, blocked Blocked) ([]Move, in
 			heap.Push(open, nodeItem{n: ni, d: int(ng) + h(nx, ny)})
 		}
 	}
-	if g[ti] < 0 {
+	if found < 0 {
 		return nil, 0, false
 	}
-	moves := make([]Move, steps[ti])
-	for i, c := len(moves)-1, ti; i >= 0; i-- {
+	moves := make([]Move, steps[found])
+	for i, c := len(moves)-1, found; i >= 0; i-- {
 		pi := int(parent[c])
 		cx, cy := int64(c)%ww+minX, int64(c)/ww+minY
 		px, py := int64(pi)%ww+minX, int64(pi)/ww+minY
@@ -320,7 +349,7 @@ func (p *Planner) local(from, to world.Pos, m Mode, blocked Blocked) ([]Move, in
 		moves[i] = Move{Dir: dirOf(cx-px, cy-py), To: to}
 		c = pi
 	}
-	return moves, int(g[ti]), true
+	return moves, int(g[found]), true
 }
 
 func dirOf(dx, dy int64) world.Dir {

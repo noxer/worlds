@@ -479,3 +479,34 @@ func TestNoJitterOnScreen(t *testing.T) {
 	swimming := func(a *entity.Actor) bool { return h.w.Terrain(a.Pos) == world.Shallow }
 	check("swimming", h.screenJitter(input.Right, 6*nav.SwimTicks, swimming))
 }
+
+// TestLongTrip sends the riding party to a spot far beyond the local
+// planning range. The scene follows the planner's stretches until arrival.
+func TestLongTrip(t *testing.T) {
+	h := newHarness(t)
+	exit := h.meadowAt(23, 9)
+	h.e.party.PlaceAll(exit, world.Right)
+	h.press(input.Ride)
+	if !h.e.riding {
+		t.Fatal("could not mount")
+	}
+	var goal world.Pos
+	for i := int64(0); i < 64; i++ {
+		q, _ := h.w.Offset(exit, 600+i, i%7)
+		if _, ok := nav.StepTicks(h.w, q, nav.Ride); ok {
+			goal = q
+			break
+		}
+	}
+	if goal == (world.Pos{}) {
+		t.Fatal("no goal found")
+	}
+	h.e.goTo(goal)
+	if !h.e.hasGoal {
+		t.Fatal("goTo refused a far goal")
+	}
+	h.runUntil("arrival", 40000, func() bool {
+		h.checkQueue()
+		return h.idle() && h.leader().Pos == goal
+	})
+}

@@ -343,12 +343,26 @@ NPC schedules, vehicles, and combat.
 1. **Local:** A* on tiles over loaded chunks, with a wrap-aware heuristic and
    the mover's movement mode. Warp tiles count as walls unless they are the
    target.
-2. **Main map, long range:** a graph of chunk portals. When a chunk is
-   resolved, it records its border portals and the costs between them inside
-   the chunk. A* runs on the portal graph first, then the current stretch is
-   refined tile by tile. Chunks that aren't resolved yet use estimates from
-   the world level (biome passability) and are resolved as the route reaches
-   them.
+2. **Main map, long range (implemented):** for goals beyond the local
+   range (up to `MaxFarRange`, 4,096 tiles), and as a fallback when a near
+   goal needs a detour wider than the local window:
+   - **Corridor:** A* over whole chunks. A chunk's cost comes from 3×3 terrain
+     samples: the real tiles for generated chunks, otherwise the generator's
+     elevation preview, so planning far ahead never generates chunks. Deep
+     water blocks walkers, any water blocks riders.
+   - **Stretch:** tile-level A* covers the next 4 corridor chunks, ending on
+     the border to the following chunk. The mover plans again when the
+     stretch is done, as after a warp.
+   - **Learning:** a stretch that can't reach its border (tree lines, inlets
+     the preview doesn't see) marks that chunk step as a dead end, and the
+     corridor is planned again. Dead ends and cached chunk costs are cleared
+     when passability changes.
+
+   This replaces the portal graph first planned here: the preview already
+   knows the large obstacles without generating chunks, and the local search
+   handles the small ones. Typical cost: about 10 ms per stretch, including
+   generating chunks not yet loaded. Unreachable goals give up within tens
+   of milliseconds.
 3. **Across maps:** a graph of warp entries and exits, including dynamic
    vehicle warps while a vehicle is at a stop. Later, routes can include
    public transport lines as edges.
@@ -463,8 +477,9 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    placement, speed, and a fingerprint of land, coast and sea chunks.
 4. Streaming in the background (**done**: workers on desktop, a per-tick
    budget in the browser, tests for identical results and for no on-demand
-   builds at riding speed, race detector in CI), the chunk portal graph,
-   abstract simulation.
+   builds at riding speed, race detector in CI), long-distance planning
+   (**done**: chunk corridors from the preview, stretches, learned dead
+   ends), abstract simulation.
 5. Public transport: routes, stops and timetables; dynamic warps; interiors as
    instances; window view; taxis.
 

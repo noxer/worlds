@@ -1,7 +1,9 @@
 package nav_test
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/noxer/worlds/internal/nav"
 	"github.com/noxer/worlds/internal/world"
@@ -70,7 +72,7 @@ func follow(t *testing.T, w *world.World, p *nav.Planner, from, goal world.Pos, 
 	var visited []world.Pos
 	cur := from
 	for legs := 0; cur != goal; legs++ {
-		if legs > 10 {
+		if legs > 60 {
 			t.Fatalf("too many legs")
 		}
 		moves, ok := p.Plan(cur, goal, nav.Foot, blocked)
@@ -185,8 +187,10 @@ func TestRangeOnOpenGround(t *testing.T) {
 	if !ok || len(moves) != 112 {
 		t.Fatalf("across the seam: ok=%v len=%d, want 112", ok, len(moves))
 	}
-	if _, ok := p.Plan(pos("main", 0, 0), pos("main", 200, 200), nav.Foot, nil); ok {
-		t.Fatal("goal beyond MaxRange should not be planned locally")
+	// Beyond MaxRange the planner returns one stretch towards the goal.
+	moves, ok = p.Plan(pos("main", 0, 0), pos("main", 200, 200), nav.Foot, nil)
+	if !ok || len(moves) == 0 || moves[len(moves)-1].To == pos("main", 200, 200) {
+		t.Fatalf("expected a partial stretch, got ok=%v len=%d", ok, len(moves))
 	}
 }
 
@@ -299,5 +303,75 @@ func TestRidingOnlyOnMainMap(t *testing.T) {
 	}
 	if _, ok := p.Plan(pos("main", 3, 2), pos("house", 3, 1), nav.Ride, nil); !ok {
 		t.Fatal("riders should be able to plan into a building (dismounting at the door)")
+	}
+}
+
+// TestFarOnOpenGround follows long-distance stretches on open ground across
+// the wrap seam, 1448 tiles in all.
+func TestFarOnOpenGround(t *testing.T) {
+	w := worldtest.Load(t, worldtest.Spec{Width: 2048, Height: 2048, Fill: '.'})
+	p := nav.NewPlanner(w)
+	from, goal := pos("main", 0, 0), pos("main", 1500, 900)
+	visited := follow(t, w, p, from, goal, nil)
+	if len(visited) != 548+900 {
+		t.Fatalf("took %d steps, want the shortest 1448", len(visited))
+	}
+}
+
+// TestFarAroundObstacle puts a 96x96 wall block on the straight line. The
+// test world has no preview, so the planner must discover the block stretch
+// by stretch and learn its way around it.
+func TestFarAroundObstacle(t *testing.T) {
+	rows := make([]string, 96)
+	for i := range rows {
+		rows[i] = strings.Repeat("#", 96)
+	}
+	w := worldtest.Load(t, worldtest.Spec{Width: 2048, Height: 2048, Fill: '.',
+		Patches: []worldtest.Map{{Name: "block", X: 320, Y: 288, Rows: rows}}})
+	p := nav.NewPlanner(w)
+	from, goal := pos("main", 100, 330), pos("main", 700, 340)
+	visited := follow(t, w, p, from, goal, nil)
+	if len(visited) < 600 || len(visited) > 900 {
+		t.Fatalf("took %d steps", len(visited))
+	}
+}
+
+// TestFarBeyondLimit refuses trips longer than MaxFarRange.
+func TestFarBeyondLimit(t *testing.T) {
+	w := worldtest.Load(t, worldtest.Spec{Width: 16384, Height: 16384, Fill: '.'})
+	p := nav.NewPlanner(w)
+	if _, ok := p.Plan(pos("main", 0, 0), pos("main", 3000, 3000), nav.Foot, nil); ok {
+		t.Fatal("planned beyond MaxFarRange")
+	}
+}
+
+// TestFarUnreachableIsQuick walls a far goal in completely. Following the
+// corridor, the planner discovers the wall and must give up quickly instead
+// of searching for long (a click on such a spot must not stall the game).
+func TestFarUnreachableIsQuick(t *testing.T) {
+	rows := []string{"#####", "#...#", "#...#", "#...#", "#####"}
+	w := worldtest.Load(t, worldtest.Spec{Width: 2048, Height: 2048, Fill: '.',
+		Patches: []worldtest.Map{{Name: "pen", X: 900, Y: 100, Rows: rows}}})
+	p := nav.NewPlanner(w)
+	goal := pos("main", 902, 102)
+	cur := pos("main", 100, 100)
+	var worst time.Duration
+	for legs := 0; legs < 50; legs++ {
+		t0 := time.Now()
+		moves, ok := p.Plan(cur, goal, nav.Foot, nil)
+		if d := time.Since(t0); d > worst {
+			worst = d
+		}
+		if !ok {
+			break
+		}
+		if legs == 49 {
+			t.Fatal("kept planning towards an unreachable goal")
+		}
+		cur = moves[len(moves)-1].To
+	}
+	t.Logf("worst planning call: %v", worst)
+	if worst > 300*time.Millisecond {
+		t.Errorf("giving up took %v", worst)
 	}
 }
