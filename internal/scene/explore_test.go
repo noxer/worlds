@@ -341,9 +341,9 @@ func TestSwimmingInShallowWater(t *testing.T) {
 		t.Fatal("leader should be swimming")
 	}
 	// Deep water cannot be entered; a notice says why.
-	h.e.party.PlaceAll(h.meadowAt(3, 14), world.Down)
-	h.hold(input.Down, 10)
-	if h.leader().Pos != h.meadowAt(3, 14) {
+	h.e.party.PlaceAll(h.meadowAt(2, 15), world.Right)
+	h.hold(input.Right, 10)
+	if h.leader().Pos != h.meadowAt(2, 15) {
 		t.Fatal("swam into deep water")
 	}
 	if h.e.notice == nil || h.e.notice.text != "The water is too deep to swim." {
@@ -472,9 +472,10 @@ func TestNoJitterOnScreen(t *testing.T) {
 	}
 	check("riding", h.screenJitter(input.Right, 12*nav.RideTicks, nil))
 
-	// Swimming across the pond (row 14 is shallow from x=1 to x=7).
+	// Swimming across the pond (row 13, its top shore, is shallow from x=1
+	// to x=7).
 	h = newHarness(t)
-	h.e.party.PlaceAll(h.meadowAt(1, 14), world.Right)
+	h.e.party.PlaceAll(h.meadowAt(1, 13), world.Right)
 	swimming := func(a *entity.Actor) bool { return h.w.Terrain(a.Pos) == world.Shallow }
 	check("swimming", h.screenJitter(input.Right, 6*nav.SwimTicks, swimming))
 }
