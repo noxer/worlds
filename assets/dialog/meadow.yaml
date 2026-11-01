@@ -1,0 +1,15 @@
+meadow_sign:
+  start: main
+  nodes:
+    main:
+      lines:
+        - "WILLOW MEADOW  -  West: Brookhaven"
+
+wanderer:
+  start: main
+  nodes:
+    main:
+      speaker: Old Wanderer
+      lines:
+        - The paths through the grove twist about.
+        - Some say the trees move when nobody is looking.
