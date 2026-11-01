@@ -608,6 +608,19 @@ const (
 
 var colorRipple = color.RGBA{0xd8, 0xf4, 0xff, 0xff}
 
+// placement returns where an actor is drawn on screen and whether it is
+// swimming. Only walkers on land hop; swimmers and riders glide, otherwise
+// the waist-deep sprite and its ripple would bob on every step.
+func (e *Explore) placement(a *entity.Actor, riding bool) (x, y int, swimming bool) {
+	swimming = e.w.Terrain(a.Pos) == world.Shallow
+	px, py := e.pixel(a)
+	if !swimming && !riding {
+		py += int64(a.Hop())
+	}
+	x, y = e.screen(a.Pos.Map, px, py)
+	return x, y, swimming
+}
+
 func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
 	sw, sh := dst.Bounds().Dx(), dst.Bounds().Dy()
 	var ds []drawable
@@ -616,13 +629,10 @@ func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
 			return
 		}
 		d := drawable{a: a, priority: priority}
-		d.swimming = e.w.Terrain(a.Pos) == world.Shallow
-		hop := a.Hop()
+		d.x, d.y, d.swimming = e.placement(a, vehicle != nil)
 		if vehicle != nil && !d.swimming {
-			d.vehicle, hop = vehicle, 0 // riding is smooth
+			d.vehicle = vehicle
 		}
-		px, py := e.pixel(a)
-		d.x, d.y = e.screen(m, px, py+int64(hop))
 		if d.x < -tile || d.y < -tile || d.x > sw || d.y > sh {
 			return
 		}
@@ -656,8 +666,7 @@ func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
 			b := img.Bounds()
 			top := img.SubImage(image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Min.Y+waterline)).(*ebiten.Image)
 			e.drawTile(dst, top, d.x, d.y+1, flip, false)
-			phase := int(ebiten.Tick()/12) % 2
-			gfx.FillRect(dst, image.Rect(d.x+2+phase, d.y+waterline+1, d.x+14-phase, d.y+waterline+2), colorRipple)
+			gfx.FillRect(dst, image.Rect(d.x+2, d.y+waterline+1, d.x+14, d.y+waterline+2), colorRipple)
 		case d.vehicle != nil:
 			e.drawTile(dst, img, d.x, d.y-riderRaise, flip, false)
 			e.drawTile(dst, d.vehicle, d.x, d.y+vehicleDrop, flip, false)

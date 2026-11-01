@@ -402,3 +402,42 @@ func TestRidingIndoorsAndThroughDoors(t *testing.T) {
 		t.Fatalf("riding indoors: riding=%v notice=%+v", h.e.riding, h.e.notice)
 	}
 }
+
+// TestSwimmersGlide swims the party across the pond and checks every
+// member's drawn position tick by tick: moving sideways, a swimmer must
+// never move vertically, and must never step back horizontally.
+func TestSwimmersGlide(t *testing.T) {
+	h := newHarness(t)
+	// Row 14 of the meadow pond is shallow from x=1 to x=7.
+	start := h.meadowAt(1, 14)
+	h.e.party.PlaceAll(start, world.Right)
+	var f input.Frame
+	f.Held[input.Right] = true
+	type pos2 struct{ x, y int }
+	last := map[int]pos2{}
+	swam := 0
+	for tick := 0; tick < 5*nav.SwimTicks; tick++ {
+		h.tick(f)
+		for i, a := range h.e.party.Members {
+			x, y, swimming := h.e.placement(a, false)
+			sx, sy := x+int(h.e.camX), y+int(h.e.camY) // in map pixels, independent of the camera
+			if !swimming {
+				delete(last, i)
+				continue
+			}
+			swam++
+			if p, ok := last[i]; ok {
+				if sy != p.y {
+					t.Fatalf("tick %d: member %d moved vertically from %d to %d while swimming sideways", tick, i, p.y, sy)
+				}
+				if sx < p.x {
+					t.Fatalf("tick %d: member %d moved back from x=%d to x=%d", tick, i, p.x, sx)
+				}
+			}
+			last[i] = pos2{sx, sy}
+		}
+	}
+	if swam == 0 {
+		t.Fatal("nobody swam")
+	}
+}
