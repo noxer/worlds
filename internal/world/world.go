@@ -182,7 +182,7 @@ func (w *World) chunk(p Pos) (c *Chunk, lx, ly int) {
 func (w *World) resolve(cx, cy int64) *Chunk {
 	c := &Chunk{}
 	if w.gen != nil {
-		w.gen.Generate(w.Seed, &ChunkBuilder{CX: cx, CY: cy, c: c})
+		w.gen.Generate(w.Seed, &ChunkBuilder{CX: cx, CY: cy, c: c, owned: w.painted, w: w.W, h: w.H})
 	}
 	for _, p := range w.patchIdx[[2]int64{cx, cy}] {
 		for ly := int64(0); ly < ChunkSize; ly++ {
@@ -203,6 +203,18 @@ func (w *World) resolve(cx, cy int64) *Chunk {
 	}
 	c.computeSolid(w.tilesets)
 	return c
+}
+
+// painted reports whether a patch paints main-map cell (x, y).
+func (w *World) painted(x, y int64) bool {
+	x, y = geom.Mod(x, w.W), geom.Mod(y, w.H)
+	for _, p := range w.patchIdx[[2]int64{geom.FloorDiv(x, ChunkSize), geom.FloorDiv(y, ChunkSize)}] {
+		px, py := geom.Mod(x-p.x, w.W), geom.Mod(y-p.y, w.H)
+		if px < p.src.w && py < p.src.h && p.src.owns(px, py) {
+			return true
+		}
+	}
+	return false
 }
 
 // CachedChunks returns the number of main-map chunks currently in memory.

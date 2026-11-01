@@ -89,3 +89,43 @@ func firstWalkable(t *testing.T, w *world.World, origin world.Pos, n int64) worl
 	t.Fatalf("no walkable tile near %v", origin)
 	return world.Pos{}
 }
+
+// TestMultiTileObjects checks that two-tile objects are always complete:
+// the bottom halves of tall trees and the well always have their top half
+// on the overhead layer above, and tops never float without a bottom. It
+// scans both patches with a margin of generated land, plus generated chunks
+// elsewhere in the world.
+func TestMultiTileObjects(t *testing.T) {
+	c := load(t)
+	w := c.World
+	ts := w.Tilesets()
+	pairs := map[world.Tile]world.Tile{} // bottom -> top
+	tops := map[world.Tile]bool{}
+	for bottom, top := range map[int]int{16: 4, 15: 3, 104: 92} {
+		b, tp := ts.MustTile("tinytown", bottom), ts.MustTile("tinytown", top)
+		pairs[b], tops[tp] = tp, true
+	}
+	check := func(origin world.Pos, wdt, hgt int64) {
+		for y := int64(0); y < hgt; y++ {
+			for x := int64(0); x < wdt; x++ {
+				p, _ := w.Offset(origin, x, y)
+				above, _ := w.Offset(p, 0, -1)
+				below, _ := w.Offset(p, 0, 1)
+				if top, ok := pairs[w.Tile(p, world.LayerDeco)]; ok && w.Tile(above, world.LayerOverhead) != top {
+					t.Errorf("%v: bottom half without its top above", p)
+				}
+				if ov := w.Tile(p, world.LayerOverhead); tops[ov] {
+					if pairs[w.Tile(below, world.LayerDeco)] != ov {
+						t.Errorf("%v: top half without its bottom below", p)
+					}
+				}
+			}
+		}
+	}
+	town, _ := w.PatchOrigin("town")
+	start, _ := w.Offset(town, -10, -10)
+	check(start, 30+24+30, 20+8+20) // town, meadow and surroundings
+	for _, ch := range [][2]int64{{0, 0}, {12345, 6789}, {32767, 16383}} {
+		check(world.Pos{Map: world.Main, X: ch[0] * world.ChunkSize, Y: ch[1] * world.ChunkSize}, 2*world.ChunkSize, 2*world.ChunkSize)
+	}
+}

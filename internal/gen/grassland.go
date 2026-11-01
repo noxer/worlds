@@ -3,11 +3,21 @@ package gen
 import "github.com/noxer/worlds/internal/world"
 
 // Grassland is a placeholder generator until the biome generators exist:
-// grass with flowers and scattered trees, using Tiny Town tiles.
+// grass with flowers, bushes, small trees and tall two-tile trees, using Tiny
+// Town tiles.
 type Grassland struct {
 	grass, grass2, flowers world.Tile
-	trees                  []world.Tile
+	trees                  []tree
 }
+
+// tree is a single-tile tree, or a tall tree whose top goes on the overhead
+// layer one tile above (the party can walk behind it). small is used instead
+// of a tall tree when there is no room for its top.
+type tree struct {
+	bottom, top, small world.Tile
+}
+
+func (t tree) tall() bool { return !t.top.Empty() }
 
 // NewGrassland creates the grassland generator.
 func NewGrassland(ts *world.Tilesets) (world.Generator, error) {
@@ -21,8 +31,35 @@ func NewGrassland(ts *world.Tilesets) (world.Generator, error) {
 		return t
 	}
 	g.grass, g.grass2, g.flowers = tile(0), tile(1), tile(2)
-	g.trees = []world.Tile{tile(16), tile(28), tile(16), tile(5), tile(27)}
+	g.trees = []tree{
+		{bottom: tile(16), top: tile(4), small: tile(28)}, // tall green
+		{bottom: tile(16), top: tile(4), small: tile(28)},
+		{bottom: tile(15), top: tile(3), small: tile(27)}, // tall orange
+		{bottom: tile(28)}, // small green
+		{bottom: tile(27)}, // small orange
+		{bottom: tile(5)},  // bush
+	}
 	return g, err
+}
+
+// treeAt returns the tree rooted at (x, y), if any. A tall tree needs both
+// its cells free of patches; otherwise it is replaced by its small variant.
+// The decision depends only on the seed, the coordinates and the patches,
+// so neighbouring chunks agree about trees whose top crosses their border.
+func (g *Grassland) treeAt(seed uint64, b *world.ChunkBuilder, x, y int64) (bottom, top world.Tile, ok bool) {
+	x, y = b.Wrap(x, y)
+	h := Hash(seed, x, y)
+	if (h>>16)%100 >= 6 {
+		return 0, 0, false
+	}
+	t := g.trees[(h>>32)%uint64(len(g.trees))]
+	if !t.tall() {
+		return t.bottom, 0, true
+	}
+	if ax, ay := b.Wrap(x, y-1); b.Painted(x, y) || b.Painted(ax, ay) {
+		return t.small, 0, true
+	}
+	return t.bottom, t.top, true
 }
 
 // Generate implements world.Generator.
@@ -30,8 +67,7 @@ func (g *Grassland) Generate(seed uint64, b *world.ChunkBuilder) {
 	for ly := 0; ly < world.ChunkSize; ly++ {
 		for lx := 0; lx < world.ChunkSize; lx++ {
 			x, y := b.CX*world.ChunkSize+int64(lx), b.CY*world.ChunkSize+int64(ly)
-			h := Hash(seed, x, y)
-			switch r := h % 100; {
+			switch r := Hash(seed, x, y) % 100; {
 			case r < 4:
 				b.Set(world.LayerGround, lx, ly, g.flowers)
 			case r < 22:
@@ -39,8 +75,12 @@ func (g *Grassland) Generate(seed uint64, b *world.ChunkBuilder) {
 			default:
 				b.Set(world.LayerGround, lx, ly, g.grass)
 			}
-			if (h>>16)%100 < 6 {
-				b.Set(world.LayerDeco, lx, ly, g.trees[(h>>32)%uint64(len(g.trees))])
+			if bottom, _, ok := g.treeAt(seed, b, x, y); ok {
+				b.Set(world.LayerDeco, lx, ly, bottom)
+			}
+			// The top of a tall tree rooted one tile below.
+			if _, top, ok := g.treeAt(seed, b, x, y+1); ok && !top.Empty() {
+				b.Set(world.LayerOverhead, lx, ly, top)
 			}
 		}
 	}

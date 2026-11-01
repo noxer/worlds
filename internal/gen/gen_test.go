@@ -30,7 +30,7 @@ func TestFingerprint(t *testing.T) {
 			}
 		}
 	}
-	const want = 0x5eb68ad07c8cfd7a
+	const want = 0xfcc7917057071216
 	if got := h.Sum64(); got != want {
 		t.Errorf("fingerprint = %#x, want %#x", got, uint64(want))
 	}

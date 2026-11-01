@@ -1,6 +1,10 @@
 package world
 
-import "container/list"
+import (
+	"container/list"
+
+	"github.com/noxer/worlds/internal/geom"
+)
 
 const chunkCells = ChunkSize * ChunkSize
 
@@ -27,7 +31,25 @@ type ChunkBuilder struct {
 	// main-map position (CX*ChunkSize+lx, CY*ChunkSize+ly).
 	CX, CY int64
 	c      *Chunk
+	owned  func(x, y int64) bool
+	w, h   int64
 }
+
+// Wrap normalises main-map coordinates. Generators must wrap the coordinates
+// of neighbouring cells they look at, or features at the world's seams come
+// out differently on both sides.
+func (b *ChunkBuilder) Wrap(x, y int64) (int64, int64) {
+	if b.w <= 0 {
+		return x, y
+	}
+	return geom.Mod(x, b.w), geom.Mod(y, b.h)
+}
+
+// Painted reports whether a hand-made patch paints the main-map cell (x, y),
+// which may lie outside this chunk. Painted cells replace generated ones, so
+// generators use this to keep multi-tile features (tall trees, later
+// buildings) from being cut in half at a patch's border.
+func (b *ChunkBuilder) Painted(x, y int64) bool { return b.owned != nil && b.owned(x, y) }
 
 // Set places tile t at local coordinates in a layer.
 func (b *ChunkBuilder) Set(layer, lx, ly int, t Tile) { b.c.layers[layer][ly*ChunkSize+lx] = t }

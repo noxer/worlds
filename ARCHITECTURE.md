@@ -143,6 +143,15 @@ is computed for the whole planet up front.
    - A chunk reads only levels 1–2 and the patches, so chunks can be
      generated in any order, in the background.
 
+**Multi-tile features.** Some art spans several tiles: tall trees and the
+well have a top half on the overhead layer one tile above the bottom half.
+Patches must paint both halves. Generators decide such features from the
+coordinates of their root cell, wrap every neighbouring coordinate they look
+at (`ChunkBuilder.Wrap`), and check `ChunkBuilder.Painted` so that a feature
+never gets cut in half by a patch: where there isn't room, the generator uses
+a one-tile variant instead. The content test checks that every half has its
+partner.
+
 Generators are registered per biome (`ocean`, `desert`, `forest`, …). Each is a
 small Go type with tests for determinism, connectivity, and "never overwrites
 patch cells".
