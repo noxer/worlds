@@ -16,8 +16,18 @@ const MaxFollowers = 5
 // its step before the leader takes the next one.
 const FollowDelay = 3
 
-// followDelay scales FollowDelay to a step of the given duration.
-func followDelay(ticks int) int { return max(1, FollowDelay*ticks/StepTicks) }
+// followDelay scales FollowDelay to a step of the given duration. Actors move
+// whole pixels, so at speeds that are not a whole number of pixels per tick
+// (swimming: 16 px in 24 ticks) positions advance in a rhythm such as
+// 1, 1, 0. The delay must cover a whole number of pixels, or followers drift a
+// pixel back and forth against the leader (and the camera following it).
+func followDelay(ticks int) int {
+	d := max(1, FollowDelay*ticks/StepTicks)
+	for d > 1 && d*world.TileSize%ticks != 0 {
+		d--
+	}
+	return d
+}
 
 // ErrPartyFull is returned when adding more than MaxFollowers companions.
 var ErrPartyFull = errors.New("party is full")

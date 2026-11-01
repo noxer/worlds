@@ -403,41 +403,78 @@ func TestRidingIndoorsAndThroughDoors(t *testing.T) {
 	}
 }
 
-// TestSwimmersGlide swims the party across the pond and checks every
-// member's drawn position tick by tick: moving sideways, a swimmer must
-// never move vertically, and must never step back horizontally.
-func TestSwimmersGlide(t *testing.T) {
-	h := newHarness(t)
-	// Row 14 of the meadow pond is shallow from x=1 to x=7.
-	start := h.meadowAt(1, 14)
-	h.e.party.PlaceAll(start, world.Right)
+// screenJitter moves the party in direction d for several steps and counts,
+// per member, how often its on-screen position along the direction of travel
+// reverses. A smooth queue drifts at most once or twice (when the party sets
+// off and stops); jitter reverses every few ticks.
+func (h *harness) screenJitter(d input.Action, ticks int, only func(*entity.Actor) bool) []int {
+	h.t.Helper()
 	var f input.Frame
-	f.Held[input.Right] = true
-	type pos2 struct{ x, y int }
-	last := map[int]pos2{}
-	swam := 0
-	for tick := 0; tick < 5*nav.SwimTicks; tick++ {
+	f.Held[d] = true
+	flips := make([]int, len(h.e.party.Members))
+	last := make([]int, len(h.e.party.Members))
+	dir := make([]int, len(h.e.party.Members))
+	seen := make([]bool, len(h.e.party.Members))
+	for tick := 0; tick < ticks; tick++ {
 		h.tick(f)
 		for i, a := range h.e.party.Members {
-			x, y, swimming := h.e.placement(a, false)
-			sx, sy := x+int(h.e.camX), y+int(h.e.camY) // in map pixels, independent of the camera
-			if !swimming {
-				delete(last, i)
+			if only != nil && !only(a) {
+				seen[i] = false
 				continue
 			}
-			swam++
-			if p, ok := last[i]; ok {
-				if sy != p.y {
-					t.Fatalf("tick %d: member %d moved vertically from %d to %d while swimming sideways", tick, i, p.y, sy)
-				}
-				if sx < p.x {
-					t.Fatalf("tick %d: member %d moved back from x=%d to x=%d", tick, i, p.x, sx)
-				}
+			x, y, _ := h.e.placement(a, h.e.riding)
+			v := x
+			if d == input.Up || d == input.Down {
+				v = y
 			}
-			last[i] = pos2{sx, sy}
+			if seen[i] && v != last[i] {
+				s := 1
+				if v < last[i] {
+					s = -1
+				}
+				if dir[i] != 0 && s != dir[i] {
+					flips[i]++
+				}
+				dir[i] = s
+			}
+			last[i], seen[i] = v, true
 		}
 	}
-	if swam == 0 {
-		t.Fatal("nobody swam")
+	return flips
+}
+
+// TestNoJitterOnScreen checks walking, swimming and riding: party members
+// must not wobble back and forth on screen while the camera follows the
+// leader. That needs the follow delay to be a whole number of pixels' worth
+// of ticks at every speed.
+func TestNoJitterOnScreen(t *testing.T) {
+	check := func(name string, flips []int) {
+		t.Helper()
+		for i, n := range flips {
+			if n > 2 {
+				t.Errorf("%s: member %d reversed on screen %d times", name, i, n)
+			}
+		}
 	}
+	// Walking along the town street.
+	h := newHarness(t)
+	town, _ := h.w.PatchOrigin("town")
+	street, _ := h.w.Offset(town, 4, 9)
+	h.e.party.PlaceAll(street, world.Right)
+	check("walking", h.screenJitter(input.Right, 8*nav.WalkTicks, nil))
+
+	// Riding along the same street.
+	h = newHarness(t)
+	h.e.party.PlaceAll(street, world.Right)
+	h.press(input.Ride)
+	if !h.e.riding {
+		t.Fatal("could not mount")
+	}
+	check("riding", h.screenJitter(input.Right, 12*nav.RideTicks, nil))
+
+	// Swimming across the pond (row 14 is shallow from x=1 to x=7).
+	h = newHarness(t)
+	h.e.party.PlaceAll(h.meadowAt(1, 14), world.Right)
+	swimming := func(a *entity.Actor) bool { return h.w.Terrain(a.Pos) == world.Shallow }
+	check("swimming", h.screenJitter(input.Right, 6*nav.SwimTicks, swimming))
 }
