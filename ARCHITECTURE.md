@@ -188,14 +188,19 @@ Untouched chunks cost nothing, because they are regenerated from the seed.
 
 ## Terrain and movement
 
+**Terrain.** Each tile in a tileset can declare `terrain: shallow` or
+`terrain: deep` (anything else is land). The ground layer's tile gives a
+cell its terrain; solid tiles still block independently.
+
 **Movement modes.** Passability depends on the terrain of a cell and the
-movement mode of the mover:
+movement mode of the mover (implemented in `nav`, where step durations
+double as path costs, so routes are the fastest ones, not the shortest):
 
 | Mode | Can enter | Notes |
 |---|---|---|
-| walk | land terrain | |
-| swim | shallow water only | entered by walking into shallow water |
-| ride | land terrain, outdoors only | bicycle or scooter: the player's only own vehicles; faster; the whole party rides; mounting and dismounting are instant |
+| walk | land terrain | 16 ticks per tile |
+| swim | shallow water only | 24 ticks; entered by walking into shallow water; deep water shows "too deep" |
+| ride | land terrain, main map only | 8 ticks; bicycle or scooter, the player's only own vehicles; toggled with R or by clicking the leader; the whole party rides; everyone dismounts at doors; clicking a target that needs walking or swimming dismounts first |
 | passenger | none | travelling in public transport (see Vehicles) |
 
 **Blockers.** Static collision comes from tiles. Dynamic blockers (doors,
@@ -376,8 +381,11 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    seam. Rendering is camera-relative. Fingerprint test for the generator.
    Still to come in this area: `tiled/` split from `world/`, and
    resolving chunks in the background (step 4).
-2. Terrain types and movement modes: swimming (shallow water), riding
-   (bicycle, scooter).
+2. **Done.** Terrain types (tileset property) and movement modes: swimming
+   in shallow water, riding (bicycle, scooter) with faster steps. Followers
+   scale their follow delay to the step speed. Art: Kenney Tiny Battle for
+   water and shores; the project's own sheet `worlds.png` (deep water,
+   placeholder bicycle and scooter).
 3. Generation levels 1–3, tileable noise, autotiler, fingerprint tests. The
    first ocean biome, with a fixed and a pool island. Needs water art (a
    placeholder sheet until a pack is chosen).
@@ -419,4 +427,7 @@ together with the world seed.
 
 ## Open questions
 
-- Art for water, coastlines, rails, vehicles and riding sprites.
+- Art: proper deep water with transitions to shallow water, rails, public
+  transport vehicles, and riding sprites (the bicycle and scooter are
+  placeholders drawn for this project). Owning bikes (inventory) is not
+  modelled yet: the party can always ride.

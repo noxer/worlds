@@ -60,7 +60,8 @@ type Explore struct {
 	waiting  int
 
 	turnWait int
-	fade     int // >0 fading out, <0 fading in
+	riding   bool // the party rides bicycles and scooters
+	fade     int  // >0 fading out, <0 fading in
 	warp     *world.Warp
 
 	// Camera: top-left pixel of the view in the coordinates of the leader's
@@ -137,7 +138,59 @@ func (e *Explore) npcAt(p world.Pos) *NPC {
 
 func (e *Explore) blocked(p world.Pos) bool { return e.npcAt(p) != nil }
 
-func (e *Explore) walkable(p world.Pos) bool { return !e.w.Solid(p) && !e.blocked(p) }
+// mode is how the party currently travels.
+func (e *Explore) mode() nav.Mode {
+	if e.riding {
+		return nav.Ride
+	}
+	return nav.Foot
+}
+
+// enterable reports whether the party can step onto p in its current mode,
+// ignoring NPCs.
+func (e *Explore) enterable(p world.Pos) bool {
+	_, ok := nav.StepTicks(e.w, p, e.mode())
+	return ok
+}
+
+func (e *Explore) walkable(p world.Pos) bool { return e.enterable(p) && !e.blocked(p) }
+
+// ticksFor returns the duration of a party member's step onto p. Members
+// still in the water when the party mounts swim until they reach land.
+func (e *Explore) ticksFor(p world.Pos) int {
+	if t, ok := nav.StepTicks(e.w, p, e.mode()); ok {
+		return t
+	}
+	if t, ok := nav.StepTicks(e.w, p, nav.Foot); ok {
+		return t
+	}
+	return entity.StepTicks
+}
+
+// setRiding mounts or dismounts the party. Mounting is only possible on land
+// on the main map; otherwise a notice explains why.
+func (e *Explore) setRiding(on bool) {
+	if !on {
+		e.riding = false
+		return
+	}
+	l := e.party.Leader()
+	switch {
+	case !l.Pos.Map.IsMain():
+		e.say("You can't ride indoors.")
+	case !nav.CanRide(e.w, l.Pos):
+		e.say("You can't ride here.")
+	default:
+		e.riding = true
+		e.notice = nil
+	}
+}
+
+// say shows a passive notice that disappears when the party moves or turns.
+func (e *Explore) say(text string) {
+	l := e.party.Leader()
+	e.notice = &notice{text: text, at: l.Pos, facing: l.Facing}
+}
 
 // Update implements Scene.
 func (e *Explore) Update(ctx *Context) {
@@ -167,6 +220,10 @@ func (e *Explore) Update(ctx *Context) {
 		}
 	}
 	if !leader.Moving() {
+		if in.Pressed(input.Ride) {
+			e.cancelPath()
+			e.setRiding(!e.riding)
+		}
 		e.control(ctx, arrived)
 	}
 	if n := e.notice; n != nil && (leader.Moving() || leader.Pos != n.at || leader.Facing != n.facing) {
@@ -206,6 +263,7 @@ func (e *Explore) updateFade() {
 				facing = e.warp.Facing
 			}
 			e.party.PlaceAll(e.warp.To, facing)
+			e.riding = false // everyone gets off at a door
 			e.warp = nil
 			e.path = nil // the next leg is planned from the new position
 			e.fade = -fadeTicks
@@ -249,12 +307,20 @@ func (e *Explore) tryStep(d world.Dir) bool {
 	leader.Facing = d
 	to, ok := e.w.Neighbor(leader.Pos, d)
 	if !ok || !e.walkable(to) {
+		if ok && !e.w.Solid(to) && !e.blocked(to) {
+			switch t := e.w.Terrain(to); {
+			case e.riding && t.IsWater():
+				e.say("You can't ride into the water.")
+			case t == world.Deep:
+				e.say("The water is too deep to swim.")
+			}
+		}
 		if ok {
 			e.bump(to)
 		}
 		return false
 	}
-	e.party.Step(e.w, d, to)
+	e.party.Step(e.w, d, to, e.ticksFor)
 	return true
 }
 
@@ -266,44 +332,81 @@ func (e *Explore) cancelPath() {
 func (e *Explore) tapAt(p image.Point) {
 	m := e.party.Leader().Pos.Map
 	tx, ty := geom.FloorDiv(e.camX+int64(p.X), tile), geom.FloorDiv(e.camY+int64(p.Y), tile)
-	if target, ok := e.w.Normalize(world.Pos{Map: m, X: tx, Y: ty}); ok {
-		e.goTo(target)
+	target, ok := e.w.Normalize(world.Pos{Map: m, X: tx, Y: ty})
+	if !ok {
+		return
 	}
+	if l := e.party.Leader(); target == l.Pos && !l.Moving() {
+		// Tapping the leader gets on or off the bikes.
+		e.cancelPath()
+		e.setRiding(!e.riding)
+		return
+	}
+	e.goTo(target)
 }
 
 // goTo walks the party to target, which may be anywhere in the world: the
 // planner routes across map edges and through warps. If target holds an NPC
-// or a sign, the party walks next to it and talks.
+// or a sign, the party walks next to it and talks. When riding and the
+// target can only be reached on foot (water, a swim on the way), the party
+// gets off the bikes first.
 func (e *Explore) goTo(target world.Pos) {
-	leader := e.party.Leader()
 	e.cancelPath()
+	if e.tryGoTo(target) || !e.riding {
+		return
+	}
+	e.riding = false
+	if !e.tryGoTo(target) {
+		e.riding = true
+	}
+}
+
+// canArrive reports whether the party can end a trip on p: free of NPCs and
+// enterable in the mode it will arrive in. On another map that is on foot,
+// since the party dismounts at the door on the way.
+func (e *Explore) canArrive(p world.Pos) bool {
+	m := e.mode()
+	if p.Map != e.party.Leader().Pos.Map {
+		m = nav.Foot
+	}
+	_, ok := nav.StepTicks(e.w, p, m)
+	return ok && !e.blocked(p)
+}
+
+// tryGoTo sets target as the goal if it is reachable in the current mode.
+func (e *Explore) tryGoTo(target world.Pos) bool {
+	leader := e.party.Leader()
 	_, isSign := e.signs[target]
 	if e.npcAt(target) != nil || isSign {
 		// Walk to the closest free neighbour, then interact.
 		best, bestLen := world.Pos{}, -1
 		for _, d := range world.Dirs {
 			n, ok := e.w.Neighbor(target, d)
-			if !ok || !e.walkable(n) || e.w.WarpAt(n) != nil {
+			if !ok || !e.canArrive(n) || e.w.WarpAt(n) != nil {
 				continue
 			}
 			if n == leader.Pos {
 				best, bestLen = n, 0
 				break
 			}
-			if moves, ok := e.planner.Plan(leader.Pos, n, e.blocked); ok && (bestLen < 0 || len(moves) < bestLen) {
+			if moves, ok := e.planner.Plan(leader.Pos, n, e.mode(), e.blocked); ok && (bestLen < 0 || len(moves) < bestLen) {
 				best, bestLen = n, len(moves)
 			}
 		}
 		if bestLen < 0 {
-			return
+			return false
 		}
 		e.goal, e.hasGoal, e.interact = best, true, &target
-		return
+		return true
 	}
-	if !e.walkable(target) {
-		return
+	if !e.canArrive(target) {
+		return false
+	}
+	if _, ok := e.planner.Plan(leader.Pos, target, e.mode(), e.blocked); !ok {
+		return false
 	}
 	e.goal, e.hasGoal = target, true
+	return true
 }
 
 func (e *Explore) followPath(ctx *Context) {
@@ -325,7 +428,7 @@ func (e *Explore) followPath(ctx *Context) {
 		return
 	}
 	if len(e.path) == 0 {
-		moves, ok := e.planner.Plan(leader.Pos, e.goal, e.blocked)
+		moves, ok := e.planner.Plan(leader.Pos, e.goal, e.mode(), e.blocked)
 		if !ok || len(moves) == 0 {
 			e.cancelPath()
 			return
@@ -335,6 +438,10 @@ func (e *Explore) followPath(ctx *Context) {
 	m := e.path[0]
 	if next, ok := e.w.Neighbor(leader.Pos, m.Dir); !ok || next != m.To {
 		e.path = nil // out of sync, replan next tick
+		return
+	}
+	if !e.enterable(m.To) {
+		e.path = nil // the mode changed; replan
 		return
 	}
 	if !e.walkable(m.To) {
@@ -348,7 +455,7 @@ func (e *Explore) followPath(ctx *Context) {
 	}
 	e.waiting = 0
 	e.path = e.path[1:]
-	e.party.Step(e.w, m.Dir, m.To)
+	e.party.Step(e.w, m.Dir, m.To, e.ticksFor)
 }
 
 // talk starts the conversation with whoever or whatever is at p.
@@ -479,27 +586,54 @@ type drawable struct {
 	a        *entity.Actor
 	x, y     int // screen position
 	priority int
+	swimming bool
+	vehicle  int // tile of the bicycle or scooter in the "worlds" sheet; 0 = none
 }
+
+// Tiles of the project's own sheet (assets/tiles/worlds.png).
+const (
+	sheetWorlds = "worlds"
+	tileBicycle = 1
+	tileScooter = 2
+	waterline   = 11 // rows of a swimmer's sprite that show above the water
+	riderRaise  = 2  // riders sit a little higher, on the saddle
+	vehicleDrop = 3  // and the vehicle shows below them
+)
+
+var colorRipple = color.RGBA{0xd8, 0xf4, 0xff, 0xff}
 
 func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
 	sw, sh := dst.Bounds().Dx(), dst.Bounds().Dy()
 	var ds []drawable
-	add := func(a *entity.Actor, priority int) {
+	add := func(a *entity.Actor, priority, vehicle int) {
 		if a.Pos.Map != m {
 			return
 		}
+		d := drawable{a: a, priority: priority}
+		d.swimming = e.w.Terrain(a.Pos) == world.Shallow
+		hop := a.Hop()
+		if vehicle != 0 && !d.swimming {
+			d.vehicle, hop = vehicle, 0 // riding is smooth
+		}
 		px, py := e.pixel(a)
-		x, y := e.screen(m, px, py+int64(a.Hop()))
-		if x < -tile || y < -tile || x > sw || y > sh {
+		d.x, d.y = e.screen(m, px, py+int64(hop))
+		if d.x < -tile || d.y < -tile || d.x > sw || d.y > sh {
 			return
 		}
-		ds = append(ds, drawable{a, x, y, priority})
+		ds = append(ds, d)
 	}
 	for _, n := range e.npcs {
-		add(&n.Actor, 0)
+		add(&n.Actor, 0, 0)
 	}
 	for i, a := range e.party.Members {
-		add(a, len(e.party.Members)-i) // leader on top when stacked after a warp
+		vehicle := 0
+		if e.riding {
+			vehicle = tileBicycle
+			if i%2 == 1 {
+				vehicle = tileScooter
+			}
+		}
+		add(a, len(e.party.Members)-i, vehicle) // leader on top when stacked after a warp
 	}
 	sort.SliceStable(ds, func(i, j int) bool {
 		if ds[i].y != ds[j].y {
@@ -509,7 +643,21 @@ func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
 	})
 	for _, d := range ds {
 		img := e.sheets.Tile(d.a.Sprite.Sheet, d.a.Sprite.Index)
-		e.drawTile(dst, img, d.x, d.y, d.a.Facing == world.Left, false)
+		flip := d.a.Facing == world.Left
+		switch {
+		case d.swimming && img != nil:
+			// Only the upper body shows above the water, with a ripple.
+			b := img.Bounds()
+			top := img.SubImage(image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Min.Y+waterline)).(*ebiten.Image)
+			e.drawTile(dst, top, d.x, d.y+1, flip, false)
+			phase := int(ebiten.Tick()/12) % 2
+			gfx.FillRect(dst, image.Rect(d.x+2+phase, d.y+waterline+1, d.x+14-phase, d.y+waterline+2), colorRipple)
+		case d.vehicle != 0:
+			e.drawTile(dst, img, d.x, d.y-riderRaise, flip, false)
+			e.drawTile(dst, e.sheets.Tile(sheetWorlds, d.vehicle), d.x, d.y+vehicleDrop, flip, false)
+		default:
+			e.drawTile(dst, img, d.x, d.y, flip, false)
+		}
 	}
 }
 

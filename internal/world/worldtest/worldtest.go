@@ -13,7 +13,7 @@ import (
 // Map describes a patch or detail map. Rows use '.' for floor and '#' for
 // walls; ' ' leaves a patch cell unpainted (generated). 'T' is the lower part
 // of a two-tile tree (solid), 't' its upper part on the overhead layer above
-// a floor cell.
+// a floor cell. 'w' is shallow water, 'W' deep water.
 type Map struct {
 	Name   string
 	X, Y   int64 // patch origin on the main map (ignored for detail maps)
@@ -63,14 +63,18 @@ func (s Spec) Config() (fstest.MapFS, world.Config) {
 		fsys[name] = &fstest.MapFile{Data: b}
 	}
 	put("tilesets/test.tsj", map[string]any{
-		"name": "test", "tilewidth": 16, "tileheight": 16, "tilecount": 4, "columns": 4,
-		"image": "test.png", "imagewidth": 64, "imageheight": 16,
+		"name": "test", "tilewidth": 16, "tileheight": 16, "tilecount": 6, "columns": 6,
+		"image": "test.png", "imagewidth": 96, "imageheight": 16,
 		"tiles": []any{
 			map[string]any{"id": 1, "properties": []any{
 				map[string]any{"name": "solid", "type": "bool", "value": true}}},
 			map[string]any{"id": 2, "properties": []any{
 				map[string]any{"name": "solid", "type": "bool", "value": true},
 				map[string]any{"name": "above", "type": "int", "value": 3}}},
+			map[string]any{"id": 4, "properties": []any{
+				map[string]any{"name": "terrain", "type": "string", "value": "shallow"}}},
+			map[string]any{"id": 5, "properties": []any{
+				map[string]any{"name": "terrain", "type": "string", "value": "deep"}}},
 		},
 	})
 	tmj := func(m Map) map[string]any {
@@ -93,6 +97,10 @@ func (s Spec) Config() (fstest.MapFS, world.Config) {
 				case 't':
 					data = append(data, 1)
 					o = 4
+				case 'w':
+					data = append(data, 5)
+				case 'W':
+					data = append(data, 6)
 				default:
 					data = append(data, 1)
 				}

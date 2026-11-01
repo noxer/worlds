@@ -12,16 +12,19 @@ const chunkCells = ChunkSize * ChunkSize
 // state (blockers, later puzzle state and save deltas) is kept separately and
 // survives cache eviction.
 type Chunk struct {
-	layers [NumLayers][chunkCells]Tile
-	solid  [chunkCells]bool
+	layers  [NumLayers][chunkCells]Tile
+	solid   [chunkCells]bool
+	terrain [chunkCells]Terrain
 }
 
 // Tile returns the tile at local coordinates in a layer.
 func (c *Chunk) Tile(layer, lx, ly int) Tile { return c.layers[layer][ly*ChunkSize+lx] }
 
-func (c *Chunk) computeSolid(ts *Tilesets) {
+// computeDerived fills collision and terrain from the tiles.
+func (c *Chunk) computeDerived(ts *Tilesets) {
 	for i := range c.solid {
 		c.solid[i] = ts.Solid(c.layers[LayerGround][i]) || ts.Solid(c.layers[LayerDeco][i])
+		c.terrain[i] = ts.Terrain(c.layers[LayerGround][i])
 	}
 }
 

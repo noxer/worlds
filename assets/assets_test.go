@@ -25,7 +25,7 @@ func reachable(w *world.World, p *nav.Planner, from, goal world.Pos) bool {
 		if cur == goal {
 			return true
 		}
-		moves, ok := p.Plan(cur, goal, nil)
+		moves, ok := p.Plan(cur, goal, nav.Foot, nil)
 		if !ok || len(moves) == 0 {
 			return false
 		}

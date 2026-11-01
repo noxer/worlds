@@ -17,6 +17,15 @@ type Tileset struct {
 	solid     []bool
 	above     []int  // index of the tile that belongs one tile above, or -1
 	isTop     []bool // tile is the upper part of a multi-tile object
+	terrain   []Terrain
+}
+
+// Terrain returns the terrain of tile i (property "terrain"; default land).
+func (t *Tileset) Terrain(i int) Terrain {
+	if i < 0 || i >= len(t.terrain) {
+		return Land
+	}
+	return t.terrain[i]
 }
 
 // Solid reports whether tile index i blocks movement.
@@ -119,6 +128,14 @@ func (ts *Tilesets) Above(t Tile) (Tile, bool) {
 	return makeTile(t.Set(), i, t.FlipH(), t.FlipV()), true
 }
 
+// Terrain returns the terrain of a ground tile (land for empty cells).
+func (ts *Tilesets) Terrain(t Tile) Terrain {
+	if t.Empty() {
+		return Land
+	}
+	return ts.list[t.Set()].Terrain(t.Index())
+}
+
 // IsTop reports whether t is the upper part of a multi-tile object.
 func (ts *Tilesets) IsTop(t Tile) bool {
 	return !t.Empty() && ts.list[t.Set()].IsTop(t.Index())
@@ -169,6 +186,7 @@ func (ts *Tilesets) load(fsys fs.FS, name string) (int, error) {
 		solid:     make([]bool, tt.TileCount),
 		above:     make([]int, tt.TileCount),
 		isTop:     make([]bool, tt.TileCount),
+		terrain:   make([]Terrain, tt.TileCount),
 	}
 	for i := range set.above {
 		set.above[i] = -1
@@ -179,6 +197,11 @@ func (ts *Tilesets) load(fsys fs.FS, name string) (int, error) {
 		}
 		props := toProps(t.Properties)
 		set.solid[t.ID] = props.Bool("solid")
+		terrain, err := ParseTerrain(props.String("terrain"))
+		if err != nil {
+			return 0, fmt.Errorf("%s: tile %d: %w", name, t.ID, err)
+		}
+		set.terrain[t.ID] = terrain
 		if a := props.Int("above", -1); a >= 0 {
 			if a >= tt.TileCount || a == t.ID {
 				return 0, fmt.Errorf("%s: tile %d: property above=%d is not another tile of this set", name, t.ID, a)

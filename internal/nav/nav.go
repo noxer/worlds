@@ -4,6 +4,10 @@
 //
 // Planning is hierarchical:
 //
+// Costs are travel times in ticks, which depend on the terrain and the
+// mover's Mode (walking, swimming, riding). Paths are the fastest routes, not
+// the ones with the fewest tiles.
+//
 //  1. Within one map, A* runs on the tile grid inside a window around start
 //     and goal (the main map is far too big to search as a whole). Coordinates
 //     in the window are offsets from the start, so the seam is invisible.
@@ -39,8 +43,9 @@ type Move struct {
 type Blocked func(world.Pos) bool
 
 const (
-	// DefaultWarpCost is the cost of using a warp, in steps.
-	DefaultWarpCost = 8
+	// DefaultWarpCost is the cost of using a warp, in ticks (about the time
+	// of the fade plus a few steps).
+	DefaultWarpCost = 8 * WalkTicks
 	// DefaultMaxRange is the largest Manhattan distance a local search covers.
 	DefaultMaxRange = 256
 	// margin is how far the search window extends beyond start and goal.
@@ -56,16 +61,22 @@ type Planner struct {
 	MaxRange int64
 
 	version uint64
-	cache   map[[2]world.Pos]int
+	cache   map[distKey]int
+}
+
+type distKey struct {
+	from, to world.Pos
+	mode     Mode
 }
 
 // NewPlanner creates a planner for w.
 func NewPlanner(w *world.World) *Planner {
 	return &Planner{w: w, WarpCost: DefaultWarpCost, MaxRange: DefaultMaxRange,
-		cache: map[[2]world.Pos]int{}, version: w.Version()}
+		cache: map[distKey]int{}, version: w.Version()}
 }
 
-// Plan returns the moves of the current leg from `from` towards goal: either
+// Plan returns the moves of the current leg from `from` towards goal, for a
+// mover in mode m (after a warp, movers are always on foot): either
 // all moves to goal, or the moves up to and including the step onto the first
 // warp of the route (that move has Warp set). ok is false if goal is
 // unreachable within range.
@@ -73,24 +84,25 @@ func NewPlanner(w *world.World) *Planner {
 // The leg avoids dynamic blockers if possible. If blockers cut it off
 // completely, the statically valid leg is returned; the mover should wait and
 // plan again.
-func (p *Planner) Plan(from, goal world.Pos, blocked Blocked) (moves []Move, ok bool) {
+func (p *Planner) Plan(from, goal world.Pos, m Mode, blocked Blocked) (moves []Move, ok bool) {
 	if from == goal {
 		return nil, true
 	}
 	if p.w.Solid(goal) {
 		return nil, false
 	}
+	m = effective(from, m)
 	if p.version != p.w.Version() || len(p.cache) > maxCache {
 		clear(p.cache)
 		p.version = p.w.Version()
 	}
-	target, warp, ok := p.firstLeg(from, goal)
+	target, warp, ok := p.firstLeg(from, goal, m)
 	if !ok {
 		return nil, false
 	}
-	moves, ok = p.local(from, target, blocked)
+	moves, _, ok = p.local(from, target, m, blocked)
 	if !ok {
-		if moves, ok = p.local(from, target, nil); !ok {
+		if moves, _, ok = p.local(from, target, m, nil); !ok {
 			return nil, false
 		}
 	}
@@ -100,20 +112,30 @@ func (p *Planner) Plan(from, goal world.Pos, blocked Blocked) (moves []Move, ok 
 	return moves, true
 }
 
-// Distance returns the static walking distance between two tiles of the same
-// map, ignoring warps and dynamic blockers. It is -1 if unreachable within
-// range.
-func (p *Planner) Distance(from, to world.Pos) int {
-	key := [2]world.Pos{from, to}
+// Distance returns the static travel time in ticks between two tiles of the
+// same map, ignoring warps and dynamic blockers. It is -1 if unreachable
+// within range.
+func (p *Planner) Distance(from, to world.Pos, m Mode) int {
+	m = effective(from, m)
+	key := distKey{from, to, m}
 	if d, ok := p.cache[key]; ok {
 		return d
 	}
 	d := -1
-	if moves, ok := p.local(from, to, nil); ok {
-		d = len(moves)
+	if _, cost, ok := p.local(from, to, m, nil); ok {
+		d = cost
 	}
 	p.cache[key] = d
 	return d
+}
+
+// effective returns the mode a mover can actually use at p: riding is only
+// possible on the main map.
+func effective(p world.Pos, m Mode) Mode {
+	if m == Ride && !p.Map.IsMain() {
+		return Foot
+	}
+	return m
 }
 
 // inRange reports whether a local search between a and b is allowed.
@@ -124,7 +146,9 @@ func (p *Planner) inRange(a, b world.Pos) bool {
 
 // firstLeg runs Dijkstra over the abstract warp graph and returns the target
 // of the first leg: goal itself, or the trigger tile of the first warp used.
-func (p *Planner) firstLeg(from, goal world.Pos) (target world.Pos, warp *world.Warp, ok bool) {
+// The first leg uses mode m; every leg after a warp is on foot, since movers
+// dismount when they go through a door.
+func (p *Planner) firstLeg(from, goal world.Pos, m Mode) (target world.Pos, warp *world.Warp, ok bool) {
 	warps := p.w.Warps()
 	// Node ids: 0 = start, 1 = goal, 2+2i = trigger of warp i, 3+2i = exit of warp i.
 	const start, gl = 0, 1
@@ -170,12 +194,16 @@ func (p *Planner) firstLeg(from, goal world.Pos) (target world.Pos, warp *world.
 			continue
 		}
 		at := pos(cur.n)
+		mode := Foot
+		if cur.n == start {
+			mode = m
+		}
 		if p.inRange(at, goal) {
-			relax(gl, p.Distance(at, goal))
+			relax(gl, p.Distance(at, goal, mode))
 		}
 		for i, wp := range warps {
 			if p.inRange(at, wp.From) {
-				relax(2+2*i, p.Distance(at, wp.From))
+				relax(2+2*i, p.Distance(at, wp.From, mode))
 			}
 		}
 	}
@@ -192,16 +220,20 @@ func (p *Planner) firstLeg(from, goal world.Pos) (target world.Pos, warp *world.
 	return pos(n), warps[(n-2)/2], true
 }
 
-// local runs A* on one map within a window around from and to. Warp tiles
-// are impassable unless they are the target, so a path never teleports by
-// accident.
-func (p *Planner) local(from, to world.Pos, blocked Blocked) ([]Move, bool) {
+// local runs A* on one map within a window around from and to, minimising
+// travel time in mode m. It returns the moves and their total cost in ticks.
+// Warp tiles are impassable unless they are the target, so a path never
+// teleports by accident.
+func (p *Planner) local(from, to world.Pos, m Mode, blocked Blocked) ([]Move, int, bool) {
 	if from == to {
-		return nil, true
+		return nil, 0, true
 	}
 	tx, ty, ok := p.w.Delta(from, to)
-	if !ok || geom.Abs(tx)+geom.Abs(ty) > p.MaxRange || p.w.Solid(to) {
-		return nil, false
+	if !ok || geom.Abs(tx)+geom.Abs(ty) > p.MaxRange {
+		return nil, 0, false
+	}
+	if _, ok := StepTicks(p.w, to, m); !ok {
+		return nil, 0, false
 	}
 	// Window in offsets relative to from.
 	minX, maxX := min(0, tx)-margin, max(0, tx)+margin
@@ -223,11 +255,13 @@ func (p *Planner) local(from, to world.Pos, blocked Blocked) ([]Move, bool) {
 	idx := func(x, y int64) int { return int((y-minY)*ww + (x - minX)) }
 	n := int(ww * wh)
 	g := make([]int32, n)
+	steps := make([]int32, n)
 	parent := make([]int32, n)
 	for i := range g {
 		g[i] = -1
 	}
-	h := func(x, y int64) int { return int(geom.Abs(x-tx) + geom.Abs(y-ty)) }
+	unit := int64(m.minTicks())
+	h := func(x, y int64) int { return int((geom.Abs(x-tx) + geom.Abs(y-ty)) * unit) }
 
 	si, ti := idx(0, 0), idx(tx, ty)
 	g[si] = 0
@@ -249,29 +283,35 @@ func (p *Planner) local(from, to world.Pos, blocked Blocked) ([]Move, bool) {
 			if nx < minX || nx > maxX || ny < minY || ny > maxY {
 				continue
 			}
-			ni := idx(nx, ny)
-			if g[ni] >= 0 && g[ni] <= cg+1 {
-				continue
-			}
 			np, ok := p.w.Offset(from, nx, ny)
 			if !ok {
 				continue
 			}
-			if ni != ti && (p.w.Solid(np) || p.w.WarpAt(np) != nil) {
+			cost, ok := StepTicks(p.w, np, m)
+			if !ok {
+				continue
+			}
+			ni := idx(nx, ny)
+			ng := cg + int32(cost)
+			if g[ni] >= 0 && g[ni] <= ng {
+				continue
+			}
+			if ni != ti && p.w.WarpAt(np) != nil {
 				continue
 			}
 			if blocked != nil && blocked(np) {
 				continue
 			}
-			g[ni] = cg + 1
+			g[ni] = ng
+			steps[ni] = steps[cur.n] + 1
 			parent[ni] = int32(cur.n)
-			heap.Push(open, nodeItem{n: ni, d: int(cg+1) + h(nx, ny)})
+			heap.Push(open, nodeItem{n: ni, d: int(ng) + h(nx, ny)})
 		}
 	}
 	if g[ti] < 0 {
-		return nil, false
+		return nil, 0, false
 	}
-	moves := make([]Move, g[ti])
+	moves := make([]Move, steps[ti])
 	for i, c := len(moves)-1, ti; i >= 0; i-- {
 		pi := int(parent[c])
 		cx, cy := int64(c)%ww+minX, int64(c)/ww+minY
@@ -280,7 +320,7 @@ func (p *Planner) local(from, to world.Pos, blocked Blocked) ([]Move, bool) {
 		moves[i] = Move{Dir: dirOf(cx-px, cy-py), To: to}
 		c = pi
 	}
-	return moves, true
+	return moves, int(g[ti]), true
 }
 
 func dirOf(dx, dy int64) world.Dir {

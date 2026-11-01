@@ -201,7 +201,7 @@ func (w *World) resolve(cx, cy int64) *Chunk {
 			}
 		}
 	}
-	c.computeSolid(w.tilesets)
+	c.computeDerived(w.tilesets)
 	return c
 }
 
@@ -245,6 +245,20 @@ func (w *World) Solid(p Pos) bool {
 		return true
 	}
 	return w.blocked[p] > 0
+}
+
+// Terrain returns the terrain at p. Positions outside detail maps are land
+// (they are solid anyway).
+func (w *World) Terrain(p Pos) Terrain {
+	p, ok := w.Normalize(p)
+	if !ok {
+		return Land
+	}
+	c, lx, ly := w.chunk(p)
+	if c == nil {
+		return Land
+	}
+	return c.terrain[ly*ChunkSize+lx]
 }
 
 // SetBlocked adds or removes a dynamic blocker at p (doors, pushed blocks).
@@ -376,7 +390,7 @@ func (w *World) loadTemplates(fsys fs.FS, dir string) error {
 						}
 					}
 				}
-				c.computeSolid(w.tilesets)
+				c.computeDerived(w.tilesets)
 				t.chunks[[2]int64{cx, cy}] = c
 			}
 		}

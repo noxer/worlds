@@ -9,6 +9,7 @@ import (
 	"github.com/noxer/worlds/internal/entity"
 	"github.com/noxer/worlds/internal/gfx"
 	"github.com/noxer/worlds/internal/input"
+	"github.com/noxer/worlds/internal/nav"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -295,5 +296,109 @@ func TestBumpShowsPassiveNotice(t *testing.T) {
 	h.press(input.Confirm)
 	if _, ok := h.top().(*DialogBox); !ok {
 		t.Fatal("confirm at the door should open the dialog")
+	}
+}
+
+// meadowAt returns a position in the meadow patch.
+func (h *harness) meadowAt(x, y int64) world.Pos {
+	o, _ := h.w.PatchOrigin("meadow")
+	p, _ := h.w.Offset(o, x, y)
+	return p
+}
+
+// stepTime presses a direction for one tick (the leader must already face
+// it) and returns how many ticks the resulting step takes.
+func (h *harness) stepTime(d input.Action) int {
+	h.t.Helper()
+	var f input.Frame
+	f.Held[d] = true
+	start := h.leader().Pos
+	h.tick(f)
+	if h.leader().Pos == start {
+		h.t.Fatalf("leader did not move from %v", start)
+	}
+	for i := 0; i < 100; i++ {
+		if !h.leader().Moving() {
+			return i
+		}
+		h.tick(input.Frame{})
+	}
+	h.t.Fatal("step never ended")
+	return 0
+}
+
+func TestSwimmingInShallowWater(t *testing.T) {
+	h := newHarness(t)
+	shore := h.meadowAt(2, 12)
+	if h.w.Terrain(shore) != world.Land || h.w.Terrain(h.meadowAt(2, 13)) != world.Shallow {
+		t.Fatal("test setup: expected land at meadow (2,12) and shallow water below")
+	}
+	h.e.party.PlaceAll(shore, world.Down)
+	if got := h.stepTime(input.Down); got != nav.SwimTicks {
+		t.Fatalf("stepping into the water took %d ticks, want %d", got, nav.SwimTicks)
+	}
+	if h.w.Terrain(h.leader().Pos) != world.Shallow {
+		t.Fatal("leader should be swimming")
+	}
+	// Deep water cannot be entered; a notice says why.
+	h.e.party.PlaceAll(h.meadowAt(3, 14), world.Down)
+	h.hold(input.Down, 10)
+	if h.leader().Pos != h.meadowAt(3, 14) {
+		t.Fatal("swam into deep water")
+	}
+	if h.e.notice == nil || h.e.notice.text != "The water is too deep to swim." {
+		t.Fatalf("notice = %+v", h.e.notice)
+	}
+}
+
+func TestRiding(t *testing.T) {
+	h := newHarness(t)
+	h.press(input.Ride)
+	if !h.e.riding {
+		t.Fatalf("could not mount: notice %+v", h.e.notice)
+	}
+	h.press(input.Right) // turn
+	h.runUntil("idle", 50, h.idle)
+	if got := h.stepTime(input.Right); got != nav.RideTicks {
+		t.Fatalf("a riding step took %d ticks, want %d", got, nav.RideTicks)
+	}
+	// Riders can't go into the water.
+	shore := h.meadowAt(2, 12)
+	h.e.party.PlaceAll(shore, world.Down)
+	h.hold(input.Down, 10)
+	if h.leader().Pos != shore {
+		t.Fatal("rode into the water")
+	}
+	if h.e.notice == nil || h.e.notice.text != "You can't ride into the water." {
+		t.Fatalf("notice = %+v", h.e.notice)
+	}
+	// Clicking a water tile gets the party off the bikes and swimming there.
+	goal := h.meadowAt(2, 14)
+	h.e.goTo(goal)
+	if h.e.riding {
+		t.Fatal("should dismount to reach the water")
+	}
+	h.runUntil("swim to the goal", 500, func() bool { return h.idle() && h.leader().Pos == goal })
+	h.press(input.Ride)
+	if h.e.riding {
+		t.Fatal("mounted a bike in the water")
+	}
+}
+
+func TestRidingIndoorsAndThroughDoors(t *testing.T) {
+	h := newHarness(t)
+	h.press(input.Ride)
+	goal := world.Pos{Map: world.Detail("smithy"), X: 6, Y: 3}
+	h.e.goTo(goal)
+	if !h.e.riding {
+		t.Fatal("the way to the door is on land: keep riding")
+	}
+	h.runUntil("arrival in the smithy", 3000, func() bool { return h.idle() && h.leader().Pos == goal })
+	if h.e.riding {
+		t.Fatal("the party should get off the bikes at the door")
+	}
+	h.press(input.Ride)
+	if h.e.riding || h.e.notice == nil || h.e.notice.text != "You can't ride indoors." {
+		t.Fatalf("riding indoors: riding=%v notice=%+v", h.e.riding, h.e.notice)
 	}
 }

@@ -10,10 +10,14 @@ import (
 const MaxFollowers = 5
 
 // FollowDelay is how many ticks each follower starts its step after the
-// member in front of it, so the queue moves in a slight ripple instead of in
-// lockstep. It must stay below StepTicks/MaxFollowers so the last follower
-// still starts its step before the leader takes the next one.
+// member in front of it when walking, so the queue moves in a slight ripple
+// instead of in lockstep. Faster or slower steps scale it proportionally. It
+// must stay below StepTicks/MaxFollowers so the last follower still starts
+// its step before the leader takes the next one.
 const FollowDelay = 3
+
+// followDelay scales FollowDelay to a step of the given duration.
+func followDelay(ticks int) int { return max(1, FollowDelay*ticks/StepTicks) }
 
 // ErrPartyFull is returned when adding more than MaxFollowers companions.
 var ErrPartyFull = errors.New("party is full")
@@ -47,20 +51,25 @@ func (p *Party) Add(a *Actor) error {
 
 // Step starts a leader step in direction d onto tile `to`. Each follower
 // queues a step into the tile the member in front of it is leaving, starting
-// FollowDelay ticks after that member.
-func (p *Party) Step(w *world.World, d world.Dir, to world.Pos) {
+// a little after that member. ticks gives the duration of a step onto a tile
+// (it depends on terrain and riding); nil means StepTicks.
+func (p *Party) Step(w *world.World, d world.Dir, to world.Pos, ticks func(world.Pos) int) {
+	if ticks == nil {
+		ticks = func(world.Pos) int { return StepTicks }
+	}
 	prev := make([]world.Pos, len(p.Members))
 	for i, m := range p.Members {
 		prev[i] = m.Dest()
 	}
-	p.Leader().BeginStep(d, to)
+	lt := ticks(to)
+	p.Leader().BeginStep(d, to, lt)
 	for i := 1; i < len(p.Members); i++ {
 		m, target := p.Members[i], prev[i-1]
 		if prev[i] == target {
 			continue // still stacked after a warp
 		}
 		if fd, ok := w.DirBetween(prev[i], target); ok {
-			m.QueueStep(fd, target, i*FollowDelay)
+			m.QueueStep(fd, target, ticks(target), i*followDelay(lt))
 		} else {
 			// Should not happen, but never let a follower get lost.
 			m.Place(target, m.Facing)

@@ -24,7 +24,7 @@ func walk(t *testing.T, w *world.World, p *entity.Party, d world.Dir) {
 	if !ok {
 		t.Fatalf("cannot walk %v from %v", d, p.Leader().Pos)
 	}
-	p.Step(w, d, to)
+	p.Step(w, d, to, nil)
 	for i := 0; i < entity.StepTicks; i++ {
 		arrived := p.Update()
 		if arrived != (i == entity.StepTicks-1) {
@@ -91,7 +91,7 @@ func TestPartyLimit(t *testing.T) {
 
 func TestOffsetInterpolates(t *testing.T) {
 	a := &entity.Actor{}
-	a.BeginStep(world.Right, pos("main", 1, 0))
+	a.BeginStep(world.Right, pos("main", 1, 0), 0)
 	if dx, dy := a.Offset(); dx != -16 || dy != 0 {
 		t.Fatalf("offset at start = %d,%d", dx, dy)
 	}
@@ -120,7 +120,7 @@ func TestFollowersRipple(t *testing.T) {
 		l := p.Leader()
 		if !l.Moving() && tick < steps*entity.StepTicks {
 			to, _ := w.Neighbor(l.Pos, world.Right)
-			p.Step(w, world.Right, to)
+			p.Step(w, world.Right, to, nil)
 		}
 		for i, m := range p.Members {
 			// A step that has just started is a full tile behind.
@@ -139,5 +139,41 @@ func TestFollowersRipple(t *testing.T) {
 				t.Errorf("member %d step %d lags %d ticks, want %d", i, s, lag, i*entity.FollowDelay)
 			}
 		}
+	}
+}
+
+func TestStepDurations(t *testing.T) {
+	a := &entity.Actor{}
+	a.BeginStep(world.Right, pos("main", 1, 0), 8)
+	for i := 0; i < 7; i++ {
+		if a.Update() {
+			t.Fatalf("arrived early on tick %d", i)
+		}
+	}
+	if dx, _ := a.Offset(); dx != -2 {
+		t.Fatalf("offset after 7 of 8 ticks = %d, want -2", dx)
+	}
+	if !a.Update() {
+		t.Fatal("8-tick step did not arrive on tick 8")
+	}
+}
+
+// When riding (8-tick steps) the follow delay shrinks, so the whole queue
+// still starts within one step of the leader.
+func TestFollowDelayScalesWithSpeed(t *testing.T) {
+	w := testWorld(t)
+	p := newParty(entity.MaxFollowers)
+	p.PlaceAll(pos("main", 0, 0), world.Right)
+	for i := 0; i < entity.MaxFollowers; i++ {
+		walk(t, w, p, world.Right)
+	}
+	to, _ := w.Neighbor(p.Leader().Pos, world.Right)
+	p.Step(w, world.Right, to, func(world.Pos) int { return 8 })
+	ticks := 0
+	for ; !p.Members[len(p.Members)-1].Moving(); ticks++ {
+		p.Update()
+	}
+	if ticks >= 8 {
+		t.Fatalf("last follower started %d ticks after the leader, want under one step (8)", ticks)
 	}
 }

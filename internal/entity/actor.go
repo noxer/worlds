@@ -4,8 +4,9 @@ package entity
 
 import "github.com/noxer/worlds/internal/world"
 
-// StepTicks is the duration of one tile step in ticks (60 ticks per second).
-// At 16 ticks per 16px tile, actors move exactly one pixel per tick.
+// StepTicks is the default duration of one tile step in ticks (60 per
+// second): walking. At 16 ticks per 16px tile, walkers move one pixel per
+// tick. Swimming and riding use other durations (see package nav).
 const StepTicks = 16
 
 // Sprite references a frame on a tile sheet by tileset name and index.
@@ -24,17 +25,19 @@ type Actor struct {
 	Pos    world.Pos
 	Facing world.Dir
 
-	stepping bool
-	stepDir  world.Dir
-	tick     int
+	stepping  bool
+	stepDir   world.Dir
+	tick      int
+	stepTicks int
 
 	queue []queuedStep // steps to start later (followers lag behind)
 }
 
 type queuedStep struct {
-	dir  world.Dir
-	to   world.Pos
-	wait int // ticks until the step may start
+	dir   world.Dir
+	to    world.Pos
+	ticks int // duration of the step
+	wait  int // ticks until the step may start
 }
 
 // Moving reports whether the actor is between two tiles.
@@ -51,19 +54,24 @@ func (a *Actor) Dest() world.Pos {
 	return a.Pos
 }
 
-// QueueStep schedules a step that starts after `wait` ticks, or as soon as
-// the actor has finished the steps before it.
-func (a *Actor) QueueStep(d world.Dir, to world.Pos, wait int) {
-	a.queue = append(a.queue, queuedStep{dir: d, to: to, wait: wait})
+// QueueStep schedules a step of the given duration that starts after `wait`
+// ticks, or as soon as the actor has finished the steps before it.
+func (a *Actor) QueueStep(d world.Dir, to world.Pos, ticks, wait int) {
+	a.queue = append(a.queue, queuedStep{dir: d, to: to, ticks: ticks, wait: wait})
 }
 
-// BeginStep starts walking one tile in direction d to the tile `to`.
-func (a *Actor) BeginStep(d world.Dir, to world.Pos) {
+// BeginStep starts moving one tile in direction d to the tile `to`, taking
+// `ticks` ticks (StepTicks if not positive).
+func (a *Actor) BeginStep(d world.Dir, to world.Pos, ticks int) {
+	if ticks <= 0 {
+		ticks = StepTicks
+	}
 	a.Facing = d
 	a.Pos = to
 	a.stepDir = d
 	a.stepping = true
 	a.tick = 0
+	a.stepTicks = ticks
 }
 
 // Place teleports the actor and cancels any step.
@@ -83,7 +91,7 @@ func (a *Actor) Update() (arrived bool) {
 	}
 	if a.stepping {
 		a.tick++
-		if a.tick >= StepTicks {
+		if a.tick >= a.stepTicks {
 			a.stepping = false
 			a.tick = 0
 			arrived = true
@@ -94,7 +102,7 @@ func (a *Actor) Update() (arrived bool) {
 	if !a.stepping && len(a.queue) > 0 && a.queue[0].wait <= 0 {
 		q := a.queue[0]
 		a.queue = a.queue[1:]
-		a.BeginStep(q.dir, q.to)
+		a.BeginStep(q.dir, q.to, q.ticks)
 	}
 	return arrived
 }
@@ -105,7 +113,7 @@ func (a *Actor) Offset() (dx, dy int) {
 	if !a.stepping {
 		return 0, 0
 	}
-	remaining := (StepTicks - a.tick) * world.TileSize / StepTicks
+	remaining := (a.stepTicks - a.tick) * world.TileSize / a.stepTicks
 	ddx, ddy := a.stepDir.Delta()
 	return -int(ddx) * remaining, -int(ddy) * remaining
 }
@@ -113,7 +121,7 @@ func (a *Actor) Offset() (dx, dy int) {
 // Hop returns a small vertical bounce used as walk animation, since the
 // Kenney characters have a single frame.
 func (a *Actor) Hop() int {
-	if a.stepping && a.tick >= StepTicks/4 && a.tick < StepTicks*3/4 {
+	if a.stepping && a.tick >= a.stepTicks/4 && a.tick < a.stepTicks*3/4 {
 		return -1
 	}
 	return 0

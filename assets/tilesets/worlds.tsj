@@ -1,0 +1,27 @@
+{
+ "type": "tileset",
+ "version": "1.10",
+ "tiledversion": "1.11.0",
+ "name": "worlds",
+ "tilewidth": 16,
+ "tileheight": 16,
+ "tilecount": 4,
+ "columns": 4,
+ "image": "../tiles/worlds.png",
+ "imagewidth": 64,
+ "imageheight": 16,
+ "margin": 0,
+ "spacing": 0,
+ "tiles": [
+  {
+   "id": 0,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "deep"
+    }
+   ]
+  }
+ ]
+}

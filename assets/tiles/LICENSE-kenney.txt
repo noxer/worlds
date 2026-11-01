@@ -1,4 +1,4 @@
-Tiny Town and Tiny Dungeon by Kenney (www.kenney.nl), downloaded from opengameart.org/users/kenney.
+Tiny Town, Tiny Dungeon and Tiny Battle by Kenney (www.kenney.nl), downloaded from opengameart.org/users/kenney.
 
 	
 
@@ -12,7 +12,8 @@ Tiny Town and Tiny Dungeon by Kenney (www.kenney.nl), downloaded from opengamear
 	License: (Creative Commons Zero, CC0)
 	http://creativecommons.org/publicdomain/zero/1.0/
 
-	This content is free to use in personal, educational and commercial projects.
+	This content is free to use in personal, educational and commercial projects.
+
 	Support us by crediting Kenney or www.kenney.nl (this is not mandatory)
 
 			------------------------------

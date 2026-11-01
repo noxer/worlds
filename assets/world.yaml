@@ -4,9 +4,12 @@ seed: 20261101
 width: 1048576
 height: 524288
 generator: grassland
-# Tilesets the generator uses (maps load theirs automatically).
+# Tilesets always loaded: those the generator and the game use directly
+# (maps load theirs automatically).
 tilesets:
   - tilesets/tinytown.tsj
+  - tilesets/tinybattle.tsj
+  - tilesets/worlds.tsj   # the project's own tiles: deep water, bicycle, scooter
 # Hand-made patches placed on the main map. Open this file in Tiled to edit
 # the patches in context. The town straddles the east-west wrap seam.
 patches: maps/patches/main.world

@@ -2,7 +2,8 @@
 
 A 2D open-world RPG experiment in Go with [Ebitengine](https://ebitengine.org):
 exploration, puzzles, dialogs and quests, and turn-based tactical fights.
-Art by [Kenney](https://kenney.nl) (CC0).
+Art by [Kenney](https://kenney.nl) (Tiny Town, Tiny Dungeon, Tiny Battle; CC0),
+plus placeholder tiles drawn for this project (`assets/tiles/worlds.png`).
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
 
@@ -23,6 +24,7 @@ On Linux, desktop builds need the X11/GL headers, for example:
 |---|---|---|---|
 | Move | arrows / WASD (tap to turn) | d-pad / left stick | click or tap a tile |
 | Talk / confirm | Space, Enter, E, Z | A | click an NPC or sign |
+| Ride bike / get off | R | Y | click your leader |
 | Cancel | Esc, X | B | |
 | Debug overlay | F3 | | |
 

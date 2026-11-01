@@ -23,6 +23,7 @@ const (
 	Confirm
 	Cancel
 	Menu
+	Ride
 	Debug
 	// NumActions is the number of actions.
 	NumActions
@@ -36,6 +37,7 @@ var keys = [NumActions][]ebiten.Key{
 	Confirm: {ebiten.KeySpace, ebiten.KeyEnter, ebiten.KeyE, ebiten.KeyZ},
 	Cancel:  {ebiten.KeyEscape, ebiten.KeyBackspace, ebiten.KeyX},
 	Menu:    {ebiten.KeyTab, ebiten.KeyM},
+	Ride:    {ebiten.KeyR},
 	Debug:   {ebiten.KeyF3, ebiten.KeyBackquote},
 }
 
@@ -47,6 +49,7 @@ var pads = [NumActions][]ebiten.StandardGamepadButton{
 	Confirm: {ebiten.StandardGamepadButtonRightBottom},
 	Cancel:  {ebiten.StandardGamepadButtonRightRight},
 	Menu:    {ebiten.StandardGamepadButtonCenterRight},
+	Ride:    {ebiten.StandardGamepadButtonRightTop},
 }
 
 var dirActions = [4]struct {
