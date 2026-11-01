@@ -173,13 +173,12 @@ Untouched chunks cost nothing, because they are regenerated from the seed.
 **Movement modes.** Passability depends on the terrain of a cell and the
 movement mode of the mover:
 
-| Mode | Can enter |
-|---|---|
-| walk | land terrain |
-| swim | shallow water (open question: deep water, stamina) |
-| ship / boat | water; docks connect to land |
-| train | rail tiles only, along routes |
-| aircraft | airfields; flies along routes |
+| Mode | Can enter | Notes |
+|---|---|---|
+| walk | land terrain | |
+| swim | shallow water only | entered by walking into shallow water |
+| ride | land terrain, outdoors only | bicycle or scooter: the player's only own vehicles; faster; the whole party rides; mounting and dismounting are instant |
+| passenger | none | travelling in public transport (see Vehicles) |
 
 **Blockers.** Static collision comes from tiles. Dynamic blockers (doors,
 pushed blocks, NPCs) come on top. Passability changes bump a version counter
@@ -187,12 +186,19 @@ for the affected chunk, which clears navigation caches for that chunk only.
 
 ## Vehicles
 
-A vehicle has two representations:
+**Personal vehicles** (bicycle, scooter) are not separate entities. They are
+a movement mode of the party: faster steps, ridden sprites, outdoors only.
+They have no interior.
+
+**Public transport** (taxi, bus, train, boat, airplane) is never steered by
+the player. Each has a **route** with **stops** (stations, harbours, airports,
+bus stops) and a timetable. A taxi instead takes the party to a chosen known
+destination nearby. Each vehicle has two representations:
 
 - **Exterior:** a small entity on the main map, for example a 2×1-tile boat, a
-  few train cars, or a plane sprite. It moves along routes (train lines, sea
-  lanes, flight paths) or is steered by the player (boats and ships). It
-  occupies tiles and blocks other movers.
+  few train cars, a bus, or a plane sprite. It moves along its route (roads,
+  train lines, sea lanes, flight paths), occupies tiles and blocks other
+  movers.
 - **Interior:** a detail-map instance, much larger than the exterior (like a
   TARDIS). The party walks around inside, talks to passengers, fights on deck,
   and solves puzzles while the vehicle travels. The interior's anchor is the
@@ -201,11 +207,13 @@ A vehicle has two representations:
 **Boarding and leaving** use dynamic warps: warps attached to an entity rather
 than a fixed tile.
 - **Boarding:** stepping onto the exterior's door or gangway while the vehicle
-  is docked or stopped warps the party into the interior.
-- **Leaving:** the interior's exit warps to the exterior's current door
-  position.
-- **In transit:** doors are closed, unless a mode allows jumping off, for
-  example swimming from a ship.
+  is stopped at a stop warps the party into the interior (with a ticket, where
+  needed).
+- **Leaving:** at a stop, the interior's exit warps to the exterior's current
+  door position.
+- **In transit:** the doors are closed. A taxi ride, or a long trip the player
+  skips, can play as a short scene with the window view instead of
+  real-time travel.
 
 **Window view.** While inside, the main map scrolls past the vehicle:
 - Cells marked as *exterior view* (a layer property, used for windows, the
@@ -224,11 +232,6 @@ than a fixed tile.
 - Time passes while the party walks around inside.
 - Arrival raises events (doors open, announcements).
 - Streaming follows the anchor, so the landscape outside is always loaded.
-
-**Control.** Player-steered vessels have a helm. Using it switches to steering
-mode, which shows the exterior on the main map and moves it with the movement
-input; leaving the helm returns to walking inside. Route-bound vehicles
-(trains, airliners) run on schedules.
 
 ## Streaming and simulation
 
@@ -257,8 +260,8 @@ NPC schedules, vehicles, and combat.
    the world level (biome passability) and are resolved as the route reaches
    them.
 3. **Across maps:** a graph of warp entries and exits, including dynamic
-   vehicle warps when the vehicle is docked. Routes can include transport
-   (ferry and train routes) later.
+   vehicle warps while a vehicle is at a stop. Later, routes can include
+   public transport lines as edges.
 4. **Only the current leg becomes concrete moves.** After a warp, a chunk
    change or a blocker, the mover plans again.
 
@@ -271,7 +274,7 @@ The leader plus up to 5 companions, queued up behind the leader like a snake.
 Each follower steps onto the tile the member in front of it just left; this
 works across chunk borders and the wrap seam. After a warp everyone stands on
 the arrival tile and the queue unfolds again. Followers don't block the leader.
-In steering mode the whole party is inside the vehicle.
+When riding, the whole party rides.
 
 ## Scenes
 
@@ -354,18 +357,20 @@ The first playable version has finite maps, regions stitched together by
    generator (grass and trees). The smithy becomes a detail map. Navigation is
    ported to chunks and the wrap. Rendering becomes camera-relative. All
    current behaviour and tests keep working.
-2. Terrain types and movement modes. Swimming.
+2. Terrain types and movement modes: swimming (shallow water), riding
+   (bicycle, scooter).
 3. Generation levels 1–3, tileable noise, autotiler, fingerprint tests. The
    first ocean biome, with a fixed and a pool island. Needs water art (a
    placeholder sheet until a pack is chosen).
 4. Streaming in the background, the chunk portal graph, abstract simulation.
-5. Vehicles: dynamic warps, interiors as instances, window view, helm
-   steering, routes.
+5. Public transport: routes, stops and timetables; dynamic warps; interiors as
+   instances; window view; taxis.
+
+## World size
+
+2²⁰ × 2¹⁹ tiles (about 1 million × 500,000), set in `assets/world.yaml`
+together with the world seed.
 
 ## Open questions
 
-- Swimming: shallow water only, or deep water with stamina?
-- Which vehicles are player-steered (boats, ships) and which are route-bound
-  (trains, airliners)? Can the player own and steer an aircraft?
-- World size: concrete `W×H`, for example 2²⁰ × 2¹⁹ tiles.
-- Art for water, coastlines, rails and vehicles.
+- Art for water, coastlines, rails, vehicles and riding sprites.
