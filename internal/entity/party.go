@@ -9,6 +9,12 @@ import (
 // MaxFollowers is the number of companions that can travel with the leader.
 const MaxFollowers = 5
 
+// FollowDelay is how many ticks each follower starts its step after the
+// member in front of it, so the queue moves in a slight ripple instead of in
+// lockstep. It must stay below StepTicks/MaxFollowers so the last follower
+// still starts its step before the leader takes the next one.
+const FollowDelay = 3
+
 // ErrPartyFull is returned when adding more than MaxFollowers companions.
 var ErrPartyFull = errors.New("party is full")
 
@@ -39,21 +45,22 @@ func (p *Party) Add(a *Actor) error {
 	return nil
 }
 
-// Step starts a leader step in direction d onto tile `to`. Followers start
-// moving into the tiles vacated by the member in front of them.
+// Step starts a leader step in direction d onto tile `to`. Each follower
+// queues a step into the tile the member in front of it is leaving, starting
+// FollowDelay ticks after that member.
 func (p *Party) Step(w *world.World, d world.Dir, to world.Pos) {
 	prev := make([]world.Pos, len(p.Members))
 	for i, m := range p.Members {
-		prev[i] = m.Pos
+		prev[i] = m.Dest()
 	}
 	p.Leader().BeginStep(d, to)
 	for i := 1; i < len(p.Members); i++ {
 		m, target := p.Members[i], prev[i-1]
-		if m.Pos == target {
+		if prev[i] == target {
 			continue // still stacked after a warp
 		}
-		if fd, ok := w.DirBetween(m.Pos, target); ok {
-			m.BeginStep(fd, target)
+		if fd, ok := w.DirBetween(prev[i], target); ok {
+			m.QueueStep(fd, target, i*FollowDelay)
 		} else {
 			// Should not happen, but never let a follower get lost.
 			m.Place(target, m.Facing)
@@ -77,6 +84,16 @@ func (p *Party) Update() (leaderArrived bool) {
 		}
 	}
 	return leaderArrived
+}
+
+// Busy reports whether any member is still moving or has queued steps.
+func (p *Party) Busy() bool {
+	for _, m := range p.Members {
+		if m.Busy() {
+			return true
+		}
+	}
+	return false
 }
 
 // Occupies reports whether any member stands on pos.

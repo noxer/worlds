@@ -31,6 +31,13 @@ func walk(t *testing.T, w *world.World, p *entity.Party, d world.Dir) {
 			t.Fatalf("arrival on tick %d", i)
 		}
 	}
+	// Followers lag behind; let them catch up.
+	for i := 0; p.Busy(); i++ {
+		if i > entity.StepTicks*2 {
+			t.Fatal("followers never caught up")
+		}
+		p.Update()
+	}
 }
 
 func newParty(n int) *entity.Party {
@@ -93,5 +100,44 @@ func TestOffsetInterpolates(t *testing.T) {
 	}
 	if dx, _ := a.Offset(); dx != -8 {
 		t.Fatalf("offset halfway = %d", dx)
+	}
+}
+
+// TestFollowersRipple checks that each follower starts its step FollowDelay
+// ticks after the member in front, and that continuous walking keeps that
+// fixed lag instead of accumulating delay.
+func TestFollowersRipple(t *testing.T) {
+	w := testWorld(t)
+	p := newParty(3)
+	p.PlaceAll(pos("main", 0, 0), world.Right)
+	// Unfold the queue first.
+	for i := 0; i < 3; i++ {
+		walk(t, w, p, world.Right)
+	}
+	const steps = 3
+	started := make([][]int, len(p.Members)) // tick each member started a step
+	for tick := 0; tick < steps*entity.StepTicks+entity.StepTicks; tick++ {
+		l := p.Leader()
+		if !l.Moving() && tick < steps*entity.StepTicks {
+			to, _ := w.Neighbor(l.Pos, world.Right)
+			p.Step(w, world.Right, to)
+		}
+		for i, m := range p.Members {
+			// A step that has just started is a full tile behind.
+			if dx, _ := m.Offset(); m.Moving() && dx == -world.TileSize {
+				started[i] = append(started[i], tick)
+			}
+		}
+		p.Update()
+	}
+	for i := 1; i < len(p.Members); i++ {
+		if len(started[i]) != steps {
+			t.Fatalf("member %d took %d steps, want %d", i, len(started[i]), steps)
+		}
+		for s := range started[i] {
+			if lag := started[i][s] - started[0][s]; lag != i*entity.FollowDelay {
+				t.Errorf("member %d step %d lags %d ticks, want %d", i, s, lag, i*entity.FollowDelay)
+			}
+		}
 	}
 }

@@ -93,24 +93,21 @@ func (h *harness) npc(name string) *NPC {
 }
 
 func (h *harness) idle() bool {
-	for _, m := range h.e.party.Members {
-		if m.Moving() {
-			return false
-		}
-	}
-	return h.e.fade == 0 && !h.e.hasGoal
+	return !h.e.party.Busy() && h.e.fade == 0 && !h.e.hasGoal
 }
 
-// checkQueue verifies the party forms a connected queue.
+// checkQueue verifies the party forms a connected queue. Followers lag a
+// few ticks behind, so it compares where everyone is heading.
 func (h *harness) checkQueue() {
 	h.t.Helper()
 	ms := h.e.party.Members
 	for i := 1; i < len(ms); i++ {
-		if ms[i].Pos == ms[i-1].Pos {
+		a, b := ms[i].Dest(), ms[i-1].Dest()
+		if a == b {
 			continue
 		}
-		if _, ok := h.w.DirBetween(ms[i].Pos, ms[i-1].Pos); !ok {
-			h.t.Errorf("member %d at %v is not next to member %d at %v", i, ms[i].Pos, i-1, ms[i-1].Pos)
+		if _, ok := h.w.DirBetween(a, b); !ok {
+			h.t.Errorf("member %d heading to %v is not next to member %d heading to %v", i, a, i-1, b)
 		}
 	}
 }
