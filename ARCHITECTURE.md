@@ -313,10 +313,22 @@ than a fixed tile.
 
 ## Streaming and simulation
 
-- **Loaded chunks:** the chunks within a radius around the current anchor are
-  resolved and kept. Chunks ahead of the direction of travel are generated in
-  the background. Distant chunks are evicted (least recently used). Detail
-  maps in use are fully loaded.
+- **Loaded chunks (implemented):** each tick the exploration scene asks for
+  the chunks within 2 chunks of the party leader, plus 3 more ahead in the
+  direction of travel, nearest first (`World.Prefetch`). Workers build them
+  in the background; the game thread moves finished chunks into the cache
+  once per tick (`World.Pump`, called by the game even while dialogs are
+  open). The cache belongs to the game thread alone; building a chunk is a
+  pure function, and the only shared mutable state (pool placements) is
+  locked.
+  - **Desktop:** one worker goroutine.
+  - **Browser:** WebAssembly is single-threaded, so `Pump` builds queued
+    chunks itself within 3 ms per tick.
+  - **Fallback:** a chunk that is needed before it arrives is built on
+    demand. The debug overlay (F3) shows both counts: `bg` for prefetched,
+    `sync` for on demand.
+  - **Eviction:** distant chunks are evicted (least recently used). Detail
+    maps in use are fully loaded.
 - **Full simulation** (actors moving tile by tile) runs only in loaded chunks
   and the current detail map.
 - **Elsewhere, entities are simulated abstractly:** NPC schedules and vehicles
@@ -449,7 +461,10 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    the shallows, reachable by swimming; `islet` is the first pool island.
    Tests cover the coast rules, autotiler fallbacks, determinism, pool
    placement, speed, and a fingerprint of land, coast and sea chunks.
-4. Streaming in the background, the chunk portal graph, abstract simulation.
+4. Streaming in the background (**done**: workers on desktop, a per-tick
+   budget in the browser, tests for identical results and for no on-demand
+   builds at riding speed, race detector in CI), the chunk portal graph,
+   abstract simulation.
 5. Public transport: routes, stops and timetables; dynamic warps; interiors as
    instances; window view; taxis.
 

@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"path"
 	"sort"
+	"sync"
 
 	"github.com/noxer/worlds/internal/geom"
 )
@@ -80,6 +81,8 @@ type World struct {
 	surroundIdx map[[2]int64][]*patch // fixed patches by chunk their surroundings reach
 	pool        []poolEntry
 	poolCache   map[[2]int64][]*patch
+	poolMu      sync.Mutex
+	stream      *streamer
 	templates   map[MapID]*template
 	cache       *chunkCache
 
@@ -89,6 +92,7 @@ type World struct {
 	objects []Object
 	blocked map[Pos]int
 	version uint64
+	stats   Stats
 }
 
 // Tilesets returns the tileset registry.
@@ -182,8 +186,10 @@ func (w *World) chunk(p Pos) (c *Chunk, lx, ly int) {
 		return t.chunks[key], lx, ly
 	}
 	if c = w.cache.get(key); c == nil {
+		// Not prefetched in time (or streaming is off): build it now.
 		c = w.resolve(cx, cy)
 		w.cache.put(key, c)
+		w.stats.SyncBuilt++
 	}
 	return c, lx, ly
 }

@@ -226,6 +226,7 @@ func (e *Explore) Update(ctx *Context) {
 		}
 		e.control(ctx, arrived)
 	}
+	e.w.Prefetch(leader.Pos, leader.Facing, leader.Moving())
 	if n := e.notice; n != nil && (leader.Moving() || leader.Pos != n.at || leader.Facing != n.facing) {
 		e.notice = nil
 	}
@@ -701,11 +702,20 @@ func (e *Explore) drawDebug(dst *ebiten.Image) {
 		gfx.FillRect(dst, image.Rect(x+6, y+6, x+10, y+10), gfx.ColorAccent)
 	}
 	l := e.party.Leader()
-	s := fmt.Sprintf("%s chunk(%d,%d) cached %d  %.0f fps", l.Pos,
-		geom.FloorDiv(l.Pos.X, world.ChunkSize), geom.FloorDiv(l.Pos.Y, world.ChunkSize),
-		e.w.CachedChunks(), ebiten.ActualFPS())
-	gfx.FillRect(dst, image.Rect(0, 0, gfx.TextWidth(s)+4, gfx.LineHeight+2), color.RGBA{A: 0xa0})
-	gfx.Text(dst, s, 2, 0, color.White)
+	st := e.w.Stats()
+	lines := []string{
+		fmt.Sprintf("%s chunk(%d,%d)", l.Pos,
+			geom.FloorDiv(l.Pos.X, world.ChunkSize), geom.FloorDiv(l.Pos.Y, world.ChunkSize)),
+		fmt.Sprintf("chunks %d  bg %d  sync %d  %.0f fps", e.w.CachedChunks(), st.Prefetched, st.SyncBuilt, ebiten.ActualFPS()),
+	}
+	w := 0
+	for _, s := range lines {
+		w = max(w, gfx.TextWidth(s))
+	}
+	gfx.FillRect(dst, image.Rect(0, 0, w+4, len(lines)*gfx.LineHeight+2), color.RGBA{A: 0xa0})
+	for i, s := range lines {
+		gfx.Text(dst, s, 2, i*gfx.LineHeight, color.White)
+	}
 }
 
 func abs(v int) int {

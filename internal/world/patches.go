@@ -216,14 +216,21 @@ func (w *World) poolIn(ax, ay int64) []*patch {
 	}
 	ax, ay = geom.Mod(ax, w.W/AreaSize), geom.Mod(ay, w.H/AreaSize)
 	key := [2]int64{ax, ay}
-	if ps, ok := w.poolCache[key]; ok {
+	// Chunks are built on background workers too, so the cache is locked.
+	// Placement is deterministic: if two builders race, both compute the
+	// same result.
+	w.poolMu.Lock()
+	ps, ok := w.poolCache[key]
+	w.poolMu.Unlock()
+	if ok {
 		return ps
 	}
-	var ps []*patch
 	if p := w.placePool(ax, ay); p != nil {
 		ps = []*patch{p}
 	}
+	w.poolMu.Lock()
 	w.poolCache[key] = ps
+	w.poolMu.Unlock()
 	return ps
 }
 

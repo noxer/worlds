@@ -125,3 +125,9 @@ func (cc *chunkCache) put(key [2]int64, c *Chunk) {
 }
 
 func (cc *chunkCache) len() int { return cc.order.Len() }
+
+// has reports whether key is cached, without counting as a use.
+func (cc *chunkCache) has(key [2]int64) bool {
+	_, ok := cc.items[key]
+	return ok
+}

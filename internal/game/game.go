@@ -12,6 +12,7 @@ import (
 	"github.com/noxer/worlds/internal/gfx"
 	"github.com/noxer/worlds/internal/input"
 	"github.com/noxer/worlds/internal/scene"
+	"github.com/noxer/worlds/internal/world"
 )
 
 // The logical screen is at least MinWidth x MinHeight pixels. It is scaled
@@ -27,6 +28,7 @@ const (
 type Game struct {
 	input input.State
 	stack *scene.Stack
+	world *world.World
 }
 
 // New loads all content from fsys and sets up the starting scene.
@@ -58,13 +60,17 @@ func New(fsys fs.FS) (*Game, error) {
 	if err != nil {
 		return nil, err
 	}
-	g := &Game{}
+	// Build chunks around the party ahead of time, so fast travel never
+	// stalls a frame on generation.
+	c.World.StartStreaming(world.DefaultWorkers())
+	g := &Game{world: c.World}
 	g.stack = scene.NewStack(&g.input, explore)
 	return g, nil
 }
 
 // Update implements ebiten.Game. It runs at a fixed 60 ticks per second.
 func (g *Game) Update() error {
+	g.world.Pump() // also while dialogs or menus are open
 	g.input.Update()
 	g.stack.Update()
 	return nil
