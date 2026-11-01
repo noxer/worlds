@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/noxer/worlds/assets"
-	"github.com/noxer/worlds/internal/dialog"
+	"github.com/noxer/worlds/internal/content"
 	"github.com/noxer/worlds/internal/entity"
 	"github.com/noxer/worlds/internal/gfx"
 	"github.com/noxer/worlds/internal/input"
@@ -24,22 +24,18 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	w, err := world.Load(assets.FS, "maps")
+	c, err := content.Load(assets.FS)
 	if err != nil {
 		t.Fatal(err)
 	}
-	lib, err := dialog.Load(assets.FS, "dialog")
-	if err != nil {
-		t.Fatal(err)
-	}
+	w := c.World
 	party := entity.NewParty(&entity.Actor{Name: "leader"})
 	for i := 0; i < 3; i++ {
 		if err := party.Add(&entity.Actor{}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	start, _ := w.Map("town").Spawn("start")
-	e, err := NewExplore(ExploreConfig{World: w, Sheets: gfx.NewSheets(assets.FS), Dialogs: lib, Party: party, Start: start})
+	e, err := NewExplore(ExploreConfig{World: w, Sheets: gfx.NewSheets(assets.FS), Dialogs: c.Dialogs, Party: party, Start: c.Start})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,8 +127,8 @@ func TestKeyboardTurnThenWalk(t *testing.T) {
 	// Holding walks; three tiles take 3*StepTicks.
 	h.hold(input.Right, 3*entity.StepTicks)
 	h.runUntil("idle", 100, h.idle)
-	if got := h.leader().Pos; got.X != start.X+3 || got.Y != start.Y {
-		t.Fatalf("leader at %v, want 3 tiles right of %v", got, start)
+	if want, _ := h.w.Offset(start, 3, 0); h.leader().Pos != want {
+		t.Fatalf("leader at %v, want 3 tiles right of %v", h.leader().Pos, start)
 	}
 	h.checkQueue()
 }
@@ -182,42 +178,45 @@ func TestTalkToNPC(t *testing.T) {
 
 func TestTapToMove(t *testing.T) {
 	h := newHarness(t)
-	target := h.leader().Pos
-	target.X -= 2
-	_, rx, ry := h.w.ToRegion(target)
-	p := image.Pt(rx*tile-h.e.camX+8, ry*tile-h.e.camY+8)
+	target, _ := h.w.Offset(h.leader().Pos, -2, 1)
+	x, y := h.e.screen(target.Map, target.X*tile, target.Y*tile)
+	p := image.Pt(x+8, y+8)
 	h.tick(input.Frame{Tap: p, Tapped: true})
 	h.runUntil("arrival", 500, func() bool { return h.idle() && h.leader().Pos == target })
 }
 
-// TestTravelThroughWarpAndAcrossEdge sends the party from inside the smithy
-// to the far side of the meadow: out through the door (warp), along the
-// street and over the edge between the town and meadow maps.
-func TestTravelThroughWarpAndAcrossEdge(t *testing.T) {
+// TestTravelThroughWarpAndAcrossSeam sends the party from inside the smithy
+// to the meadow: out through the door (warp), along the street, across the
+// east-west wrap seam of the world (the town straddles it) into the meadow.
+func TestTravelThroughWarpAndAcrossSeam(t *testing.T) {
 	h := newHarness(t)
-	in, _ := h.w.Map("smithy").Spawn("entrance")
+	in, _ := h.w.Spawn("smithy", "entrance")
 	h.e.party.PlaceAll(in.Pos, world.Up)
-	goal := world.Pos{Map: "meadow", X: 20, Y: 17}
+	meadow, _ := h.w.PatchOrigin("meadow")
+	goal, _ := h.w.Offset(meadow, 20, 17)
 	h.e.goTo(goal)
 
-	var maps []world.MapID
+	var maps []world.MapRef
+	crossed := false
+	last := h.leader().Pos
 	h.runUntil("arrival in the meadow", 5000, func() bool {
-		if m := h.leader().Pos.Map; len(maps) == 0 || maps[len(maps)-1] != m {
-			maps = append(maps, m)
+		l := h.leader().Pos
+		if len(maps) == 0 || maps[len(maps)-1] != l.Map {
+			maps = append(maps, l.Map)
 		}
+		if l.Map.IsMain() && last.Map.IsMain() && last.X == h.w.W-1 && l.X == 0 {
+			crossed = true
+		}
+		last = l
 		h.checkQueue()
-		return h.idle() && h.leader().Pos == goal
+		return h.idle() && l == goal
 	})
-	want := []world.MapID{"smithy", "town", "meadow"}
-	if len(maps) != len(want) {
-		t.Fatalf("visited maps %v, want %v", maps, want)
+	if len(maps) != 2 || maps[0] != world.Detail("smithy") || maps[1] != world.Main {
+		t.Fatalf("visited maps %v, want [smithy main]", maps)
 	}
-	for i := range want {
-		if maps[i] != want[i] {
-			t.Fatalf("visited maps %v, want %v", maps, want)
-		}
+	if !crossed {
+		t.Fatal("the route should cross the wrap seam")
 	}
-	// Followers queued up behind the leader in the meadow.
 	h.checkQueue()
 	for i, m := range h.e.party.Members[1:] {
 		if m.Pos == goal {
@@ -228,7 +227,7 @@ func TestTravelThroughWarpAndAcrossEdge(t *testing.T) {
 
 func TestEnterBuildingThroughDoor(t *testing.T) {
 	h := newHarness(t)
-	goal := world.Pos{Map: "smithy", X: 6, Y: 3}
+	goal := world.Pos{Map: world.Detail("smithy"), X: 6, Y: 3}
 	h.e.goTo(goal)
 	h.runUntil("arrival in the smithy", 3000, func() bool { return h.idle() && h.leader().Pos == goal })
 }

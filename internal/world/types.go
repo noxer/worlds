@@ -1,7 +1,8 @@
-// Package world holds the static description of the game world: maps loaded
-// from Tiled, the regions that stitch edge-connected maps together, warps,
-// spawns and collision. It deliberately has no dependency on Ebitengine so
-// that movement and navigation can be tested headless.
+// Package world holds the game world: the wrapping, chunked main map
+// assembled from procedural generation and hand-made patches, and the
+// bounded detail maps (interiors, caves) reached through warps. It has no
+// dependency on Ebitengine so that movement and navigation are testable
+// headless.
 package world
 
 import "fmt"
@@ -9,13 +10,44 @@ import "fmt"
 // TileSize is the edge length of a tile in pixels.
 const TileSize = 16
 
-// MapID identifies a map. It is the map's file name without extension.
+// ChunkSize is the edge length of a chunk in tiles.
+const ChunkSize = 32
+
+// MapID names a map: MainMap or the id of a detail-map template (its file
+// name without extension).
 type MapID string
 
-// Pos is a tile position on a specific map.
+// MainMap is the id of the open-world main map.
+const MainMap MapID = "main"
+
+// MapRef identifies a concrete map: the main map, or one instance of a
+// detail-map template. Instance 0 is the default instance.
+type MapRef struct {
+	Template MapID
+	Instance uint64
+}
+
+// Main is the reference to the main map.
+var Main = MapRef{Template: MainMap}
+
+// Detail returns the default instance of a detail-map template.
+func Detail(id MapID) MapRef { return MapRef{Template: id} }
+
+func (m MapRef) String() string {
+	if m.Instance == 0 {
+		return string(m.Template)
+	}
+	return fmt.Sprintf("%s#%d", m.Template, m.Instance)
+}
+
+// IsMain reports whether m is the main map.
+func (m MapRef) IsMain() bool { return m.Template == MainMap }
+
+// Pos is a tile position on a map. Positions on the main map are kept
+// normalised to [0,W)x[0,H).
 type Pos struct {
-	Map  MapID
-	X, Y int
+	Map  MapRef
+	X, Y int64
 }
 
 func (p Pos) String() string { return fmt.Sprintf("%s(%d,%d)", p.Map, p.X, p.Y) }
@@ -35,7 +67,7 @@ const (
 var Dirs = [4]Dir{Up, Down, Left, Right}
 
 // Delta returns the tile offset of one step in direction d.
-func (d Dir) Delta() (dx, dy int) {
+func (d Dir) Delta() (dx, dy int64) {
 	switch d {
 	case Up:
 		return 0, -1

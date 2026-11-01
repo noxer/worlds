@@ -8,13 +8,13 @@ import (
 	"github.com/noxer/worlds/internal/world/worldtest"
 )
 
-func pos(m string, x, y int) world.Pos { return world.Pos{Map: world.MapID(m), X: x, Y: y} }
+var pos = worldtest.Pos
 
+// A 64x64 world whose open floor straddles the east-west seam.
 func testWorld(t *testing.T) *world.World {
-	return worldtest.Load(t,
-		worldtest.Map{Name: "a", Placed: true, Rows: []string{"....", "...."}},
-		worldtest.Map{Name: "b", Placed: true, Origin: [2]int{4, 0}, Rows: []string{"....", "...."}},
-	)
+	return worldtest.Load(t, worldtest.Spec{
+		Patches: []worldtest.Map{{Name: "strip", X: -4, Y: 0, Rows: []string{"........", "........"}}},
+	})
 }
 
 // walk moves the leader one tile and runs the animation to completion.
@@ -43,17 +43,17 @@ func newParty(n int) *entity.Party {
 	return p
 }
 
-func TestPartyUnfoldsAndFollowsAcrossEdge(t *testing.T) {
+func TestPartyUnfoldsAndFollowsAcrossSeam(t *testing.T) {
 	w := testWorld(t)
 	p := newParty(3)
-	p.PlaceAll(pos("a", 1, 0), world.Right)
+	p.PlaceAll(pos("main", 61, 0), world.Right)
 
-	walk(t, w, p, world.Right) // a(2,0)
-	walk(t, w, p, world.Right) // a(3,0)
-	walk(t, w, p, world.Right) // b(0,0), across the edge
-	walk(t, w, p, world.Down)  // b(0,1)
+	walk(t, w, p, world.Right) // 62
+	walk(t, w, p, world.Right) // 63
+	walk(t, w, p, world.Right) // 0, across the seam
+	walk(t, w, p, world.Down)  // (0,1)
 
-	want := []world.Pos{pos("b", 0, 1), pos("b", 0, 0), pos("a", 3, 0), pos("a", 2, 0)}
+	want := []world.Pos{pos("main", 0, 1), pos("main", 0, 0), pos("main", 63, 0), pos("main", 62, 0)}
 	for i, m := range p.Members {
 		if m.Pos != want[i] {
 			t.Errorf("member %d at %v, want %v", i, m.Pos, want[i])
@@ -67,10 +67,10 @@ func TestPartyUnfoldsAndFollowsAcrossEdge(t *testing.T) {
 func TestPartySwapWhenLeaderTurnsBack(t *testing.T) {
 	w := testWorld(t)
 	p := newParty(1)
-	p.PlaceAll(pos("a", 0, 0), world.Right)
+	p.PlaceAll(pos("main", 0, 0), world.Right)
 	walk(t, w, p, world.Right)
 	walk(t, w, p, world.Left) // into the follower's tile: they swap
-	if p.Leader().Pos != pos("a", 0, 0) || p.Members[1].Pos != pos("a", 1, 0) {
+	if p.Leader().Pos != pos("main", 0, 0) || p.Members[1].Pos != pos("main", 1, 0) {
 		t.Fatalf("leader %v follower %v", p.Leader().Pos, p.Members[1].Pos)
 	}
 }
@@ -84,7 +84,7 @@ func TestPartyLimit(t *testing.T) {
 
 func TestOffsetInterpolates(t *testing.T) {
 	a := &entity.Actor{}
-	a.BeginStep(world.Right, pos("a", 1, 0))
+	a.BeginStep(world.Right, pos("main", 1, 0))
 	if dx, dy := a.Offset(); dx != -16 || dy != 0 {
 		t.Fatalf("offset at start = %d,%d", dx, dy)
 	}

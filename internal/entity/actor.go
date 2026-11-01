@@ -72,7 +72,7 @@ func (a *Actor) Offset() (dx, dy int) {
 	}
 	remaining := (StepTicks - a.tick) * world.TileSize / StepTicks
 	ddx, ddy := a.stepDir.Delta()
-	return -ddx * remaining, -ddy * remaining
+	return -int(ddx) * remaining, -int(ddy) * remaining
 }
 
 // Hop returns a small vertical bounce used as walk animation, since the

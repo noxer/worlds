@@ -28,7 +28,9 @@ On Linux, desktop builds need the X11/GL headers, for example:
 
 ## Editing the world
 
-Maps are [Tiled](https://www.mapeditor.org) files in `assets/maps`. Open
-`assets/maps/overworld.world` in Tiled to edit the town and meadow side by
-side. The object conventions (spawns, warps, NPCs, signs) are listed in
+The world is configured in `assets/world.yaml` (seed, size, generator).
+Hand-made areas are [Tiled](https://www.mapeditor.org) patches placed on the
+main map: open `assets/maps/patches/main.world` in Tiled to edit them in
+context. Interiors and caves are detail maps in `assets/maps/detail`. The
+object conventions (spawns, warps, NPCs, signs) are listed in
 ARCHITECTURE.md. `go test ./assets` validates the content.

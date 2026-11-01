@@ -1,0 +1,16 @@
+# The main map: a 2^20 x 2^19 tile torus. The seed is fixed: every player
+# gets the same world.
+seed: 20261101
+width: 1048576
+height: 524288
+generator: grassland
+# Tilesets the generator uses (maps load theirs automatically).
+tilesets:
+  - tilesets/tinytown.tsj
+# Hand-made patches placed on the main map. Open this file in Tiled to edit
+# the patches in context. The town straddles the east-west wrap seam.
+patches: maps/patches/main.world
+# Detail-map templates: interiors, caves, later vehicle interiors.
+details: maps/detail
+# Where a new game starts (a spawn on the main map).
+start: start

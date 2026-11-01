@@ -10,6 +10,7 @@ import (
 
 	"github.com/noxer/worlds/internal/dialog"
 	"github.com/noxer/worlds/internal/entity"
+	"github.com/noxer/worlds/internal/geom"
 	"github.com/noxer/worlds/internal/gfx"
 	"github.com/noxer/worlds/internal/input"
 	"github.com/noxer/worlds/internal/nav"
@@ -57,7 +58,10 @@ type Explore struct {
 	fade     int // >0 fading out, <0 fading in
 	warp     *world.Warp
 
-	camX, camY int
+	// Camera: top-left pixel of the view in the coordinates of the leader's
+	// map. On the main map it is not wrapped; everything drawn is placed
+	// relative to it with wrap-aware deltas.
+	camX, camY int64
 	debug      bool
 }
 
@@ -80,29 +84,20 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		party:   cfg.Party,
 		signs:   map[world.Pos]string{},
 	}
-	ids := make([]string, 0, len(e.w.Maps))
-	for id := range e.w.Maps {
-		ids = append(ids, string(id))
-	}
-	sort.Strings(ids)
-	for _, id := range ids {
-		m := e.w.Maps[world.MapID(id)]
-		for _, o := range m.Objects {
-			p := world.Pos{Map: m.ID, X: o.X, Y: o.Y}
-			switch o.Type {
-			case "npc":
-				if o.Tile.Empty() {
-					return nil, fmt.Errorf("map %s: npc %q must be a tile object", id, o.Name)
-				}
-				facing, _ := world.ParseDir(o.Props.String("facing"))
-				n := &NPC{Dialog: o.Props.String("dialog")}
-				n.Name = o.Name
-				n.Sprite = entity.Sprite{Sheet: o.Tile.Set.Name, Index: o.Tile.Index}
-				n.Place(p, facing)
-				e.npcs = append(e.npcs, n)
-			case "sign":
-				e.signs[p] = o.Props.String("dialog")
+	for _, o := range e.w.Objects() {
+		switch o.Type {
+		case "npc":
+			if o.Tile.Empty() {
+				return nil, fmt.Errorf("%v: npc %q must be a tile object", o.Pos, o.Name)
 			}
+			facing, _ := world.ParseDir(o.Props.String("facing"))
+			n := &NPC{Dialog: o.Props.String("dialog")}
+			n.Name = o.Name
+			n.Sprite = entity.Sprite{Sheet: e.w.Tilesets().Get(o.Tile.Set()).Name, Index: o.Tile.Index()}
+			n.Place(o.Pos, facing)
+			e.npcs = append(e.npcs, n)
+		case "sign":
+			e.signs[o.Pos] = o.Props.String("dialog")
 		}
 	}
 	facing := world.Down
@@ -224,9 +219,9 @@ func (e *Explore) cancelPath() {
 
 // tapAt converts a tap to a tile on the current region and walks there.
 func (e *Explore) tapAt(p image.Point) {
-	leader := e.party.Leader()
-	r, _, _ := e.w.ToRegion(leader.Pos)
-	if target, ok := r.At(floorDiv(p.X+e.camX, tile), floorDiv(p.Y+e.camY, tile)); ok {
+	m := e.party.Leader().Pos.Map
+	tx, ty := geom.FloorDiv(e.camX+int64(p.X), tile), geom.FloorDiv(e.camY+int64(p.Y), tile)
+	if target, ok := e.w.Normalize(world.Pos{Map: m, X: tx, Y: ty}); ok {
 		e.goTo(target)
 	}
 }
@@ -329,44 +324,51 @@ func (e *Explore) talk(ctx *Context, p world.Pos) {
 	ctx.Push(NewDialogBox(dialog.NewRunner(d), nil))
 }
 
-// regionPixel returns the top-left pixel of an actor in region coordinates.
-func (e *Explore) regionPixel(a *entity.Actor) (x, y int) {
-	_, rx, ry := e.w.ToRegion(a.Pos)
+// pixel returns the top-left pixel of an actor in its map's coordinates
+// (unwrapped).
+func (e *Explore) pixel(a *entity.Actor) (x, y int64) {
 	dx, dy := a.Offset()
-	return rx*tile + dx, ry*tile + dy + a.Hop()
+	return a.Pos.X*tile + int64(dx), a.Pos.Y*tile + int64(dy+a.Hop())
+}
+
+// screen converts a pixel position on the leader's map to screen
+// coordinates. On the main map the shortest way around the world is used, so
+// things across the seam appear next to each other.
+func (e *Explore) screen(m world.MapRef, px, py int64) (int, int) {
+	w, h, wraps := e.w.Size(m)
+	if wraps {
+		return int(geom.WrapDelta(e.camX, px, w*tile)), int(geom.WrapDelta(e.camY, py, h*tile))
+	}
+	return int(px - e.camX), int(py - e.camY)
 }
 
 func (e *Explore) updateCamera(ctx *Context) {
-	r, _, _ := e.w.ToRegion(e.party.Leader().Pos)
-	x, y := e.regionPixel(e.party.Leader())
-	e.camX = clampCam(x+tile/2-ctx.W/2, r.MinX*tile, r.W*tile, ctx.W)
-	e.camY = clampCam(y+tile/2-ctx.H/2, r.MinY*tile, r.H*tile, ctx.H)
+	l := e.party.Leader()
+	x, y := e.pixel(l)
+	e.camX = x + tile/2 - int64(ctx.W)/2
+	e.camY = y + tile/2 - int64(ctx.H)/2
+	if w, h, wraps := e.w.Size(l.Pos.Map); !wraps {
+		e.camX = clampCam(e.camX, w*tile, int64(ctx.W))
+		e.camY = clampCam(e.camY, h*tile, int64(ctx.H))
+	}
 }
 
-// clampCam keeps the view inside the region, or centres the region if it is
+// clampCam keeps the view inside a detail map, or centres the map if it is
 // smaller than the screen.
-func clampCam(c, lo, size, view int) int {
+func clampCam(c, size, view int64) int64 {
 	if size <= view {
-		return lo - (view-size)/2
+		return -(view - size) / 2
 	}
-	return max(lo, min(c, lo+size-view))
-}
-
-func floorDiv(a, b int) int {
-	q := a / b
-	if (a%b != 0) && ((a < 0) != (b < 0)) {
-		q--
-	}
-	return q
+	return max(0, min(c, size-view))
 }
 
 // Draw implements Scene.
 func (e *Explore) Draw(dst *ebiten.Image) {
 	dst.Fill(gfx.ColorVoid)
-	r, _, _ := e.w.ToRegion(e.party.Leader().Pos)
-	e.drawLayers(dst, r, false)
-	e.drawActors(dst, r)
-	e.drawLayers(dst, r, true)
+	m := e.party.Leader().Pos.Map
+	e.drawLayers(dst, m, false)
+	e.drawActors(dst, m)
+	e.drawLayers(dst, m, true)
 	if e.debug {
 		e.drawDebug(dst)
 	}
@@ -379,24 +381,29 @@ func (e *Explore) Draw(dst *ebiten.Image) {
 	}
 }
 
-func (e *Explore) drawLayers(dst *ebiten.Image, r *world.Region, overhead bool) {
-	sw, sh := dst.Bounds().Dx(), dst.Bounds().Dy()
-	for _, m := range r.Maps {
-		ox, oy := m.OriginX*tile-e.camX, m.OriginY*tile-e.camY
-		x0, y0 := max(0, floorDiv(-ox, tile)), max(0, floorDiv(-oy, tile))
-		x1, y1 := min(m.W, floorDiv(sw-ox, tile)+1), min(m.H, floorDiv(sh-oy, tile)+1)
-		for _, l := range m.Layers {
-			if l.Overhead != overhead {
+// drawLayers draws the visible tiles. Tile coordinates are iterated in
+// camera space and normalised per tile, so the seam needs no special case.
+func (e *Explore) drawLayers(dst *ebiten.Image, m world.MapRef, overhead bool) {
+	sw, sh := int64(dst.Bounds().Dx()), int64(dst.Bounds().Dy())
+	x0, y0 := geom.FloorDiv(e.camX, tile), geom.FloorDiv(e.camY, tile)
+	x1, y1 := geom.FloorDiv(e.camX+sw-1, tile), geom.FloorDiv(e.camY+sh-1, tile)
+	sets := e.w.Tilesets()
+	for ty := y0; ty <= y1; ty++ {
+		for tx := x0; tx <= x1; tx++ {
+			p, ok := e.w.Normalize(world.Pos{Map: m, X: tx, Y: ty})
+			if !ok {
 				continue
 			}
-			for y := y0; y < y1; y++ {
-				for x := x0; x < x1; x++ {
-					t := l.Tiles[y*m.W+x]
-					if t.Empty() {
-						continue
-					}
-					e.drawTile(dst, e.sheets.Tile(t.Set.Name, t.Index), ox+x*tile, oy+y*tile, t.FlipH, t.FlipV)
+			sx, sy := int(tx*tile-e.camX), int(ty*tile-e.camY)
+			for l := 0; l < world.NumLayers; l++ {
+				if (l == world.LayerOverhead) != overhead {
+					continue
 				}
+				t := e.w.Tile(p, l)
+				if t.Empty() {
+					continue
+				}
+				e.drawTile(dst, e.sheets.Tile(sets.Get(t.Set()).Name, t.Index()), sx, sy, t.FlipH(), t.FlipV())
 			}
 		}
 	}
@@ -421,23 +428,29 @@ func (e *Explore) drawTile(dst, img *ebiten.Image, x, y int, flipH, flipV bool) 
 
 type drawable struct {
 	a        *entity.Actor
-	x, y     int
+	x, y     int // screen position
 	priority int
 }
 
-func (e *Explore) drawActors(dst *ebiten.Image, r *world.Region) {
+func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
+	sw, sh := dst.Bounds().Dx(), dst.Bounds().Dy()
 	var ds []drawable
-	for _, n := range e.npcs {
-		if e.w.Map(n.Pos.Map).Region != r {
-			continue
+	add := func(a *entity.Actor, priority int) {
+		if a.Pos.Map != m {
+			return
 		}
-		x, y := e.regionPixel(&n.Actor)
-		ds = append(ds, drawable{&n.Actor, x, y, 0})
+		px, py := e.pixel(a)
+		x, y := e.screen(m, px, py)
+		if x < -tile || y < -tile || x > sw || y > sh {
+			return
+		}
+		ds = append(ds, drawable{a, x, y, priority})
 	}
-	for i, m := range e.party.Members {
-		x, y := e.regionPixel(m)
-		// Leader on top when the party is stacked after a warp.
-		ds = append(ds, drawable{m, x, y, len(e.party.Members) - i})
+	for _, n := range e.npcs {
+		add(&n.Actor, 0)
+	}
+	for i, a := range e.party.Members {
+		add(a, len(e.party.Members)-i) // leader on top when stacked after a warp
 	}
 	sort.SliceStable(ds, func(i, j int) bool {
 		if ds[i].y != ds[j].y {
@@ -447,22 +460,19 @@ func (e *Explore) drawActors(dst *ebiten.Image, r *world.Region) {
 	})
 	for _, d := range ds {
 		img := e.sheets.Tile(d.a.Sprite.Sheet, d.a.Sprite.Index)
-		e.drawTile(dst, img, d.x-e.camX, d.y-e.camY, d.a.Facing == world.Left, false)
+		e.drawTile(dst, img, d.x, d.y, d.a.Facing == world.Left, false)
 	}
 }
 
 func (e *Explore) drawDebug(dst *ebiten.Image) {
-	for _, m := range e.path {
-		r, rx, ry := e.w.ToRegion(m.To)
-		if r == nil {
-			continue
-		}
-		x, y := rx*tile-e.camX, ry*tile-e.camY
+	for _, mv := range e.path {
+		x, y := e.screen(mv.To.Map, mv.To.X*tile, mv.To.Y*tile)
 		gfx.FillRect(dst, image.Rect(x+6, y+6, x+10, y+10), gfx.ColorAccent)
 	}
 	l := e.party.Leader()
-	r, rx, ry := e.w.ToRegion(l.Pos)
-	s := fmt.Sprintf("%s  region %s (%d,%d)  %.0f fps", l.Pos, r.ID, rx, ry, ebiten.ActualFPS())
+	s := fmt.Sprintf("%s chunk(%d,%d) cached %d  %.0f fps", l.Pos,
+		geom.FloorDiv(l.Pos.X, world.ChunkSize), geom.FloorDiv(l.Pos.Y, world.ChunkSize),
+		e.w.CachedChunks(), ebiten.ActualFPS())
 	gfx.FillRect(dst, image.Rect(0, 0, gfx.TextWidth(s)+4, gfx.LineHeight+2), color.RGBA{A: 0xa0})
 	gfx.Text(dst, s, 2, 0, color.White)
 }

@@ -5,5 +5,5 @@ package assets
 
 import "embed"
 
-//go:embed tiles tilesets maps dialog
+//go:embed world.yaml tiles tilesets maps dialog
 var FS embed.FS

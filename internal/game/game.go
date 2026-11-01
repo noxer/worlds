@@ -2,18 +2,16 @@
 package game
 
 import (
-	"fmt"
 	"io/fs"
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"github.com/noxer/worlds/internal/dialog"
+	"github.com/noxer/worlds/internal/content"
 	"github.com/noxer/worlds/internal/entity"
 	"github.com/noxer/worlds/internal/gfx"
 	"github.com/noxer/worlds/internal/input"
 	"github.com/noxer/worlds/internal/scene"
-	"github.com/noxer/worlds/internal/world"
 )
 
 // The logical screen is at least MinWidth x MinHeight pixels. It is scaled
@@ -33,38 +31,17 @@ type Game struct {
 
 // New loads all content from fsys and sets up the starting scene.
 func New(fsys fs.FS) (*Game, error) {
-	w, err := world.Load(fsys, "maps")
+	c, err := content.Load(fsys)
 	if err != nil {
-		return nil, fmt.Errorf("load world: %w", err)
-	}
-	dialogs, err := dialog.Load(fsys, "dialog")
-	if err != nil {
-		return nil, fmt.Errorf("load dialogs: %w", err)
+		return nil, err
 	}
 	sheets := gfx.NewSheets(fsys)
-	for _, m := range w.Maps {
-		for _, l := range m.Layers {
-			for _, t := range l.Tiles {
-				if !t.Empty() {
-					if err := sheets.Register(t.Set); err != nil {
-						return nil, err
-					}
-				}
-			}
-		}
-		for _, o := range m.Objects {
-			if !o.Tile.Empty() {
-				if err := sheets.Register(o.Tile.Set); err != nil {
-					return nil, err
-				}
-			}
+	for _, ts := range c.World.Tilesets().All() {
+		if err := sheets.Register(ts); err != nil {
+			return nil, err
 		}
 	}
 
-	start, ok := w.Map("town").Spawn("start")
-	if !ok {
-		return nil, fmt.Errorf("map town has no spawn named start")
-	}
 	party := entity.NewParty(&entity.Actor{Name: "Ari", Sprite: entity.Sprite{Sheet: "tinydungeon", Index: 85}})
 	for _, f := range []struct {
 		name  string
@@ -76,7 +53,7 @@ func New(fsys fs.FS) (*Game, error) {
 	}
 
 	explore, err := scene.NewExplore(scene.ExploreConfig{
-		World: w, Sheets: sheets, Dialogs: dialogs, Party: party, Start: start,
+		World: c.World, Sheets: sheets, Dialogs: c.Dialogs, Party: party, Start: c.Start,
 	})
 	if err != nil {
 		return nil, err

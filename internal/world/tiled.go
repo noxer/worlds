@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"path"
 )
 
 // This file contains the minimal subset of the Tiled JSON formats (.tmj maps,
@@ -138,33 +137,4 @@ func (p Props) Int(name string, def int) int {
 		return int(v)
 	}
 	return def
-}
-
-func loadTileset(fsys fs.FS, name string) (*Tileset, error) {
-	var tt tiledTileset
-	if err := readJSON(fsys, name, &tt); err != nil {
-		return nil, err
-	}
-	if tt.TileWidth != TileSize || tt.TileHeight != TileSize {
-		return nil, fmt.Errorf("%s: tiles must be %dx%d", name, TileSize, TileSize)
-	}
-	if tt.Image == "" {
-		return nil, fmt.Errorf("%s: image collection tilesets are not supported", name)
-	}
-	ts := &Tileset{
-		Name:      tt.Name,
-		Image:     path.Join(path.Dir(name), tt.Image),
-		Columns:   tt.Columns,
-		TileCount: tt.TileCount,
-		Margin:    tt.Margin,
-		Spacing:   tt.Spacing,
-		solid:     make([]bool, tt.TileCount),
-	}
-	for _, t := range tt.Tiles {
-		if t.ID < 0 || t.ID >= tt.TileCount {
-			return nil, fmt.Errorf("%s: tile id %d out of range", name, t.ID)
-		}
-		ts.solid[t.ID] = toProps(t.Properties).Bool("solid")
-	}
-	return ts, nil
 }

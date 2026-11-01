@@ -10,25 +10,48 @@ import (
 	"github.com/noxer/worlds/internal/world"
 )
 
-// Map describes a test map. Rows use '.' for floor and '#' for walls.
+// Map describes a patch or detail map. Rows use '.' for floor and '#' for
+// walls; ' ' leaves a patch cell unpainted (generated).
 type Map struct {
-	Name string
-	Rows []string
-	// Placed maps are put into one shared region ("overworld") at Origin.
-	Placed bool
-	Origin [2]int
+	Name   string
+	X, Y   int64 // patch origin on the main map (ignored for detail maps)
+	Rows   []string
 	Spawns map[string][2]int
 	Warps  []Warp
 }
 
-// Warp is a single-tile warp to a spawn on another map.
+// Warp is a single-tile warp to a spawn. ToMap is "main" or a detail map.
 type Warp struct {
 	X, Y           int
 	ToMap, ToSpawn string
 }
 
-// FS renders the maps as Tiled files.
-func FS(maps ...Map) fstest.MapFS {
+// Spec describes a test world.
+type Spec struct {
+	Width, Height int64 // default 64x64
+	// Fill is what the generator produces outside patches: '.' floor,
+	// '#' wall (default).
+	Fill    byte
+	Patches []Map
+	Details []Map
+}
+
+// fill generates every cell with one tile.
+type fill struct{ t world.Tile }
+
+func (f fill) Generate(_ uint64, b *world.ChunkBuilder) {
+	for y := 0; y < world.ChunkSize; y++ {
+		for x := 0; x < world.ChunkSize; x++ {
+			b.Set(world.LayerGround, x, y, f.t)
+		}
+	}
+}
+
+// Config renders the spec as Tiled files and returns a world config for it.
+func (s Spec) Config() (fstest.MapFS, world.Config) {
+	if s.Width == 0 {
+		s.Width, s.Height = 64, 64
+	}
 	fsys := fstest.MapFS{}
 	put := func(name string, v any) {
 		b, err := json.Marshal(v)
@@ -43,8 +66,7 @@ func FS(maps ...Map) fstest.MapFS {
 		"tiles": []any{map[string]any{"id": 1, "properties": []any{
 			map[string]any{"name": "solid", "type": "bool", "value": true}}}},
 	})
-	var placed []any
-	for _, m := range maps {
+	tmj := func(m Map) map[string]any {
 		h, w := len(m.Rows), len(m.Rows[0])
 		data := make([]uint32, 0, w*h)
 		for _, row := range m.Rows {
@@ -52,9 +74,12 @@ func FS(maps ...Map) fstest.MapFS {
 				panic(fmt.Sprintf("map %s: ragged rows", m.Name))
 			}
 			for _, c := range row {
-				if c == '#' {
+				switch c {
+				case '#':
 					data = append(data, 2)
-				} else {
+				case ' ':
+					data = append(data, 0)
+				default:
 					data = append(data, 1)
 				}
 			}
@@ -75,31 +100,57 @@ func FS(maps ...Map) fstest.MapFS {
 				}})
 			id++
 		}
-		put("maps/"+m.Name+".tmj", map[string]any{
+		return map[string]any{
 			"width": w, "height": h, "tilewidth": 16, "tileheight": 16,
 			"tilesets": []any{map[string]any{"firstgid": 1, "source": "../tilesets/test.tsj"}},
 			"layers": []any{
 				map[string]any{"name": "ground", "type": "tilelayer", "width": w, "height": h, "data": data},
 				map[string]any{"name": "objects", "type": "objectgroup", "objects": objs},
 			},
-		})
-		if m.Placed {
-			placed = append(placed, map[string]any{"fileName": m.Name + ".tmj",
-				"x": m.Origin[0] * 16, "y": m.Origin[1] * 16, "width": w * 16, "height": h * 16})
 		}
 	}
-	if len(placed) > 0 {
-		put("maps/overworld.world", map[string]any{"type": "world", "maps": placed})
+	var placed []any
+	for _, m := range s.Patches {
+		put("patches/"+m.Name+".tmj", tmj(m))
+		placed = append(placed, map[string]any{"fileName": m.Name + ".tmj",
+			"x": m.X * 16, "y": m.Y * 16, "width": len(m.Rows[0]) * 16, "height": len(m.Rows) * 16})
 	}
-	return fsys
+	put("patches/main.world", map[string]any{"type": "world", "maps": placed})
+	for _, m := range s.Details {
+		put("detail/"+m.Name+".tmj", tmj(m))
+	}
+	fsys["detail/.keep"] = &fstest.MapFile{}
+	idx := 1
+	if s.Fill == '.' {
+		idx = 0
+	}
+	cfg := world.Config{
+		Seed: 1, Width: s.Width, Height: s.Height,
+		Tilesets: []string{"tilesets/test.tsj"},
+		Patches:  "patches/main.world",
+		Details:  "detail",
+		Generator: func(ts *world.Tilesets) (world.Generator, error) {
+			return fill{ts.MustTile("test", idx)}, nil
+		},
+	}
+	return fsys, cfg
 }
 
 // Load builds and loads a world, failing the test on error.
-func Load(t testing.TB, maps ...Map) *world.World {
+func Load(t testing.TB, s Spec) *world.World {
 	t.Helper()
-	w, err := world.Load(FS(maps...), "maps")
+	fsys, cfg := s.Config()
+	w, err := world.Load(fsys, cfg)
 	if err != nil {
 		t.Fatalf("load world: %v", err)
 	}
 	return w
+}
+
+// Pos is shorthand for a position on a map: "main" or a detail map.
+func Pos(m string, x, y int64) world.Pos {
+	if m == "main" {
+		return world.Pos{Map: world.Main, X: x, Y: y}
+	}
+	return world.Pos{Map: world.Detail(world.MapID(m)), X: x, Y: y}
 }

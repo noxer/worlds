@@ -341,7 +341,7 @@
       {
        "name": "to_map",
        "type": "string",
-       "value": "town"
+       "value": "main"
       },
       {
        "name": "to_spawn",
@@ -380,7 +380,7 @@
  "tilesets": [
   {
    "firstgid": 1,
-   "source": "../tilesets/tinydungeon.tsj"
+   "source": "../../tilesets/tinydungeon.tsj"
   }
  ]
 }

@@ -2023,11 +2023,11 @@
  "tilesets": [
   {
    "firstgid": 1,
-   "source": "../tilesets/tinytown.tsj"
+   "source": "../../tilesets/tinytown.tsj"
   },
   {
    "firstgid": 133,
-   "source": "../tilesets/tinydungeon.tsj"
+   "source": "../../tilesets/tinydungeon.tsj"
   }
  ]
 }

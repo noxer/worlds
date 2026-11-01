@@ -8,9 +8,10 @@ hand-made and procedurally generated content. It is built with Go and
 [Kenney](https://kenney.nl) (CC0). It targets desktop and browser (WASM);
 mobile comes later.
 
-> **Status.** The first playable version implements an earlier model:
-> finite Tiled maps grouped into *regions*. This document describes the target
-> design. Section [Migration](#migration) lists the steps from here to there.
+> **Status.** Migration step 1 is done: chunked maps, the wrapping main map
+> assembled from patches plus a placeholder generator, detail maps, and
+> navigation and rendering ported. This document describes the target design.
+> [Migration](#migration) lists the remaining steps.
 
 ## Ground rules
 
@@ -321,7 +322,8 @@ cmd/worlds/          entry point
 assets/              embedded content: tiles, tilesets, patches, detail maps,
                      dialogs, quests; content validation test
 internal/
-  geom/              int64 positions, wrap maths, chunk coordinates
+  geom/              int64 wrap maths
+  content/           loads world.yaml, the world and dialogs (no Ebitengine)
   world/             main map, detail maps, chunk storage and cache,
                      terrain, warps (static and dynamic), anchors
   tiled/             Tiled loading (maps, tilesets, Wang sets, .world)
@@ -349,14 +351,14 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
 
 ## Migration
 
-The first playable version has finite maps, regions stitched together by
-`.world` files, and `int` coordinates. The steps to the target design:
-
-1. `geom` with `int64` and wrap maths. Chunked storage for main and detail
-   maps. The main map is assembled from patches (town, meadow) plus a stub
-   generator (grass and trees). The smithy becomes a detail map. Navigation is
-   ported to chunks and the wrap. Rendering becomes camera-relative. All
-   current behaviour and tests keep working.
+1. **Done.** `geom` with `int64` wrap maths. Chunked storage (32×32 tiles,
+   compact 4-byte tiles, a bounded cache of 1024 chunks) for main and detail
+   maps. The main map is assembled from patches (town, meadow) plus a
+   placeholder generator (`grassland`). The smithy is a detail map.
+   Navigation searches a window around start and goal, so it works across the
+   seam. Rendering is camera-relative. Fingerprint test for the generator.
+   Still to come in this area: `tiled/` split from `world/`, and
+   resolving chunks in the background (step 4).
 2. Terrain types and movement modes: swimming (shallow water), riding
    (bicycle, scooter).
 3. Generation levels 1–3, tileable noise, autotiler, fingerprint tests. The

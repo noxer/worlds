@@ -1,24 +1,30 @@
-// Package nav finds paths through the world. Paths may cross map edges
-// (inside a region, maps share one coordinate space) and warps (doors, stairs,
-// cave entrances), which connect regions.
+// Package nav finds paths through the world: across chunk borders and the
+// wrap seam of the main map, and through warps between the main map and
+// detail maps.
 //
 // Planning is hierarchical:
 //
-//  1. Within a region, A* runs on the tile grid in region coordinates.
-//  2. Across regions, Dijkstra runs on a small abstract graph whose nodes are
-//     warp entries and exits. Edge weights between nodes in the same region are
+//  1. Within one map, A* runs on the tile grid inside a window around start
+//     and goal (the main map is far too big to search as a whole). Coordinates
+//     in the window are offsets from the start, so the seam is invisible.
+//  2. Across maps, Dijkstra runs on a small graph whose nodes are warp
+//     entries and exits. Edge weights between nodes on the same map are
 //     static A* distances, computed lazily and cached until the world's
-//     passability version changes.
+//     passability version changes. On the main map only warps within
+//     MaxRange are considered.
 //
 // Only the current leg (up to the first warp, or to the goal) is refined into
-// concrete moves, taking dynamic blockers such as NPCs into account. After a
-// warp the caller plans again; that keeps plans valid when the world changes
-// while the player is on the move.
+// concrete moves, avoiding dynamic blockers such as NPCs. After a warp the
+// caller plans again.
+//
+// Long-distance travel on the main map (beyond MaxRange) will use a chunk
+// portal graph; see ARCHITECTURE.md.
 package nav
 
 import (
 	"container/heap"
 
+	"github.com/noxer/worlds/internal/geom"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -32,47 +38,46 @@ type Move struct {
 // Blocked reports dynamic obstacles (other actors). It may be nil.
 type Blocked func(world.Pos) bool
 
-// DefaultWarpCost is the cost of using a warp, in steps. A transition takes
-// time, so short walks are preferred over hopping through buildings.
-const DefaultWarpCost = 8
-
-// maxCache bounds the static distance cache.
-const maxCache = 8192
+const (
+	// DefaultWarpCost is the cost of using a warp, in steps.
+	DefaultWarpCost = 8
+	// DefaultMaxRange is the largest Manhattan distance a local search covers.
+	DefaultMaxRange = 256
+	// margin is how far the search window extends beyond start and goal.
+	margin = 24
+	// maxCache bounds the static distance cache.
+	maxCache = 8192
+)
 
 // Planner plans paths in a world. It is not safe for concurrent use.
 type Planner struct {
 	w        *world.World
 	WarpCost int
+	MaxRange int64
 
 	version uint64
 	cache   map[[2]world.Pos]int
-	byReg   map[*world.Region][]int // warp indices by region of their trigger tile
 }
 
 // NewPlanner creates a planner for w.
 func NewPlanner(w *world.World) *Planner {
-	p := &Planner{w: w, WarpCost: DefaultWarpCost, cache: map[[2]world.Pos]int{}, byReg: map[*world.Region][]int{}}
-	for i, wp := range w.Warps {
-		r, _, _ := w.ToRegion(wp.From)
-		p.byReg[r] = append(p.byReg[r], i)
-	}
-	p.version = w.Version()
-	return p
+	return &Planner{w: w, WarpCost: DefaultWarpCost, MaxRange: DefaultMaxRange,
+		cache: map[[2]world.Pos]int{}, version: w.Version()}
 }
 
 // Plan returns the moves of the current leg from `from` towards goal: either
 // all moves to goal, or the moves up to and including the step onto the first
 // warp of the route (that move has Warp set). ok is false if goal is
-// unreachable.
+// unreachable within range.
 //
-// The leg avoids dynamic blockers if possible. If blockers cut the leg off
+// The leg avoids dynamic blockers if possible. If blockers cut it off
 // completely, the statically valid leg is returned; the mover should wait and
 // plan again.
 func (p *Planner) Plan(from, goal world.Pos, blocked Blocked) (moves []Move, ok bool) {
 	if from == goal {
 		return nil, true
 	}
-	if p.w.Solid(goal) || p.w.Map(from.Map) == nil {
+	if p.w.Solid(goal) {
 		return nil, false
 	}
 	if p.version != p.w.Version() || len(p.cache) > maxCache {
@@ -85,8 +90,7 @@ func (p *Planner) Plan(from, goal world.Pos, blocked Blocked) (moves []Move, ok 
 	}
 	moves, ok = p.local(from, target, blocked)
 	if !ok {
-		moves, ok = p.local(from, target, nil)
-		if !ok {
+		if moves, ok = p.local(from, target, nil); !ok {
 			return nil, false
 		}
 	}
@@ -97,7 +101,8 @@ func (p *Planner) Plan(from, goal world.Pos, blocked Blocked) (moves []Move, ok 
 }
 
 // Distance returns the static walking distance between two tiles of the same
-// region, ignoring warps and dynamic blockers. It is -1 if unreachable.
+// map, ignoring warps and dynamic blockers. It is -1 if unreachable within
+// range.
 func (p *Planner) Distance(from, to world.Pos) int {
 	key := [2]world.Pos{from, to}
 	if d, ok := p.cache[key]; ok {
@@ -111,10 +116,16 @@ func (p *Planner) Distance(from, to world.Pos) int {
 	return d
 }
 
+// inRange reports whether a local search between a and b is allowed.
+func (p *Planner) inRange(a, b world.Pos) bool {
+	dx, dy, ok := p.w.Delta(a, b)
+	return ok && geom.Abs(dx)+geom.Abs(dy) <= p.MaxRange
+}
+
 // firstLeg runs Dijkstra over the abstract warp graph and returns the target
 // of the first leg: goal itself, or the trigger tile of the first warp used.
 func (p *Planner) firstLeg(from, goal world.Pos) (target world.Pos, warp *world.Warp, ok bool) {
-	warps := p.w.Warps
+	warps := p.w.Warps()
 	// Node ids: 0 = start, 1 = goal, 2+2i = trigger of warp i, 3+2i = exit of warp i.
 	const start, gl = 0, 1
 	pos := func(n int) world.Pos {
@@ -129,11 +140,6 @@ func (p *Planner) firstLeg(from, goal world.Pos) (target world.Pos, warp *world.
 			return warps[(n-3)/2].To
 		}
 	}
-	region := func(q world.Pos) *world.Region {
-		r, _, _ := p.w.ToRegion(q)
-		return r
-	}
-	goalRegion := region(goal)
 
 	dist := map[int]int{start: 0}
 	prev := map[int]int{}
@@ -160,23 +166,22 @@ func (p *Planner) firstLeg(from, goal world.Pos) (target world.Pos, warp *world.
 			}
 		}
 		if cur.n >= 2 && cur.n%2 == 0 {
-			// Warp trigger: the only edge is the warp itself.
-			relax(cur.n+1, p.WarpCost)
+			relax(cur.n+1, p.WarpCost) // the warp itself
 			continue
 		}
 		at := pos(cur.n)
-		r := region(at)
-		if r == goalRegion {
+		if p.inRange(at, goal) {
 			relax(gl, p.Distance(at, goal))
 		}
-		for _, i := range p.byReg[r] {
-			relax(2+2*i, p.Distance(at, warps[i].From))
+		for i, wp := range warps {
+			if p.inRange(at, wp.From) {
+				relax(2+2*i, p.Distance(at, wp.From))
+			}
 		}
 	}
 	if !done[gl] {
 		return world.Pos{}, nil, false
 	}
-	// Walk back to the node right after start.
 	n := gl
 	for prev[n] != start {
 		n = prev[n]
@@ -187,39 +192,53 @@ func (p *Planner) firstLeg(from, goal world.Pos) (target world.Pos, warp *world.
 	return pos(n), warps[(n-2)/2], true
 }
 
-// local runs A* inside the region of from. Warp tiles are impassable unless
-// they are the target, so a path never teleports by accident.
+// local runs A* on one map within a window around from and to. Warp tiles
+// are impassable unless they are the target, so a path never teleports by
+// accident.
 func (p *Planner) local(from, to world.Pos, blocked Blocked) ([]Move, bool) {
-	r, fx, fy := p.w.ToRegion(from)
-	rt, tx, ty := p.w.ToRegion(to)
-	if r == nil || r != rt {
-		return nil, false
-	}
 	if from == to {
 		return nil, true
 	}
-	if p.w.Solid(to) {
+	tx, ty, ok := p.w.Delta(from, to)
+	if !ok || geom.Abs(tx)+geom.Abs(ty) > p.MaxRange || p.w.Solid(to) {
 		return nil, false
 	}
-	idx := func(x, y int) int { return (y-r.MinY)*r.W + (x - r.MinX) }
-	n := r.W * r.H
+	// Window in offsets relative to from.
+	minX, maxX := min(0, tx)-margin, max(0, tx)+margin
+	minY, maxY := min(0, ty)-margin, max(0, ty)+margin
+	if mw, mh, wraps := p.w.Size(from.Map); !wraps {
+		// Clip to the detail map.
+		minX, maxX = max(minX, -from.X), min(maxX, mw-1-from.X)
+		minY, maxY = max(minY, -from.Y), min(maxY, mh-1-from.Y)
+	} else {
+		// Never let the window wrap onto itself.
+		if maxX-minX+1 > mw {
+			minX, maxX = -mw/2, mw-1-mw/2
+		}
+		if maxY-minY+1 > mh {
+			minY, maxY = -mh/2, mh-1-mh/2
+		}
+	}
+	ww, wh := maxX-minX+1, maxY-minY+1
+	idx := func(x, y int64) int { return int((y-minY)*ww + (x - minX)) }
+	n := int(ww * wh)
 	g := make([]int32, n)
 	parent := make([]int32, n)
 	for i := range g {
 		g[i] = -1
 	}
-	h := func(x, y int) int { return abs(x-tx) + abs(y-ty) }
+	h := func(x, y int64) int { return int(geom.Abs(x-tx) + geom.Abs(y-ty)) }
 
-	si, ti := idx(fx, fy), idx(tx, ty)
+	si, ti := idx(0, 0), idx(tx, ty)
 	g[si] = 0
 	parent[si] = -1
-	open := &nodeHeap{{n: si, d: h(fx, fy)}}
+	open := &nodeHeap{{n: si, d: h(0, 0)}}
 	for open.Len() > 0 {
 		cur := heap.Pop(open).(nodeItem)
 		if cur.n == ti {
 			break
 		}
-		cx, cy := cur.n%r.W+r.MinX, cur.n/r.W+r.MinY
+		cx, cy := int64(cur.n)%ww+minX, int64(cur.n)/ww+minY
 		cg := g[cur.n]
 		if int(cg)+h(cx, cy) < cur.d {
 			continue // stale entry
@@ -227,19 +246,21 @@ func (p *Planner) local(from, to world.Pos, blocked Blocked) ([]Move, bool) {
 		for _, d := range world.Dirs {
 			dx, dy := d.Delta()
 			nx, ny := cx+dx, cy+dy
-			np, ok := r.At(nx, ny)
-			if !ok {
+			if nx < minX || nx > maxX || ny < minY || ny > maxY {
 				continue
 			}
 			ni := idx(nx, ny)
 			if g[ni] >= 0 && g[ni] <= cg+1 {
 				continue
 			}
-			if ni != ti {
-				if p.w.Solid(np) || p.w.WarpAt(np) != nil || (blocked != nil && blocked(np)) {
-					continue
-				}
-			} else if blocked != nil && blocked(np) {
+			np, ok := p.w.Offset(from, nx, ny)
+			if !ok {
+				continue
+			}
+			if ni != ti && (p.w.Solid(np) || p.w.WarpAt(np) != nil) {
+				continue
+			}
+			if blocked != nil && blocked(np) {
 				continue
 			}
 			g[ni] = cg + 1
@@ -253,16 +274,16 @@ func (p *Planner) local(from, to world.Pos, blocked Blocked) ([]Move, bool) {
 	moves := make([]Move, g[ti])
 	for i, c := len(moves)-1, ti; i >= 0; i-- {
 		pi := int(parent[c])
-		cx, cy := c%r.W+r.MinX, c/r.W+r.MinY
-		px, py := pi%r.W+r.MinX, pi/r.W+r.MinY
-		to, _ := r.At(cx, cy)
+		cx, cy := int64(c)%ww+minX, int64(c)/ww+minY
+		px, py := int64(pi)%ww+minX, int64(pi)/ww+minY
+		to, _ := p.w.Offset(from, cx, cy)
 		moves[i] = Move{Dir: dirOf(cx-px, cy-py), To: to}
 		c = pi
 	}
 	return moves, true
 }
 
-func dirOf(dx, dy int) world.Dir {
+func dirOf(dx, dy int64) world.Dir {
 	switch {
 	case dx > 0:
 		return world.Right
@@ -273,13 +294,6 @@ func dirOf(dx, dy int) world.Dir {
 	default:
 		return world.Down
 	}
-}
-
-func abs(v int) int {
-	if v < 0 {
-		return -v
-	}
-	return v
 }
 
 type nodeItem struct{ n, d int }
