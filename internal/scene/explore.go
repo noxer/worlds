@@ -325,10 +325,10 @@ func (e *Explore) talk(ctx *Context, p world.Pos) {
 }
 
 // pixel returns the top-left pixel of an actor in its map's coordinates
-// (unwrapped).
+// (unwrapped), following its step but without the walk hop.
 func (e *Explore) pixel(a *entity.Actor) (x, y int64) {
 	dx, dy := a.Offset()
-	return a.Pos.X*tile + int64(dx), a.Pos.Y*tile + int64(dy+a.Hop())
+	return a.Pos.X*tile + int64(dx), a.Pos.Y*tile + int64(dy)
 }
 
 // screen converts a pixel position on the leader's map to screen
@@ -440,7 +440,7 @@ func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
 			return
 		}
 		px, py := e.pixel(a)
-		x, y := e.screen(m, px, py)
+		x, y := e.screen(m, px, py+int64(a.Hop()))
 		if x < -tile || y < -tile || x > sw || y > sh {
 			return
 		}

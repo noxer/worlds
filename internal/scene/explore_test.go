@@ -133,6 +133,29 @@ func TestKeyboardTurnThenWalk(t *testing.T) {
 	h.checkQueue()
 }
 
+// TestCameraDoesNotBob checks that the view moves smoothly with the leader:
+// walking sideways must never move the camera vertically (the walk hop only
+// moves the sprite).
+func TestCameraDoesNotBob(t *testing.T) {
+	h := newHarness(t)
+	h.press(input.Right) // turn first
+	h.runUntil("idle", 100, h.idle)
+	y := h.e.camY
+	lastX := h.e.camX
+	var f input.Frame
+	f.Held[input.Right] = true
+	for i := 0; i < 3*entity.StepTicks; i++ {
+		h.tick(f)
+		if h.e.camY != y {
+			t.Fatalf("tick %d: camera moved vertically from %d to %d", i, y, h.e.camY)
+		}
+		if d := h.e.camX - lastX; d < 0 || d > 1 {
+			t.Fatalf("tick %d: camera moved %d px horizontally, want 0 or 1", i, d)
+		}
+		lastX = h.e.camX
+	}
+}
+
 func TestNPCBlocksMovement(t *testing.T) {
 	h := newHarness(t)
 	elder := h.npc("elder")
