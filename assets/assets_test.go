@@ -90,33 +90,31 @@ func firstWalkable(t *testing.T, w *world.World, origin world.Pos, n int64) worl
 	return world.Pos{}
 }
 
-// TestMultiTileObjects checks that two-tile objects are always complete:
-// the bottom halves of tall trees and the well always have their top half
-// on the overhead layer above, and tops never float without a bottom. It
-// scans both patches with a margin of generated land, plus generated chunks
-// elsewhere in the world.
+// TestMultiTileObjects checks that multi-tile objects are complete: every
+// tile with an "above" property in its tileset has that tile on the
+// overhead layer above it, and upper parts never float. Patches and detail
+// maps are already checked when they load; this scans the generated land
+// around the patches and elsewhere in the world, including the seams.
 func TestMultiTileObjects(t *testing.T) {
 	c := load(t)
 	w := c.World
 	ts := w.Tilesets()
-	pairs := map[world.Tile]world.Tile{} // bottom -> top
-	tops := map[world.Tile]bool{}
-	for bottom, top := range map[int]int{16: 4, 15: 3, 104: 92} {
-		b, tp := ts.MustTile("tinytown", bottom), ts.MustTile("tinytown", top)
-		pairs[b], tops[tp] = tp, true
-	}
 	check := func(origin world.Pos, wdt, hgt int64) {
 		for y := int64(0); y < hgt; y++ {
 			for x := int64(0); x < wdt; x++ {
 				p, _ := w.Offset(origin, x, y)
 				above, _ := w.Offset(p, 0, -1)
 				below, _ := w.Offset(p, 0, 1)
-				if top, ok := pairs[w.Tile(p, world.LayerDeco)]; ok && w.Tile(above, world.LayerOverhead) != top {
-					t.Errorf("%v: bottom half without its top above", p)
+				for _, l := range []int{world.LayerGround, world.LayerDeco} {
+					if top, ok := ts.Above(w.Tile(p, l)); ok && w.Tile(above, world.LayerOverhead) != top {
+						t.Errorf("%v: lower part without its upper part above", p)
+					}
 				}
-				if ov := w.Tile(p, world.LayerOverhead); tops[ov] {
-					if pairs[w.Tile(below, world.LayerDeco)] != ov {
-						t.Errorf("%v: top half without its bottom below", p)
+				if ov := w.Tile(p, world.LayerOverhead); ts.IsTop(ov) {
+					t1, ok1 := ts.Above(w.Tile(below, world.LayerGround))
+					t2, ok2 := ts.Above(w.Tile(below, world.LayerDeco))
+					if !(ok1 && t1 == ov) && !(ok2 && t2 == ov) {
+						t.Errorf("%v: upper part without its lower part below", p)
 					}
 				}
 			}

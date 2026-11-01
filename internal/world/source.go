@@ -1,6 +1,7 @@
 package world
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"math"
@@ -151,7 +152,53 @@ func loadSource(fsys fs.FS, name string, ts *Tilesets) (*sourceMap, error) {
 	if err := walk(tm.Layers); err != nil {
 		return nil, err
 	}
+	if err := s.checkMultiTile(ts); err != nil {
+		return nil, fmt.Errorf("%s: %w", name, err)
+	}
 	return s, nil
+}
+
+// checkMultiTile verifies multi-tile objects (tiles with an "above"
+// property): every lower part has its upper part on the overhead layer one
+// tile above, and every upper part stands on its lower part.
+func (s *sourceMap) checkMultiTile(ts *Tilesets) error {
+	var errs []error
+	for y := int64(0); y < s.h; y++ {
+		for x := int64(0); x < s.w; x++ {
+			for _, l := range []int{LayerGround, LayerDeco} {
+				t := s.tile(l, x, y)
+				top, ok := ts.Above(t)
+				if !ok {
+					continue
+				}
+				if y == 0 {
+					errs = append(errs, fmt.Errorf("cell (%d,%d): tile %d of %s needs tile %d above it, but it is in the top row",
+						x, y, t.Index(), ts.list[t.Set()].Name, top.Index()))
+				} else if got := s.tile(LayerOverhead, x, y-1); got != top {
+					errs = append(errs, fmt.Errorf("cell (%d,%d): tile %d of %s needs tile %d on the overhead layer above it",
+						x, y, t.Index(), ts.list[t.Set()].Name, top.Index()))
+				}
+			}
+			if t := s.tile(LayerOverhead, x, y); ts.IsTop(t) {
+				ok := false
+				if y+1 < s.h {
+					for _, l := range []int{LayerGround, LayerDeco} {
+						if top, isBottom := ts.Above(s.tile(l, x, y+1)); isBottom && top == t {
+							ok = true
+						}
+					}
+				}
+				if !ok {
+					errs = append(errs, fmt.Errorf("cell (%d,%d): tile %d of %s is the upper part of an object, but its lower part is missing below it",
+						x, y, t.Index(), ts.list[t.Set()].Name))
+				}
+			}
+		}
+	}
+	if len(errs) > 5 {
+		errs = append(errs[:5], fmt.Errorf("and %d more", len(errs)-5))
+	}
+	return errors.Join(errs...)
 }
 
 func convertObject(o tiledObject, resolve func(uint32) (Tile, error)) (Object, error) {

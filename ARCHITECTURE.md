@@ -144,13 +144,20 @@ is computed for the whole planet up front.
      generated in any order, in the background.
 
 **Multi-tile features.** Some art spans several tiles: tall trees and the
-well have a top half on the overhead layer one tile above the bottom half.
-Patches must paint both halves. Generators decide such features from the
-coordinates of their root cell, wrap every neighbouring coordinate they look
-at (`ChunkBuilder.Wrap`), and check `ChunkBuilder.Painted` so that a feature
-never gets cut in half by a patch: where there isn't room, the generator uses
-a one-tile variant instead. The content test checks that every half has its
-partner.
+well have a top half that belongs on the overhead layer one tile above the
+bottom half. The tileset declares this, not code: the bottom tile gets the
+integer tile property `above` naming its top tile (set in Tiled's tileset
+editor, next to `solid`).
+- Patches and detail maps are checked when they load. A lower part without
+  its upper part above, a lower part in the top row, or a floating upper part
+  is a load error naming the file and cell.
+- Generators look up tops with `Tilesets.Above`. They decide a feature from
+  the coordinates of its root cell, wrap every neighbouring coordinate they
+  look at (`ChunkBuilder.Wrap`), and check `ChunkBuilder.Painted` so that a
+  feature never gets cut in half by a patch. Where there isn't room, they use
+  a one-tile variant instead.
+- The content test scans generated land, including the world's seams, for
+  incomplete objects, using the same tileset data.
 
 Generators are registered per biome (`ocean`, `desert`, `forest`, …). Each is a
 small Go type with tests for determinism, connectivity, and "never overwrites

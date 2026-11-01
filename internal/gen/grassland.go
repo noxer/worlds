@@ -1,6 +1,10 @@
 package gen
 
-import "github.com/noxer/worlds/internal/world"
+import (
+	"fmt"
+
+	"github.com/noxer/worlds/internal/world"
+)
 
 // Grassland is a placeholder generator until the biome generators exist:
 // grass with flowers, bushes, small trees and tall two-tile trees, using Tiny
@@ -31,13 +35,23 @@ func NewGrassland(ts *world.Tilesets) (world.Generator, error) {
 		return t
 	}
 	g.grass, g.grass2, g.flowers = tile(0), tile(1), tile(2)
-	g.trees = []tree{
-		{bottom: tile(16), top: tile(4), small: tile(28)}, // tall green
-		{bottom: tile(16), top: tile(4), small: tile(28)},
-		{bottom: tile(15), top: tile(3), small: tile(27)}, // tall orange
-		{bottom: tile(28)}, // small green
-		{bottom: tile(27)}, // small orange
-		{bottom: tile(5)},  // bush
+	// Which trees are tall, and their tops, comes from the tileset's "above"
+	// property. small is the one-tile fallback for tall trees.
+	for _, t := range []tree{
+		{bottom: tile(16), small: tile(28)}, // tall green
+		{bottom: tile(16), small: tile(28)},
+		{bottom: tile(15), small: tile(27)}, // tall orange
+		{bottom: tile(28)},                  // small green
+		{bottom: tile(27)},                  // small orange
+		{bottom: tile(5)},                   // bush
+	} {
+		if top, ok := ts.Above(t.bottom); ok {
+			if t.small.Empty() && err == nil {
+				err = fmt.Errorf("grassland: tall tree tile %d needs a one-tile fallback", t.bottom.Index())
+			}
+			t.top = top
+		}
+		g.trees = append(g.trees, t)
 	}
 	return g, err
 }

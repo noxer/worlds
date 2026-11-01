@@ -161,3 +161,38 @@ func TestValidation(t *testing.T) {
 	s.Patches = append(s.Patches, worldtest.Map{Name: "other", X: 1, Y: 12, Rows: []string{"  ", "  ", ".."}})
 	worldtest.Load(t, s)
 }
+
+// TestMultiTileValidation checks the "above" tileset property: the lower
+// part of a two-tile object needs its upper part on the overhead layer
+// above, and upper parts may not float.
+func TestMultiTileValidation(t *testing.T) {
+	cases := []struct {
+		name string
+		rows []string
+		err  string // "" means the map is valid
+	}{
+		{"complete", []string{"..t..", "..T.."}, ""},
+		{"missing top", []string{".....", "..T.."}, "needs tile 3 on the overhead layer"},
+		{"top row", []string{"..T..", "....."}, "top row"},
+		{"floating top", []string{"..t..", "....."}, "lower part is missing"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fsys, cfg := worldtest.Spec{Details: []worldtest.Map{{Name: "room", Rows: c.rows}}}.Config()
+			w, err := world.Load(fsys, cfg)
+			if c.err == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				// The top is on the overhead layer and does not block.
+				if w.Solid(pos("room", 2, 0)) || !w.Solid(pos("room", 2, 1)) {
+					t.Fatal("upper part must be walkable, lower part solid")
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), c.err) || !strings.Contains(err.Error(), "room.tmj") {
+				t.Fatalf("error = %v, want one naming room.tmj and containing %q", err, c.err)
+			}
+		})
+	}
+}

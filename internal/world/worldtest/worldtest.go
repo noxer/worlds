@@ -11,7 +11,9 @@ import (
 )
 
 // Map describes a patch or detail map. Rows use '.' for floor and '#' for
-// walls; ' ' leaves a patch cell unpainted (generated).
+// walls; ' ' leaves a patch cell unpainted (generated). 'T' is the lower part
+// of a two-tile tree (solid), 't' its upper part on the overhead layer above
+// a floor cell.
 type Map struct {
 	Name   string
 	X, Y   int64 // patch origin on the main map (ignored for detail maps)
@@ -61,27 +63,40 @@ func (s Spec) Config() (fstest.MapFS, world.Config) {
 		fsys[name] = &fstest.MapFile{Data: b}
 	}
 	put("tilesets/test.tsj", map[string]any{
-		"name": "test", "tilewidth": 16, "tileheight": 16, "tilecount": 2, "columns": 2,
-		"image": "test.png", "imagewidth": 32, "imageheight": 16,
-		"tiles": []any{map[string]any{"id": 1, "properties": []any{
-			map[string]any{"name": "solid", "type": "bool", "value": true}}}},
+		"name": "test", "tilewidth": 16, "tileheight": 16, "tilecount": 4, "columns": 4,
+		"image": "test.png", "imagewidth": 64, "imageheight": 16,
+		"tiles": []any{
+			map[string]any{"id": 1, "properties": []any{
+				map[string]any{"name": "solid", "type": "bool", "value": true}}},
+			map[string]any{"id": 2, "properties": []any{
+				map[string]any{"name": "solid", "type": "bool", "value": true},
+				map[string]any{"name": "above", "type": "int", "value": 3}}},
+		},
 	})
 	tmj := func(m Map) map[string]any {
 		h, w := len(m.Rows), len(m.Rows[0])
 		data := make([]uint32, 0, w*h)
+		over := make([]uint32, 0, w*h)
 		for _, row := range m.Rows {
 			if len(row) != w {
 				panic(fmt.Sprintf("map %s: ragged rows", m.Name))
 			}
 			for _, c := range row {
+				o := uint32(0)
 				switch c {
 				case '#':
 					data = append(data, 2)
 				case ' ':
 					data = append(data, 0)
+				case 'T':
+					data = append(data, 3)
+				case 't':
+					data = append(data, 1)
+					o = 4
 				default:
 					data = append(data, 1)
 				}
+				over = append(over, o)
 			}
 		}
 		var objs []any
@@ -105,6 +120,7 @@ func (s Spec) Config() (fstest.MapFS, world.Config) {
 			"tilesets": []any{map[string]any{"firstgid": 1, "source": "../tilesets/test.tsj"}},
 			"layers": []any{
 				map[string]any{"name": "ground", "type": "tilelayer", "width": w, "height": h, "data": data},
+				map[string]any{"name": "overhead", "type": "tilelayer", "width": w, "height": h, "data": over},
 				map[string]any{"name": "objects", "type": "objectgroup", "objects": objs},
 			},
 		}

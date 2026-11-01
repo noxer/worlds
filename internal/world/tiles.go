@@ -15,10 +15,25 @@ type Tileset struct {
 	Margin    int
 	Spacing   int
 	solid     []bool
+	above     []int  // index of the tile that belongs one tile above, or -1
+	isTop     []bool // tile is the upper part of a multi-tile object
 }
 
 // Solid reports whether tile index i blocks movement.
 func (t *Tileset) Solid(i int) bool { return i >= 0 && i < len(t.solid) && t.solid[i] }
+
+// Above returns the tile index that must sit one tile above tile i on the
+// overhead layer (the top half of a tall tree, a well's roof). It is
+// declared in Tiled as the integer tile property "above".
+func (t *Tileset) Above(i int) (int, bool) {
+	if i < 0 || i >= len(t.above) || t.above[i] < 0 {
+		return 0, false
+	}
+	return t.above[i], true
+}
+
+// IsTop reports whether tile i is the upper part of a multi-tile object.
+func (t *Tileset) IsTop(i int) bool { return i >= 0 && i < len(t.isTop) && t.isTop[i] }
 
 // Tile is a compact tile reference (4 bytes, chunks hold many of them).
 // Layout: bit 31 flip H, bit 30 flip V, bits 20-29 tileset number + 1,
@@ -91,6 +106,24 @@ func (ts *Tilesets) Solid(t Tile) bool {
 	return !t.Empty() && ts.list[t.Set()].Solid(t.Index())
 }
 
+// Above returns the tile that belongs one tile above t, if t is the lower
+// part of a multi-tile object.
+func (ts *Tilesets) Above(t Tile) (Tile, bool) {
+	if t.Empty() {
+		return 0, false
+	}
+	i, ok := ts.list[t.Set()].Above(t.Index())
+	if !ok {
+		return 0, false
+	}
+	return makeTile(t.Set(), i, t.FlipH(), t.FlipV()), true
+}
+
+// IsTop reports whether t is the upper part of a multi-tile object.
+func (ts *Tilesets) IsTop(t Tile) bool {
+	return !t.Empty() && ts.list[t.Set()].IsTop(t.Index())
+}
+
 func makeTile(set, index int, flipH, flipV bool) Tile {
 	t := Tile(set+1)<<tileSetShift | Tile(index)
 	if flipH {
@@ -134,12 +167,25 @@ func (ts *Tilesets) load(fsys fs.FS, name string) (int, error) {
 		Margin:    tt.Margin,
 		Spacing:   tt.Spacing,
 		solid:     make([]bool, tt.TileCount),
+		above:     make([]int, tt.TileCount),
+		isTop:     make([]bool, tt.TileCount),
+	}
+	for i := range set.above {
+		set.above[i] = -1
 	}
 	for _, t := range tt.Tiles {
 		if t.ID < 0 || t.ID >= tt.TileCount {
 			return 0, fmt.Errorf("%s: tile id %d out of range", name, t.ID)
 		}
-		set.solid[t.ID] = toProps(t.Properties).Bool("solid")
+		props := toProps(t.Properties)
+		set.solid[t.ID] = props.Bool("solid")
+		if a := props.Int("above", -1); a >= 0 {
+			if a >= tt.TileCount || a == t.ID {
+				return 0, fmt.Errorf("%s: tile %d: property above=%d is not another tile of this set", name, t.ID, a)
+			}
+			set.above[t.ID] = a
+			set.isTop[a] = true
+		}
 	}
 	i := len(ts.list)
 	ts.list = append(ts.list, set)
