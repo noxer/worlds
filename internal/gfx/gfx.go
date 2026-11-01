@@ -8,9 +8,9 @@ import (
 	_ "image/png" // register PNG decoder
 	"io/fs"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"golang.org/x/image/font/basicfont"
 
 	"github.com/noxer/worlds/internal/world"
@@ -76,11 +76,53 @@ var (
 	ColorVoid   = color.RGBA{0x1b, 0x1b, 0x28, 0xff}
 )
 
-// Face is the UI font: a crisp bitmap font that suits the pixel art.
-var Face text.Face = text.NewGoXFace(basicfont.Face7x13)
+// The UI font is the 7x13 bitmap font from x/image: crisp at any integer
+// scale and it suits the pixel art. Glyphs are drawn from an atlas image;
+// this avoids Ebitengine's text/v2, whose shaping engine adds about 1.5 MB
+// to the WebAssembly build.
+var face = basicfont.Face7x13
 
 // LineHeight is the distance between text lines in pixels.
 const LineHeight = 13
+
+var (
+	fontAtlas *ebiten.Image
+	glyphs    = map[rune]*ebiten.Image{}
+)
+
+// glyph returns the image of r, or of '?' for runes the font lacks.
+func glyph(r rune) *ebiten.Image {
+	if g, ok := glyphs[r]; ok {
+		return g
+	}
+	if fontAtlas == nil {
+		// The mask is an alpha image; draw it as white with that alpha so
+		// that ColorScale can tint it.
+		b := face.Mask.Bounds()
+		rgba := image.NewRGBA(b)
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			for x := b.Min.X; x < b.Max.X; x++ {
+				_, _, _, a := face.Mask.At(x, y).RGBA()
+				rgba.Set(x, y, color.RGBA{uint8(a >> 8), uint8(a >> 8), uint8(a >> 8), uint8(a >> 8)})
+			}
+		}
+		fontAtlas = ebiten.NewImageFromImage(rgba)
+	}
+	h := face.Ascent + face.Descent
+	var g *ebiten.Image
+	for _, rg := range face.Ranges {
+		if r >= rg.Low && r < rg.High {
+			y := (int(r-rg.Low) + rg.Offset) * h
+			g = fontAtlas.SubImage(image.Rect(0, y, face.Width, y+h)).(*ebiten.Image)
+			break
+		}
+	}
+	if g == nil && r != '?' {
+		g = glyph('?')
+	}
+	glyphs[r] = g
+	return g
+}
 
 var pixel *ebiten.Image
 
@@ -106,14 +148,20 @@ func Box(dst *ebiten.Image, r image.Rectangle) {
 
 // Text draws a single line of text with its top-left corner at x, y.
 func Text(dst *ebiten.Image, s string, x, y int, c color.Color) {
-	op := &text.DrawOptions{}
-	op.GeoM.Translate(float64(x), float64(y))
+	op := &ebiten.DrawImageOptions{}
 	op.ColorScale.ScaleWithColor(c)
-	text.Draw(dst, s, Face, op)
+	for _, r := range s {
+		if r != ' ' {
+			op.GeoM.Reset()
+			op.GeoM.Translate(float64(x), float64(y))
+			dst.DrawImage(glyph(r), op)
+		}
+		x += face.Advance
+	}
 }
 
 // TextWidth returns the width of s in pixels.
-func TextWidth(s string) int { return int(text.Advance(s, Face)) }
+func TextWidth(s string) int { return utf8.RuneCountInString(s) * face.Advance }
 
 // Wrap breaks s into lines no wider than width pixels.
 func Wrap(s string, width int) []string {

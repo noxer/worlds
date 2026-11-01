@@ -368,6 +368,33 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
 5. Public transport: routes, stops and timetables; dynamic warps; interiors as
    instances; window view; taxis.
 
+## Asset delivery
+
+The world itself costs almost nothing to ship: generated chunks come from the
+seed, and only patches, detail maps and art are data. Today all content is
+embedded with `go:embed`, about 100 KB. The executable is the big part: about
+13.6 MB of WebAssembly is Ebitengine and the Go runtime, and the game adds
+under 1 MB. (Ebitengine's `text/v2` was replaced by a bitmap glyph atlas,
+because its shaping engine alone added 1.5 MB.)
+
+As content grows (art packs, audio, hundreds of patches and detail maps), it
+moves out of the binary:
+- **One loading abstraction:** all content is read through an `fs.FS`. A
+  content pack is a directory (desktop) or a set of files fetched over HTTP
+  (browser, mobile).
+- **Base pack:** UI, the start area and core tilesets, embedded or fetched at
+  start.
+- **Regional packs:** patches, detail maps and NPC data for an area of the
+  main map, keyed by area coordinates. They are fetched in the background
+  when the party's anchor approaches, alongside chunk streaming. Generation
+  never waits on the network; a patch that hasn't arrived yet is applied when
+  it does, before its chunks are shown.
+- **Shared assets** (tilesets, sprites, audio) are fetched on first use and
+  cached by the browser. A manifest lists every pack with a content hash, so
+  updates only download what changed.
+- **Compression** is left to the transport (gzip or brotli over HTTP); the
+  WebAssembly binary compresses to about 4 MB.
+
 ## World size
 
 2²⁰ × 2¹⁹ tiles (about 1 million × 500,000), set in `assets/world.yaml`
