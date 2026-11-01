@@ -36,3 +36,10 @@ main map: open `assets/maps/patches/main.world` in Tiled to edit them in
 context. Interiors and caves are detail maps in `assets/maps/detail`. The
 object conventions (spawns, warps, NPCs, signs) are listed in
 ARCHITECTURE.md. `go test ./assets` validates the content.
+
+To see the generated world, render it with `cmd/worldmap`:
+
+```sh
+go run ./cmd/worldmap -step 1024 -o planet.png                       # whole planet
+go run ./cmd/worldmap -tiles -x -22 -y 193752 -w 72 -h 40 -o start.png # tile art
+```

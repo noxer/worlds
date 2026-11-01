@@ -19,6 +19,13 @@ type Tileset struct {
 	isTop     []bool // tile is the upper part of a multi-tile object
 	terrain   []Terrain
 	anims     map[int]*Animation
+	names     map[string]int // tile property "name"
+}
+
+// Named returns the tile with the given "name" property.
+func (t *Tileset) Named(name string) (int, bool) {
+	i, ok := t.names[name]
+	return i, ok
 }
 
 // Terrain returns the terrain of tile i (property "terrain"; default land).
@@ -100,6 +107,19 @@ func (ts *Tilesets) Tile(name string, index int) (Tile, error) {
 		return 0, fmt.Errorf("tileset %q has no tile %d", name, index)
 	}
 	return makeTile(i, index, false, false), nil
+}
+
+// Named returns a tile by tileset name and the tile's "name" property.
+func (ts *Tilesets) Named(set, name string) (Tile, error) {
+	i, ok := ts.byName[set]
+	if !ok {
+		return 0, fmt.Errorf("unknown tileset %q", set)
+	}
+	idx, ok := ts.list[i].Named(name)
+	if !ok {
+		return 0, fmt.Errorf("tileset %q has no tile named %q", set, name)
+	}
+	return makeTile(i, idx, false, false), nil
 }
 
 // MustTile is Tile for use in generator setup with known-good arguments.
@@ -189,6 +209,7 @@ func (ts *Tilesets) load(fsys fs.FS, name string) (int, error) {
 		isTop:     make([]bool, tt.TileCount),
 		terrain:   make([]Terrain, tt.TileCount),
 		anims:     map[int]*Animation{},
+		names:     map[string]int{},
 	}
 	for i := range set.above {
 		set.above[i] = -1
@@ -204,6 +225,12 @@ func (ts *Tilesets) load(fsys fs.FS, name string) (int, error) {
 			return 0, fmt.Errorf("%s: tile %d: %w", name, t.ID, err)
 		}
 		set.terrain[t.ID] = terrain
+		if n := props.String("name"); n != "" {
+			if _, dup := set.names[n]; dup {
+				return 0, fmt.Errorf("%s: tile %d: duplicate tile name %q", name, t.ID, n)
+			}
+			set.names[n] = t.ID
+		}
 		if a := props.Int("above", -1); a >= 0 {
 			if a >= tt.TileCount || a == t.ID {
 				return 0, fmt.Errorf("%s: tile %d: property above=%d is not another tile of this set", name, t.ID, a)

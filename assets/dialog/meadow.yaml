@@ -13,3 +13,10 @@ wanderer:
       lines:
         - The paths through the grove twist about.
         - Some say the trees move when nobody is looking.
+
+isle_sign:
+  start: main
+  nodes:
+    main:
+      lines:
+        - "GULL ISLE  -  Swimmers welcome. Boats, one day."

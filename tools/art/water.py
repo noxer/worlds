@@ -149,6 +149,8 @@ for k, (name, t, terrain) in enumerate(rows):
         entry = {"id": first + f, "properties": [{"name": "terrain", "type": "string", "value": terrain}]}
         if f == 0:
             entry["animation"] = [{"tileid": first + g, "duration": DURATION} for g in range(len(OFFSETS))]
+            # Generators look tiles up by this name (Tilesets.Named).
+            entry["properties"].append({"name": "name", "type": "string", "value": name})
         tiles.append(entry)
 sheet.save(out_png)
 ts = {"type": "tileset", "version": "1.10", "tiledversion": "1.11.0", "name": "water",

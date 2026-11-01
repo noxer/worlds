@@ -27,10 +27,11 @@ func Hash(seed uint64, vals ...int64) uint64 {
 }
 
 // Constructor creates a generator once tilesets are loaded.
-type Constructor func(*world.Tilesets) (world.Generator, error)
+type Constructor func(world.GenInfo) (world.Generator, error)
 
 var registry = map[string]Constructor{
 	"grassland": NewGrassland,
+	"earth":     NewEarth,
 }
 
 // ByName returns a registered generator.

@@ -23,9 +23,13 @@ type Config struct {
 	Patches string
 	// Details is a directory of detail-map templates (*.tmj).
 	Details string
+	// Pool is a directory of pool patches (*.tmj): hand-made pieces such as
+	// small islands that the world places by itself, at most one per area of
+	// AreaSize x AreaSize tiles, where the generator reports a suitable spot.
+	Pool string
 	// Generator creates the procedural generator once tilesets are loaded.
 	// Nil means the main map is empty (void) outside patches.
-	Generator func(*Tilesets) (Generator, error)
+	Generator func(GenInfo) (Generator, error)
 	// CacheChunks bounds the number of resolved main-map chunks kept in
 	// memory. Default 1024 (about 13 MB).
 	CacheChunks int
@@ -47,8 +51,11 @@ type Spawn struct {
 }
 
 type patch struct {
-	src  *sourceMap
-	x, y int64 // normalised origin on the main map
+	src      *sourceMap
+	x, y     int64  // normalised origin on the main map
+	surround string // what the generator must put around it ("" = anything)
+	margin   int64  // width of the surroundings in tiles
+	pool     bool   // placed by the world from the pool
 }
 
 type template struct {
@@ -66,12 +73,15 @@ type World struct {
 	Seed uint64
 	W, H int64
 
-	tilesets  *Tilesets
-	gen       Generator
-	patches   []*patch
-	patchIdx  map[[2]int64][]*patch
-	templates map[MapID]*template
-	cache     *chunkCache
+	tilesets    *Tilesets
+	gen         Generator
+	patches     []*patch
+	patchIdx    map[[2]int64][]*patch // fixed patches by chunk they paint
+	surroundIdx map[[2]int64][]*patch // fixed patches by chunk their surroundings reach
+	pool        []poolEntry
+	poolCache   map[[2]int64][]*patch
+	templates   map[MapID]*template
+	cache       *chunkCache
 
 	spawns  map[MapID]map[string]Spawn
 	warps   map[warpKey]*Warp
@@ -182,9 +192,9 @@ func (w *World) chunk(p Pos) (c *Chunk, lx, ly int) {
 func (w *World) resolve(cx, cy int64) *Chunk {
 	c := &Chunk{}
 	if w.gen != nil {
-		w.gen.Generate(w.Seed, &ChunkBuilder{CX: cx, CY: cy, c: c, owned: w.painted, w: w.W, h: w.H})
+		w.gen.Generate(w.Seed, &ChunkBuilder{CX: cx, CY: cy, c: c, w: w, ww: w.W, wh: w.H})
 	}
-	for _, p := range w.patchIdx[[2]int64{cx, cy}] {
+	for _, p := range w.patchesNear(cx, cy, false) {
 		for ly := int64(0); ly < ChunkSize; ly++ {
 			py := geom.Mod(cy*ChunkSize+ly-p.y, w.H)
 			if py >= p.src.h {
@@ -203,18 +213,6 @@ func (w *World) resolve(cx, cy int64) *Chunk {
 	}
 	c.computeDerived(w.tilesets)
 	return c
-}
-
-// painted reports whether a patch paints main-map cell (x, y).
-func (w *World) painted(x, y int64) bool {
-	x, y = geom.Mod(x, w.W), geom.Mod(y, w.H)
-	for _, p := range w.patchIdx[[2]int64{geom.FloorDiv(x, ChunkSize), geom.FloorDiv(y, ChunkSize)}] {
-		px, py := geom.Mod(x-p.x, w.W), geom.Mod(y-p.y, w.H)
-		if px < p.src.w && py < p.src.h && p.src.owns(px, py) {
-			return true
-		}
-	}
-	return false
 }
 
 // CachedChunks returns the number of main-map chunks currently in memory.
@@ -323,13 +321,15 @@ func Load(fsys fs.FS, cfg Config) (*World, error) {
 	}
 	w := &World{
 		Seed: cfg.Seed, W: cfg.Width, H: cfg.Height,
-		tilesets:  newTilesets(),
-		patchIdx:  map[[2]int64][]*patch{},
-		templates: map[MapID]*template{},
-		cache:     newChunkCache(cfg.CacheChunks),
-		spawns:    map[MapID]map[string]Spawn{},
-		warps:     map[warpKey]*Warp{},
-		blocked:   map[Pos]int{},
+		tilesets:    newTilesets(),
+		patchIdx:    map[[2]int64][]*patch{},
+		surroundIdx: map[[2]int64][]*patch{},
+		poolCache:   map[[2]int64][]*patch{},
+		templates:   map[MapID]*template{},
+		cache:       newChunkCache(cfg.CacheChunks),
+		spawns:      map[MapID]map[string]Spawn{},
+		warps:       map[warpKey]*Warp{},
+		blocked:     map[Pos]int{},
 	}
 	for _, ts := range cfg.Tilesets {
 		if _, err := w.tilesets.load(fsys, ts); err != nil {
@@ -347,11 +347,16 @@ func Load(fsys fs.FS, cfg Config) (*World, error) {
 		}
 	}
 	if cfg.Generator != nil {
-		g, err := cfg.Generator(w.tilesets)
+		g, err := cfg.Generator(GenInfo{Tilesets: w.tilesets, W: w.W, H: w.H})
 		if err != nil {
 			return nil, fmt.Errorf("generator: %w", err)
 		}
 		w.gen = g
+	}
+	if cfg.Pool != "" {
+		if err := w.loadPool(fsys, cfg.Pool); err != nil {
+			return nil, err
+		}
 	}
 	if err := w.resolveObjects(); err != nil {
 		return nil, err
@@ -435,14 +440,10 @@ func (w *World) loadPatches(fsys fs.FS, name string) error {
 				owner[key] = src.id
 			}
 		}
-		// Index the patch by every chunk it touches.
-		cw, ch := w.W/ChunkSize, w.H/ChunkSize
-		for cy := geom.FloorDiv(p.y, ChunkSize); cy <= geom.FloorDiv(p.y+src.h-1, ChunkSize); cy++ {
-			for cx := geom.FloorDiv(p.x, ChunkSize); cx <= geom.FloorDiv(p.x+src.w-1, ChunkSize); cx++ {
-				key := [2]int64{geom.Mod(cx, cw), geom.Mod(cy, ch)}
-				w.patchIdx[key] = append(w.patchIdx[key], p)
-			}
+		if p.surround, p.margin, err = patchSurround(src, ""); err != nil {
+			return err
 		}
+		w.indexPatch(p)
 		w.patches = append(w.patches, p)
 	}
 	return nil

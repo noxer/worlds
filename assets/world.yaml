@@ -3,7 +3,7 @@
 seed: 20261101
 width: 1048576
 height: 524288
-generator: grassland
+generator: earth     # oceans, coasts and grassland (internal/gen/earth.go)
 # Tilesets always loaded: those the generator and the game use directly
 # (maps load theirs automatically).
 tilesets:
@@ -16,5 +16,8 @@ tilesets:
 patches: maps/patches/main.world
 # Detail-map templates: interiors, caves, later vehicle interiors.
 details: maps/detail
+# Pool patches: hand-made pieces (small islands) the world places by itself,
+# at most one per 512x512 area, where the generator finds open sea.
+pool: maps/pool
 # Where a new game starts (a spawn on the main map).
 start: start

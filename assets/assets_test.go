@@ -58,7 +58,7 @@ func TestReachability(t *testing.T) {
 	for _, id := range w.Templates() {
 		goals = append(goals, firstWalkable(t, w, world.Pos{Map: world.Detail(id)}, 64))
 	}
-	for _, name := range []world.MapID{"town", "meadow"} {
+	for _, name := range []world.MapID{"town", "meadow", "isle"} { // the isle: by swimming
 		o, ok := w.PatchOrigin(name)
 		if !ok {
 			t.Fatalf("patch %s missing", name)

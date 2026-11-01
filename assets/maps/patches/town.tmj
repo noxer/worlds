@@ -2034,5 +2034,17 @@
    "firstgid": 133,
    "source": "../../tilesets/tinydungeon.tsj"
   }
+ ],
+ "properties": [
+  {
+   "name": "surround",
+   "type": "string",
+   "value": "land"
+  },
+  {
+   "name": "margin",
+   "type": "int",
+   "value": 4
+  }
  ]
 }

@@ -22,6 +22,7 @@ type WorldFile struct {
 	Tilesets  []string `yaml:"tilesets"`
 	Patches   string   `yaml:"patches"`
 	Details   string   `yaml:"details"`
+	Pool      string   `yaml:"pool"`
 	Start     string   `yaml:"start"`
 }
 
@@ -32,8 +33,16 @@ type Content struct {
 	Start   world.Spawn
 }
 
+// Options override parts of world.yaml (for tools and tests).
+type Options struct {
+	Seed *uint64
+}
+
 // Load reads world.yaml, assembles the world and loads all dialogs.
-func Load(fsys fs.FS) (*Content, error) {
+func Load(fsys fs.FS) (*Content, error) { return LoadWith(fsys, Options{}) }
+
+// LoadWith is Load with overrides.
+func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 	b, err := fs.ReadFile(fsys, "world.yaml")
 	if err != nil {
 		return nil, err
@@ -42,9 +51,12 @@ func Load(fsys fs.FS) (*Content, error) {
 	if err := yaml.Unmarshal(b, &wf); err != nil {
 		return nil, fmt.Errorf("world.yaml: %w", err)
 	}
+	if opt.Seed != nil {
+		wf.Seed = *opt.Seed
+	}
 	cfg := world.Config{
 		Seed: wf.Seed, Width: wf.Width, Height: wf.Height,
-		Tilesets: wf.Tilesets, Patches: wf.Patches, Details: wf.Details,
+		Tilesets: wf.Tilesets, Patches: wf.Patches, Details: wf.Details, Pool: wf.Pool,
 	}
 	if wf.Generator != "" {
 		if cfg.Generator, err = gen.ByName(wf.Generator); err != nil {

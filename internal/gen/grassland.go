@@ -24,7 +24,8 @@ type tree struct {
 func (t tree) tall() bool { return !t.top.Empty() }
 
 // NewGrassland creates the grassland generator.
-func NewGrassland(ts *world.Tilesets) (world.Generator, error) {
+func NewGrassland(info world.GenInfo) (world.Generator, error) {
+	ts := info.Tilesets
 	g := &Grassland{}
 	var err error
 	tile := func(i int) world.Tile {
@@ -57,10 +58,12 @@ func NewGrassland(ts *world.Tilesets) (world.Generator, error) {
 }
 
 // treeAt returns the tree rooted at (x, y), if any. A tall tree needs both
-// its cells free of patches; otherwise it is replaced by its small variant.
-// The decision depends only on the seed, the coordinates and the patches,
-// so neighbouring chunks agree about trees whose top crosses their border.
-func (g *Grassland) treeAt(seed uint64, b *world.ChunkBuilder, x, y int64) (bottom, top world.Tile, ok bool) {
+// its cells free of patches and roomAbove (the caller's terrain allows a
+// tree top above); otherwise it is replaced by its small variant. The
+// decision depends only on the seed, the coordinates, the patches and the
+// terrain, so neighbouring chunks agree about trees whose top crosses their
+// border.
+func (g *Grassland) treeAt(seed uint64, b *world.ChunkBuilder, x, y int64, roomAbove bool) (bottom, top world.Tile, ok bool) {
 	x, y = b.Wrap(x, y)
 	h := Hash(seed, x, y)
 	if (h>>16)%100 >= 6 {
@@ -70,10 +73,22 @@ func (g *Grassland) treeAt(seed uint64, b *world.ChunkBuilder, x, y int64) (bott
 	if !t.tall() {
 		return t.bottom, 0, true
 	}
-	if ax, ay := b.Wrap(x, y-1); b.Painted(x, y) || b.Painted(ax, ay) {
+	if ax, ay := b.Wrap(x, y-1); !roomAbove || b.Painted(x, y) || b.Painted(ax, ay) {
 		return t.small, 0, true
 	}
 	return t.bottom, t.top, true
+}
+
+// ground sets the grass of local cell (lx, ly) at main-map position (x, y).
+func (g *Grassland) ground(seed uint64, b *world.ChunkBuilder, lx, ly int, x, y int64) {
+	switch r := Hash(seed, x, y) % 100; {
+	case r < 4:
+		b.Set(world.LayerGround, lx, ly, g.flowers)
+	case r < 22:
+		b.Set(world.LayerGround, lx, ly, g.grass2)
+	default:
+		b.Set(world.LayerGround, lx, ly, g.grass)
+	}
 }
 
 // Generate implements world.Generator.
@@ -81,19 +96,12 @@ func (g *Grassland) Generate(seed uint64, b *world.ChunkBuilder) {
 	for ly := 0; ly < world.ChunkSize; ly++ {
 		for lx := 0; lx < world.ChunkSize; lx++ {
 			x, y := b.CX*world.ChunkSize+int64(lx), b.CY*world.ChunkSize+int64(ly)
-			switch r := Hash(seed, x, y) % 100; {
-			case r < 4:
-				b.Set(world.LayerGround, lx, ly, g.flowers)
-			case r < 22:
-				b.Set(world.LayerGround, lx, ly, g.grass2)
-			default:
-				b.Set(world.LayerGround, lx, ly, g.grass)
-			}
-			if bottom, _, ok := g.treeAt(seed, b, x, y); ok {
+			g.ground(seed, b, lx, ly, x, y)
+			if bottom, _, ok := g.treeAt(seed, b, x, y, true); ok {
 				b.Set(world.LayerDeco, lx, ly, bottom)
 			}
 			// The top of a tall tree rooted one tile below.
-			if _, top, ok := g.treeAt(seed, b, x, y+1); ok && !top.Empty() {
+			if _, top, ok := g.treeAt(seed, b, x, y+1, true); ok && !top.Empty() {
 				b.Set(world.LayerOverhead, lx, ly, top)
 			}
 		}

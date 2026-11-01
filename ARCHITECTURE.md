@@ -8,10 +8,10 @@ hand-made and procedurally generated content. It is built with Go and
 [Kenney](https://kenney.nl) (CC0). It targets desktop and browser (WASM);
 mobile comes later.
 
-> **Status.** Migration step 1 is done: chunked maps, the wrapping main map
-> assembled from patches plus a placeholder generator, detail maps, and
-> navigation and rendering ported. This document describes the target design.
-> [Migration](#migration) lists the remaining steps.
+> **Status.** Migration steps 1–3 are done: chunked wrapping world, terrain
+> and movement modes, and procedural generation with oceans, coastlines and
+> islands. This document describes the target design; [Migration](#migration)
+> lists what is left.
 
 ## Ground rules
 
@@ -111,9 +111,18 @@ The result of resolving a chunk:
   | `reserve` | the generator places no features here |
   | `pool` | an area where pool patches (below) may be placed |
 
-- **Pool patches:** generic hand-made pieces (small islands, ruins, oases)
-  that the generator places randomly inside `pool` areas or matching biomes.
-  It keeps a minimum distance between them and uses the world seed.
+- **Surroundings:** a patch can set `surround: land` or `surround: ocean`
+  with a `margin` (tiles, default 8). Within the margin the generator puts
+  land or water, so a coastline never runs into a hand-made town and an
+  island always sits in water. The depth of that water still comes from the
+  elevation: an island in the shallows can be reached by swimming.
+- **Pool patches** (`maps/pool`, `pool:` in `world.yaml`): generic hand-made
+  pieces (small islands now; ruins, oases later) that the world places by
+  itself. Each 512×512 area gets at most one, chosen by `weight` from the
+  seed and the area's coordinates, at a random spot where the generator
+  reports open deep sea for the piece plus its margin, and never near a
+  hand-placed patch. Pool patches can't contain objects yet (they would need
+  one instance per placement).
 
 ### Procedural content: generation levels
 
@@ -179,9 +188,35 @@ corners, named after where the shallow water is: `deep n`, `deep nw`,
 coastline autotiler of the generator will use these sets. `worlds_sheet.py`
 draws the project's own placeholder tiles.
 
-Generators are registered per biome (`ocean`, `desert`, `forest`, …). Each is a
-small Go type with tests for determinism, connectivity, and "never overwrites
-patch cells".
+**The `earth` generator (implemented).**
+- **World level:** elevation from tileable value noise in integer
+  arithmetic (`gen.Field`), with octaves from 131,072 tiles (continents) down
+  to 8 tiles (coastline detail). Below `SeaLevel` is water, below
+  `DeepLevel` deep water. `Preview` gives this level cheaply for any
+  position (overview and world maps).
+- **Chunk level:** per-cell classes for the chunk plus a 6-tile margin.
+  Painted patch cells are fixed constraints, and surroundings force land or
+  water. Cleanup passes then make sure the art always fits:
+  - water and land cells come in 2×2 blocks (no one-tile channels, spits or
+    islets);
+  - deep water only where all eight neighbours are water;
+  - deep water also comes in 2×2 blocks.
+- **Autotiling:** water cells get Kenney's shore tiles chosen from the land
+  around them, including single and double inner corners; deep cells get
+  the deep-to-shallow transitions. Tiles are looked up by their `name`
+  property in the water tileset. Neighbourhoods without exact art fall back
+  to the closest tile (about 1 in 16,000 cells).
+- **Land:** grass, flowers and trees from the grassland generator. Tall trees
+  only where there is land above them.
+- **Speed:** about 1.2 ms per chunk.
+
+`cmd/worldmap` renders any part of the world to a PNG: terrain colours,
+real tile art (`-tiles`), or a whole-planet preview (`-step 1024`). It is the
+tool for choosing where hand-made content goes.
+
+Generators are registered by name (`earth`, `grassland`). Later biomes
+(desert, forest, mountains) become land generators chosen from further
+noise fields (temperature, moisture).
 
 ### Determinism
 
@@ -407,9 +442,13 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    water and shores, animated by `tools/art/water.py` (`water.tsj`, with a
    deep-water variant); the project's own sheet `worlds.png` (placeholder
    bicycle and scooter). Tile animations from Tiled tilesets.
-3. Generation levels 1–3, tileable noise, autotiler, fingerprint tests. The
-   first ocean biome, with a fixed and a pool island. Needs water art (a
-   placeholder sheet until a pack is chosen).
+3. **Done.** The `earth` generator: tileable integer noise, continents and
+   oceans, cleanup rules, shore and deep-water autotiling, patch
+   surroundings, pool islands placed per area, `cmd/worldmap`. The start
+   (town and meadow) moved to a coast. Gull Isle is a hand-made island in
+   the shallows, reachable by swimming; `islet` is the first pool island.
+   Tests cover the coast rules, autotiler fallbacks, determinism, pool
+   placement, speed, and a fingerprint of land, coast and sea chunks.
 4. Streaming in the background, the chunk portal graph, abstract simulation.
 5. Public transport: routes, stops and timetables; dynamic warps; interiors as
    instances; window view; taxis.

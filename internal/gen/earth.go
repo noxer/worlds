@@ -1,0 +1,465 @@
+package gen
+
+import (
+	"fmt"
+	"sync/atomic"
+
+	"github.com/noxer/worlds/internal/world"
+)
+
+// Earth generates the main map: oceans and continents from a tileable
+// elevation field, coastlines drawn with Kenney's shore tiles, deep water with
+// the project's deep-to-shallow transitions, and grassland (grass, flowers,
+// trees) on land. Hand-made patches are constraints: their painted terrain is
+// fixed, and patches can require land or ocean around themselves
+// ("surround"), which also lets the world place pool islands in the open sea.
+//
+// Generation runs in levels:
+//   - world level: elevation from the coarse octaves of the noise field,
+//     evaluable anywhere in O(1);
+//   - area level: pool patches placed by the world (see world.Placer);
+//   - chunk level: per-cell terrain classes, cleaned up so that every
+//     configuration has art, then tiles and decoration.
+type Earth struct {
+	elevation *Field
+	land      *Grassland
+	shore     map[string]world.Tile // Kenney Tiny Battle water tiles, by name
+	deep      map[string]world.Tile // deep water and transitions, by name
+}
+
+// Sea levels on the elevation scale [0, MaxValue).
+const (
+	SeaLevel  = 32300 // below: water
+	DeepLevel = 32000 // below (and away from land): deep water
+)
+
+// margin is how far beyond its chunk the generator looks: the cleanup
+// passes and the autotiler each need one more ring of neighbours.
+const margin = 6
+
+// fallbacks counts water cells whose neighbourhood has no exact tile; tests
+// keep it rare.
+var fallbacks atomic.Int64
+
+// NewEarth creates the earth generator.
+func NewEarth(info world.GenInfo) (world.Generator, error) {
+	elev, err := NewField(info.W, info.H, 0x656c6576,
+		Octave{Cell: 131072, Amp: 64}, // continents and oceans
+		Octave{Cell: 32768, Amp: 32},
+		Octave{Cell: 8192, Amp: 16}, // seas, peninsulas
+		Octave{Cell: 2048, Amp: 8},
+		Octave{Cell: 512, Amp: 5}, // bays, lakes
+		Octave{Cell: 128, Amp: 3},
+		Octave{Cell: 32, Amp: 2}, // coastline detail
+		Octave{Cell: 8, Amp: 1},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("earth: %w", err)
+	}
+	land, err := NewGrassland(info)
+	if err != nil {
+		return nil, err
+	}
+	e := &Earth{elevation: elev, land: land.(*Grassland), shore: map[string]world.Tile{}, deep: map[string]world.Tile{}}
+	for _, n := range []int{18, 19, 20, 36, 37, 38, 54, 55, 56, 39, 57, 72, 73, 74, 75, 90, 91, 92, 93} {
+		name := fmt.Sprintf("battle %d", n)
+		if e.shore[name], err = info.Tilesets.Named("water", name); err != nil {
+			return nil, fmt.Errorf("earth: %w", err)
+		}
+	}
+	for _, n := range []string{"deep", "deep n", "deep s", "deep w", "deep e", "deep nw", "deep ne", "deep sw", "deep se",
+		"deep inner nw", "deep inner ne", "deep inner sw", "deep inner se"} {
+		if e.deep[n], err = info.Tilesets.Named("water", n); err != nil {
+			return nil, fmt.Errorf("earth: %w", err)
+		}
+	}
+	return e, nil
+}
+
+// Terrain classes during generation.
+const (
+	cLand uint8 = iota
+	cWater
+	cDeep
+)
+
+// region is the chunk plus a margin, in which classes are computed.
+type region struct {
+	x0, y0 int64 // main-map position of cell (0, 0)
+	n      int   // edge length
+	class  []uint8
+	fixed  []bool // painted by a patch: never changed by cleanup
+	raw    []bool // elevation (or surroundings) asks for deep water
+}
+
+func (r *region) at(x, y int) uint8 {
+	x, y = min(max(x, 0), r.n-1), min(max(y, 0), r.n-1)
+	return r.class[y*r.n+x]
+}
+
+// Generate implements world.Generator.
+func (e *Earth) Generate(seed uint64, b *world.ChunkBuilder) {
+	r := e.classify(seed, b)
+	ox, oy := margin, margin
+	for ly := 0; ly < world.ChunkSize; ly++ {
+		for lx := 0; lx < world.ChunkSize; lx++ {
+			x, y := ox+lx, oy+ly
+			wx, wy := b.Wrap(r.x0+int64(x), r.y0+int64(y))
+			switch r.at(x, y) {
+			case cLand:
+				e.land.ground(seed, b, lx, ly, wx, wy)
+			case cWater:
+				b.Set(world.LayerGround, lx, ly, e.shoreTile(r, x, y))
+			case cDeep:
+				b.Set(world.LayerGround, lx, ly, e.deepTile(r, x, y))
+			}
+			// Trees grow on land; a tall one needs land above it too.
+			isLand := func(dy int) bool { return r.at(x, y+dy) == cLand }
+			if isLand(0) {
+				if bottom, _, ok := e.land.treeAt(seed, b, wx, wy, isLand(-1)); ok {
+					b.Set(world.LayerDeco, lx, ly, bottom)
+				}
+			}
+			if isLand(0) && isLand(1) {
+				bx, by := b.Wrap(wx, wy+1)
+				if _, top, ok := e.land.treeAt(seed, b, bx, by, true); ok && !top.Empty() {
+					b.Set(world.LayerOverhead, lx, ly, top)
+				}
+			}
+		}
+	}
+}
+
+// classify computes the cleaned-up terrain classes of the chunk and its
+// margin.
+func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
+	n := world.ChunkSize + 2*margin
+	r := &region{
+		x0: b.CX*world.ChunkSize - margin, y0: b.CY*world.ChunkSize - margin, n: n,
+		class: make([]uint8, n*n), fixed: make([]bool, n*n), raw: make([]bool, n*n),
+	}
+	for y := 0; y < n; y++ {
+		for x := 0; x < n; x++ {
+			i := y*n + x
+			wx, wy := b.Wrap(r.x0+int64(x), r.y0+int64(y))
+			if t, ok := b.PaintedTerrain(wx, wy); ok {
+				r.fixed[i] = true
+				switch t {
+				case world.Deep:
+					r.class[i] = cDeep
+				case world.Shallow:
+					r.class[i] = cWater
+				default:
+					r.class[i] = cLand
+				}
+				continue
+			}
+			h := e.elevation.At(seed, wx, wy)
+			if kind, _, ok := b.Surround(wx, wy); ok {
+				// The patch decides land or water; the elevation still decides
+				// how deep the water is, so an island in the shallows can be
+				// reached by swimming and one at sea cannot.
+				if kind == world.SurroundLand {
+					r.class[i] = cLand
+				} else {
+					r.class[i], r.raw[i] = cWater, h < DeepLevel
+				}
+				continue
+			}
+			switch {
+			case h < DeepLevel:
+				r.class[i], r.raw[i] = cWater, true
+			case h < SeaLevel:
+				r.class[i] = cWater
+			default:
+				r.class[i] = cLand
+			}
+		}
+	}
+	// 1. Water must come in 2x2 blocks: no one-tile channels or ponds.
+	r.open(func(c uint8) bool { return c != cLand }, cLand)
+	// 2. Land likewise: no one-tile spits or islets.
+	r.open(func(c uint8) bool { return c == cLand }, cWater)
+	// 3. Deep water only where all eight neighbours are water, so there is
+	// always shallow water between land and deep water.
+	next := append([]uint8(nil), r.class...)
+	for y := 0; y < n; y++ {
+		for x := 0; x < n; x++ {
+			i := y*n + x
+			if r.fixed[i] || r.class[i] == cLand || !r.raw[i] {
+				continue
+			}
+			ok := true
+			for dy := -1; dy <= 1 && ok; dy++ {
+				for dx := -1; dx <= 1; dx++ {
+					if r.at(x+dx, y+dy) == cLand {
+						ok = false
+						break
+					}
+				}
+			}
+			if ok {
+				next[i] = cDeep
+			}
+		}
+	}
+	r.class = next
+	// 4. Deep water in 2x2 blocks too.
+	r.open(func(c uint8) bool { return c == cDeep }, cWater)
+	return r
+}
+
+// open keeps a non-fixed cell matching `in` only if some 2x2 block containing
+// it matches entirely; otherwise the cell becomes `out`.
+func (r *region) open(in func(uint8) bool, out uint8) {
+	n := r.n
+	next := append([]uint8(nil), r.class...)
+	for y := 0; y < n; y++ {
+		for x := 0; x < n; x++ {
+			i := y*n + x
+			if r.fixed[i] || !in(r.class[i]) {
+				continue
+			}
+			keep := false
+			for _, d := range [4][2]int{{-1, -1}, {0, -1}, {-1, 0}, {0, 0}} {
+				bx, by := x+d[0], y+d[1]
+				if in(r.at(bx, by)) && in(r.at(bx+1, by)) && in(r.at(bx, by+1)) && in(r.at(bx+1, by+1)) {
+					keep = true
+					break
+				}
+			}
+			if !keep {
+				next[i] = out
+			}
+		}
+	}
+	r.class = next
+}
+
+// neighbours reports which of the 8 neighbours match: orthogonal N, E, S, W
+// and diagonal NE, SE, SW, NW (the diagonals only where no orthogonal
+// neighbour next to them matches, since the edge art already covers those).
+type neighbours struct{ n, e, s, w, ne, se, sw, nw bool }
+
+func (r *region) neighbours(x, y int, match func(uint8) bool) neighbours {
+	m := func(dx, dy int) bool { return match(r.at(x+dx, y+dy)) }
+	nb := neighbours{n: m(0, -1), e: m(1, 0), s: m(0, 1), w: m(-1, 0)}
+	nb.ne = m(1, -1) && !nb.n && !nb.e
+	nb.se = m(1, 1) && !nb.s && !nb.e
+	nb.sw = m(-1, 1) && !nb.s && !nb.w
+	nb.nw = m(-1, -1) && !nb.n && !nb.w
+	return nb
+}
+
+func (nb neighbours) orth() int {
+	c := 0
+	for _, b := range []bool{nb.n, nb.e, nb.s, nb.w} {
+		if b {
+			c++
+		}
+	}
+	return c
+}
+
+// shoreTile picks Kenney's water tile for a shallow cell from where the
+// land is.
+func (e *Earth) shoreTile(r *region, x, y int) world.Tile {
+	nb := r.neighbours(x, y, func(c uint8) bool { return c == cLand })
+	t := func(n int) world.Tile { return e.shore[fmt.Sprintf("battle %d", n)] }
+	switch nb.orth() {
+	case 0:
+		switch nb {
+		case neighbours{}:
+			return t(37)
+		case neighbours{nw: true}:
+			return t(90)
+		case neighbours{ne: true}:
+			return t(91)
+		case neighbours{se: true}:
+			return t(92)
+		case neighbours{sw: true}:
+			return t(93)
+		case neighbours{nw: true, ne: true}:
+			return t(75)
+		case neighbours{sw: true, se: true}:
+			return t(39)
+		case neighbours{ne: true, se: true}:
+			return t(72)
+		case neighbours{nw: true, sw: true}:
+			return t(74)
+		}
+	case 1:
+		switch {
+		case nb.n && nb.sw && nb.se:
+			return t(73)
+		case nb.n && !nb.sw && !nb.se:
+			return t(19)
+		case nb.s && !nb.nw && !nb.ne:
+			return t(55)
+		case nb.e && !nb.nw && !nb.sw:
+			return t(38)
+		case nb.w && !nb.ne && !nb.se:
+			return t(36)
+		}
+	case 2:
+		switch {
+		case nb.n && nb.w && !nb.se:
+			return t(18)
+		case nb.n && nb.e && !nb.sw:
+			return t(20)
+		case nb.s && nb.w && !nb.ne:
+			return t(54)
+		case nb.s && nb.e && !nb.nw:
+			return t(56)
+		case nb.e && nb.w:
+			return t(57)
+		}
+	}
+	return e.fallbackShore(nb)
+}
+
+// fallbackShore handles neighbourhoods without exact art (rare after the
+// cleanup): it drops diagonals, then picks the closest edge or corner.
+func (e *Earth) fallbackShore(nb neighbours) world.Tile {
+	fallbacks.Add(1)
+	t := func(n int) world.Tile { return e.shore[fmt.Sprintf("battle %d", n)] }
+	switch {
+	case nb.n && nb.w:
+		return t(18)
+	case nb.n && nb.e:
+		return t(20)
+	case nb.s && nb.w:
+		return t(54)
+	case nb.s && nb.e:
+		return t(56)
+	case nb.n:
+		return t(19)
+	case nb.s:
+		return t(55)
+	case nb.e:
+		return t(38)
+	case nb.w:
+		return t(36)
+	case nb.nw:
+		return t(90)
+	case nb.ne:
+		return t(91)
+	case nb.se:
+		return t(92)
+	case nb.sw:
+		return t(93)
+	}
+	return t(37)
+}
+
+// deepTile picks the deep-water tile for a deep cell from where the shallow
+// water is.
+func (e *Earth) deepTile(r *region, x, y int) world.Tile {
+	nb := r.neighbours(x, y, func(c uint8) bool { return c != cDeep })
+	name := ""
+	switch nb.orth() {
+	case 0:
+		switch nb {
+		case neighbours{}:
+			name = "deep"
+		case neighbours{nw: true}:
+			name = "deep inner nw"
+		case neighbours{ne: true}:
+			name = "deep inner ne"
+		case neighbours{se: true}:
+			name = "deep inner se"
+		case neighbours{sw: true}:
+			name = "deep inner sw"
+		}
+	case 1:
+		switch {
+		case nb.n && !nb.sw && !nb.se:
+			name = "deep n"
+		case nb.s && !nb.nw && !nb.ne:
+			name = "deep s"
+		case nb.e && !nb.nw && !nb.sw:
+			name = "deep e"
+		case nb.w && !nb.ne && !nb.se:
+			name = "deep w"
+		}
+	case 2:
+		switch {
+		case nb.n && nb.w && !nb.se:
+			name = "deep nw"
+		case nb.n && nb.e && !nb.sw:
+			name = "deep ne"
+		case nb.s && nb.w && !nb.ne:
+			name = "deep sw"
+		case nb.s && nb.e && !nb.nw:
+			name = "deep se"
+		}
+	}
+	if name == "" {
+		fallbacks.Add(1)
+		switch {
+		case nb.n && nb.w:
+			name = "deep nw"
+		case nb.n && nb.e:
+			name = "deep ne"
+		case nb.s && nb.w:
+			name = "deep sw"
+		case nb.s && nb.e:
+			name = "deep se"
+		case nb.n:
+			name = "deep n"
+		case nb.s:
+			name = "deep s"
+		case nb.e:
+			name = "deep e"
+		case nb.w:
+			name = "deep w"
+		case nb.nw:
+			name = "deep inner nw"
+		case nb.ne:
+			name = "deep inner ne"
+		case nb.se:
+			name = "deep inner se"
+		case nb.sw:
+			name = "deep inner sw"
+		default:
+			name = "deep"
+		}
+	}
+	return e.deep[name]
+}
+
+// Suitable implements world.Placer: the rectangle plus margin must be deep
+// open ocean according to the elevation alone.
+func (e *Earth) Suitable(seed uint64, x, y, w, h, margin int64) bool {
+	for dy := -margin - 2; dy <= h+margin+2; dy += 2 {
+		for dx := -margin - 2; dx <= w+margin+2; dx += 2 {
+			px, py := mod(x+dx, e.elevation.W), mod(y+dy, e.elevation.H)
+			if e.elevation.At(seed, px, py) >= DeepLevel {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func mod(a, n int64) int64 {
+	m := a % n
+	if m < 0 {
+		m += n
+	}
+	return m
+}
+
+// Preview returns the terrain at a main-map position from the elevation
+// alone (the world level of generation), without patches, cleanup or chunk
+// generation. It is cheap enough for overview maps of the whole planet.
+func (e *Earth) Preview(seed uint64, x, y int64) world.Terrain {
+	h := e.elevation.At(seed, mod(x, e.elevation.W), mod(y, e.elevation.H))
+	switch {
+	case h < DeepLevel:
+		return world.Deep
+	case h < SeaLevel:
+		return world.Shallow
+	}
+	return world.Land
+}

@@ -153,8 +153,8 @@ func (s Spec) Config() (fstest.MapFS, world.Config) {
 		Tilesets: []string{"tilesets/test.tsj"},
 		Patches:  "patches/main.world",
 		Details:  "detail",
-		Generator: func(ts *world.Tilesets) (world.Generator, error) {
-			return fill{ts.MustTile("test", idx)}, nil
+		Generator: func(g world.GenInfo) (world.Generator, error) {
+			return fill{g.Tilesets.MustTile("test", idx)}, nil
 		},
 	}
 	return fsys, cfg
