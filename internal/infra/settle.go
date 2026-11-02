@@ -169,6 +169,9 @@ type Config struct {
 	Relief Relief
 	Fixed  []Fixed
 	Avoid  []Rect // hand-made patches: routes go round them
+	// Prefabs are the pieces village layouts place (Building.Prefab
+	// indexes this list).
+	Prefabs []PrefabSpec
 }
 
 // Infra answers questions about settlements and networks. It is safe for
@@ -182,12 +185,14 @@ type Infra struct {
 	fixedAt   map[ID]Settlement
 	ends      map[ID][]Gate // gates of hand-made settlements
 	avoid     []Rect
+	prefabs   []PrefabSpec
 
 	mu     sync.Mutex
 	cells  map[ID]cellResult
 	routes map[edgeKey]*Route
 	blocks map[[2]int64][]*Way
 	ways   map[edgeKey]*Way
+	sites  map[ID]*Site
 
 	prefetchAt      [2]int64
 	prefetchStarted bool
@@ -229,6 +234,8 @@ func New(cfg Config) (*Infra, error) {
 		fixedAt: map[ID]Settlement{},
 		ends:    map[ID][]Gate{},
 		avoid:   cfg.Avoid,
+		prefabs: cfg.Prefabs,
+		sites:   map[ID]*Site{},
 		ways:    map[edgeKey]*Way{},
 		cells:   map[ID]cellResult{},
 		routes:  map[edgeKey]*Route{},

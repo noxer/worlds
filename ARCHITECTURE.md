@@ -211,7 +211,9 @@ deep-to-shallow transitions (4 edges, 4 rounded outer corners, 4 inner
 corners, named after where the shallow water is: `deep n`, `deep nw`,
 `deep inner nw`, ...). The script prints the tile index of each name; the
 coastline autotiler of the generator will use these sets. `worlds_sheet.py`
-draws the project's own placeholder tiles.
+draws the project's own placeholder tiles. `prefabs.py` writes the
+starting set of village prefabs (`assets/maps/prefabs`), which are ordinary
+Tiled maps from then on.
 
 **The `earth` generator (implemented).**
 - **World level:** elevation from tileable value noise in integer
@@ -248,7 +250,8 @@ noise fields (temperature, moisture).
 Settlements, roads, rail lines, power lines and cities are generated in
 layers. Implemented (package `infra`, drawn by `cmd/worldmap -infra`):
 settlements, the network graphs with their routes, and paths and roads as
-tiles. Planned: highways, rail and sea lanes as tiles, cities, power lines. Each layer is a pure function of the seed, the terrain preview and
+tiles, and villages. Planned: highways, rail and sea lanes as tiles, towns
+and cities, power lines. Each layer is a pure function of the seed, the terrain preview and
 the layers above it, so any place can still be computed on its own and
 chunks stay independent.
 
@@ -421,6 +424,39 @@ blocks overlapping the chunk, with the autotiler for junctions and kerbs.
   building), which is cheap to evaluate.
 - **Villages and towns** use the same pipeline with one or a few districts
   and organic streets, so there is one generator, not one per size.
+
+**Villages (implemented, `infra/site.go`).** A generated village's layout
+is planned once on a grid around its centre (radius plus 8 tiles) and
+cached; hand-made settlements keep their own.
+1. Footprint: the cells of the circle that are dry (elevation at least 48
+   above sea level) and not within 2 tiles of a hand-made patch.
+2. Streets: the ways crossing it (paths and roads end at the centre).
+3. The square: 7×7 cobbles at the centre, the `well` prefab in the middle,
+   a lamp post on each corner.
+4. Lanes: 2-wide dirt lanes from the square, 30–45% of the radius long, in
+   directions no way leaves it, until at least two directions have a
+   street (and sometimes more).
+5. Houses and gardens: 10–16 prefabs by weight, each tried a few tiles from
+   a random street cell within 55% of the radius; the prefab and a ring
+   round it must be open ground, and a house's front step must reach a
+   street, lane, the square or another footpath within 14 steps
+   (breadth-first, 4 directions). The footpath is cobbles.
+6. In chunks: cobbles for the square and footpaths (no 2×2 rule, unlike
+   dirt), dirt for lanes, land under buildings and yards, prefab tiles on
+   top, a quarter of the trees elsewhere in the footprint and none next to
+   buildings. Prefab objects become generated objects: `solid` blocks the
+   cell (`ChunkBuilder.Block`), `bump` gives it a bump dialog
+   (`ChunkBuilder.Bump`, `World.Bump`), which Explore shows like those of
+   patch objects, and confirm opens.
+
+**Prefabs** are hand-made Tiled maps in `assets/maps/prefabs`
+(`prefabs:` in `world.yaml`). Map properties: `kind` (`house`, `garden`
+or `well`) and `weight`. A house has one object of type `door` (with
+`solid` and `bump: house_locked`) in the row above the bottom row; the
+cell below it is the front step. Empty cells keep the generated ground.
+The starting set: red and grey houses 3–5 wide in Brookhaven's style, a
+garden with beehives, the well. Doors are locked until interiors become
+instances (step 6).
 
 **5. Hand-made content.** Patches mark their gates with `road_end`
 objects on the patch border (implemented; later also `rail_end`). A route
@@ -759,8 +795,10 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       neighbour villages; routes round patches; ways cached per block and
       prepared in the background; tests for the paths from the gates and a
       chunk fingerprint with a path;
-   3. generated villages from a prefab pool (the city pipeline with one
-      district);
+   3. **done:** generated villages: square with well and lamps, lanes,
+      houses and gardens from prefabs with footpaths, locked doors with a
+      message; tests for the layouts, reachability of every door in the
+      real world, the door notice, and a chunk fingerprint with a village;
    4. rail and harbours (with rail art of our own);
    5. towns and cities: districts, arterials, blocks, urban art, city
       transit.

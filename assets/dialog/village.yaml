@@ -1,0 +1,8 @@
+# Messages of generated villages.
+
+house_locked:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The door is locked. Nobody seems to be home.

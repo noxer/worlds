@@ -28,6 +28,9 @@ type Config struct {
 	// small islands that the world places by itself, at most one per area of
 	// AreaSize x AreaSize tiles, where the generator reports a suitable spot.
 	Pool string
+	// Prefabs is a directory of prefabs (*.tmj): hand-made pieces such as
+	// houses that generators place in villages and towns.
+	Prefabs string
 	// Generator creates the procedural generator once tilesets are loaded.
 	// Nil means the main map is empty (void) outside patches.
 	Generator func(GenInfo) (Generator, error)
@@ -84,6 +87,7 @@ type World struct {
 	poolMu      sync.Mutex
 	stream      *streamer
 	templates   map[MapID]*template
+	prefabs     []*Prefab
 	cache       *chunkCache
 
 	spawns  map[MapID]map[string]Spawn
@@ -375,8 +379,16 @@ func Load(fsys fs.FS, cfg Config) (*World, error) {
 			return nil, err
 		}
 	}
+	var prefabs []*Prefab
+	if cfg.Prefabs != "" {
+		var err error
+		if prefabs, err = loadPrefabs(fsys, cfg.Prefabs, w.tilesets); err != nil {
+			return nil, err
+		}
+	}
+	w.prefabs = prefabs
 	if cfg.Generator != nil {
-		g, err := cfg.Generator(GenInfo{Tilesets: w.tilesets, W: w.W, H: w.H, Seed: w.Seed, Patches: w.Patches()})
+		g, err := cfg.Generator(GenInfo{Tilesets: w.tilesets, W: w.W, H: w.H, Seed: w.Seed, Patches: w.Patches(), Prefabs: prefabs})
 		if err != nil {
 			return nil, fmt.Errorf("generator: %w", err)
 		}

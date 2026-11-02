@@ -142,6 +142,13 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 			}
 		}
 	}
+	for _, pf := range e.w.Prefabs() {
+		for _, o := range pf.Objects {
+			if id := o.Props.String("bump"); id != "" && e.dialogs[id] == nil {
+				return nil, fmt.Errorf("prefab %s: object %q: unknown bump dialog %q", pf.Name, o.Name, id)
+			}
+		}
+	}
 	facing := world.Down
 	if cfg.Start.HasFacing {
 		facing = cfg.Start.Facing
@@ -272,7 +279,9 @@ type notice struct {
 func (e *Explore) bump(p world.Pos) {
 	id, ok := e.bumps[p]
 	if !ok {
-		return
+		if id, ok = e.w.Bump(p); !ok || e.dialogs[id] == nil {
+			return
+		}
 	}
 	l := e.party.Leader()
 	if e.notice != nil && e.notice.at == l.Pos && e.notice.facing == l.Facing {
@@ -415,6 +424,9 @@ func (e *Explore) canArrive(p world.Pos) bool {
 func (e *Explore) tryGoTo(target world.Pos) bool {
 	leader := e.party.Leader()
 	_, isSign := e.signs[target]
+	if _, ok := e.w.Bump(target); ok {
+		isSign = true // tapping a generated door walks up to it
+	}
 	if e.npcAt(target) != nil || isSign {
 		// Walk to the closest free neighbour, then interact.
 		best, bestLen := world.Pos{}, -1
@@ -506,6 +518,8 @@ func (e *Explore) talk(ctx *Context, p world.Pos) {
 		}
 	} else if s, ok := e.signs[p]; ok {
 		id = s
+	} else if s, ok := e.w.Bump(p); ok {
+		id = s // a generated object, such as a locked door
 	}
 	d := e.dialogs[id]
 	if d == nil {

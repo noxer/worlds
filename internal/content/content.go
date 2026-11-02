@@ -24,6 +24,7 @@ type WorldFile struct {
 	Patches   string   `yaml:"patches"`
 	Details   string   `yaml:"details"`
 	Pool      string   `yaml:"pool"`
+	Prefabs   string   `yaml:"prefabs"`
 	Start     string   `yaml:"start"`
 }
 
@@ -58,7 +59,7 @@ func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 	}
 	cfg := world.Config{
 		Seed: wf.Seed, Width: wf.Width, Height: wf.Height,
-		Tilesets: wf.Tilesets, Patches: wf.Patches, Details: wf.Details, Pool: wf.Pool,
+		Tilesets: wf.Tilesets, Patches: wf.Patches, Details: wf.Details, Pool: wf.Pool, Prefabs: wf.Prefabs,
 	}
 	if wf.Generator != "" {
 		if cfg.Generator, err = gen.ByName(wf.Generator); err != nil {

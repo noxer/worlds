@@ -288,3 +288,85 @@ func TestPrefetch(t *testing.T) {
 		t.Errorf("prefetched ways differ from direct ones (or there are none):\n%.200s\n%.200s", a, b)
 	}
 }
+
+var testPrefabs = []infra.PrefabSpec{
+	{Name: "house", Kind: "house", W: 4, H: 4, Weight: 3, DoorX: 2},
+	{Name: "garden", Kind: "garden", W: 5, H: 3, Weight: 1},
+	{Name: "well", Kind: "well", W: 3, H: 3, Weight: 1},
+}
+
+func newInfraWithPrefabs(t *testing.T) *infra.Infra {
+	t.Helper()
+	in, err := infra.New(infra.Config{Seed: 42, W: testW, H: testH, Relief: relief{}, Prefabs: testPrefabs})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return in
+}
+
+// TestVillageLayouts: villages get a square with a well, houses that don't
+// overlap, and a footpath from every front step to a street.
+func TestVillageLayouts(t *testing.T) {
+	in := newInfraWithPrefabs(t)
+	sites := in.SitesIn(20000, 20000, 20000, 20000)
+	if len(sites) < 5 {
+		t.Fatalf("only %d villages", len(sites))
+	}
+	again := newInfraWithPrefabs(t).SitesIn(20000, 20000, 20000, 20000)
+	for k, site := range sites {
+		if fmt.Sprint(site.Buildings, site.Lamps) != fmt.Sprint(again[k].Buildings, again[k].Lamps) {
+			t.Fatalf("village %v: layouts differ between runs", site.S.ID)
+		}
+		houses, wells := 0, 0
+		for _, b := range site.Buildings {
+			pf := testPrefabs[b.Prefab]
+			i0 := geom.WrapDelta(site.X0, b.X, testW)
+			j0 := geom.WrapDelta(site.Y0, b.Y, testH)
+			for j := j0; j < j0+pf.H; j++ {
+				for i := i0; i < i0+pf.W; i++ {
+					c := site.At(i, j)
+					step := pf.Kind == "house" && i == i0+pf.DoorX && j == j0+pf.H-1
+					if (step && c != infra.Foot) || (!step && c != infra.Built) {
+						t.Fatalf("village %v: %s at %d,%d has a cell of kind %d", site.S.ID, pf.Name, i, j, c)
+					}
+				}
+			}
+			switch pf.Kind {
+			case "well":
+				wells++
+			case "house":
+				houses++
+				if !reachesStreet(site, i0+pf.DoorX, j0+pf.H-1) {
+					t.Errorf("village %v: house at %d,%d has no footpath to a street", site.S.ID, b.X, b.Y)
+				}
+			}
+		}
+		if wells != 1 || houses < 4 {
+			t.Errorf("village %v: %d wells, %d houses", site.S.ID, wells, houses)
+		}
+	}
+}
+
+// reachesStreet follows footpath cells from (i, j) to a street, lane or
+// the square.
+func reachesStreet(site *infra.Site, i, j int64) bool {
+	seen := map[[2]int64]bool{{i, j}: true}
+	queue := [][2]int64{{i, j}}
+	for len(queue) > 0 {
+		p := queue[0]
+		queue = queue[1:]
+		for _, d := range [4][2]int64{{0, 1}, {0, -1}, {1, 0}, {-1, 0}} {
+			q := [2]int64{p[0] + d[0], p[1] + d[1]}
+			switch site.At(q[0], q[1]) {
+			case infra.Street, infra.Lane, infra.Square:
+				return true
+			case infra.Foot:
+				if !seen[q] {
+					seen[q] = true
+					queue = append(queue, q)
+				}
+			}
+		}
+	}
+	return false
+}

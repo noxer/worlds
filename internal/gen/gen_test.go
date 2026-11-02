@@ -24,6 +24,7 @@ func TestFingerprint(t *testing.T) {
 		{1, 193824 / world.ChunkSize},                       // Gull Isle: a patch with generated shores
 		{3, 193920 / world.ChunkSize},                       // coast and open sea south of the start
 		{w.W/world.ChunkSize - 1, 193792 / world.ChunkSize}, // the path from Brookhaven's south gate
+		{2802 / world.ChunkSize, 193995 / world.ChunkSize},  // the square of the village east of it
 	}
 	for _, ch := range chunks {
 		for y := int64(0); y < world.ChunkSize; y++ {
@@ -36,7 +37,7 @@ func TestFingerprint(t *testing.T) {
 			}
 		}
 	}
-	const want = 0x2f804628de7cf38
+	const want = 0xc288a7c4499d2c12
 	if got := h.Sum64(); got != want {
 		t.Errorf("fingerprint = %#x, want %#x", got, uint64(want))
 	}

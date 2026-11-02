@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/noxer/worlds/internal/geom"
 	"github.com/noxer/worlds/internal/infra"
 	"github.com/noxer/worlds/internal/world"
 )
@@ -30,6 +31,8 @@ type Earth struct {
 	dirt      [16]world.Tile        // dirt path tiles by grass edges (see dirtTile)
 	dirtInner [4]world.Tile         // dirt with grass in one corner: nw, ne, se, sw
 	cobble    world.Tile            // road
+	prefabs   []*world.Prefab       // by the index of infra.Building.Prefab
+	lamp      [2]world.Tile         // lamp post and lantern (the tile above)
 }
 
 // Sea levels on the elevation scale [0, MaxValue).
@@ -95,6 +98,15 @@ func NewEarth(info world.GenInfo) (world.Generator, error) {
 	if err != nil {
 		return nil, fmt.Errorf("earth: %w", err)
 	}
+	if t, err2 := info.Tilesets.Named("worlds", "lamp_post"); err2 == nil {
+		top, _ := info.Tilesets.Above(t)
+		e.lamp = [2]world.Tile{t, top}
+	}
+	specs, err := prefabSpecs(info.Prefabs)
+	if err != nil {
+		return nil, err
+	}
+	e.prefabs = info.Prefabs
 	if infra.Supports(info.W, info.H) {
 		fixed, err := infra.FixedFrom(info.Patches)
 		if err != nil {
@@ -104,7 +116,7 @@ func NewEarth(info world.GenInfo) (world.Generator, error) {
 		for _, p := range info.Patches {
 			avoid = append(avoid, infra.Rect{X: p.X, Y: p.Y, W: p.W, H: p.H})
 		}
-		if e.infra, err = infra.New(infra.Config{Seed: info.Seed, W: info.W, H: info.H, Relief: e, Fixed: fixed, Avoid: avoid}); err != nil {
+		if e.infra, err = infra.New(infra.Config{Seed: info.Seed, W: info.W, H: info.H, Relief: e, Fixed: fixed, Avoid: avoid, Prefabs: specs}); err != nil {
 			return nil, err
 		}
 	}
@@ -117,6 +129,40 @@ func (e *Earth) Prefetch(x, y int64) {
 	if e.infra != nil {
 		e.infra.Prefetch(x, y)
 	}
+}
+
+// prefabSpecs describes the prefabs for village layouts, checking the
+// conventions: the map property "kind" (house, garden or well), "weight",
+// and for houses a "door" object in the row above the bottom row.
+func prefabSpecs(ps []*world.Prefab) ([]infra.PrefabSpec, error) {
+	var out []infra.PrefabSpec
+	for _, p := range ps {
+		s := infra.PrefabSpec{Name: string(p.Name), Kind: p.Props.String("kind"), W: p.W, H: p.H, Weight: p.Props.Int("weight", 1)}
+		if s.Weight <= 0 {
+			return nil, fmt.Errorf("prefab %s: weight must be positive", p.Name)
+		}
+		doors := 0
+		for _, o := range p.Objects {
+			if o.Type == "door" {
+				doors++
+				s.DoorX = o.Pos.X
+				if o.Pos.Y != p.H-2 {
+					return nil, fmt.Errorf("prefab %s: the door must be in the row above the bottom row", p.Name)
+				}
+			}
+		}
+		switch s.Kind {
+		case "house":
+			if doors != 1 {
+				return nil, fmt.Errorf("prefab %s: a house needs exactly one door", p.Name)
+			}
+		case "garden", "well":
+		default:
+			return nil, fmt.Errorf("prefab %s: kind must be house, garden or well, not %q", p.Name, s.Kind)
+		}
+		out = append(out, s)
+	}
+	return out, nil
 }
 
 // Infra returns the world's settlements and networks (nil if the world
@@ -138,6 +184,14 @@ type region struct {
 	fixed  []bool  // painted by a patch: never changed by cleanup
 	raw    []bool  // elevation (or surroundings) asks for deep water
 	way    []uint8 // 0, or 1 + the network of a path or road on the cell
+	site   []infra.SiteCell
+	sites  []*infra.Site // villages overlapping the region
+}
+
+// siteAt is the village layout's kind of a cell (Outside if none).
+func (r *region) siteAt(x, y int) infra.SiteCell {
+	x, y = min(max(x, 0), r.n-1), min(max(y, 0), r.n-1)
+	return r.site[y*r.n+x]
 }
 
 func (r *region) wayAt(x, y int) bool {
@@ -174,19 +228,87 @@ func (e *Earth) Generate(seed uint64, b *world.ChunkBuilder) {
 			case cDeep:
 				b.Set(world.LayerGround, lx, ly, e.deepTile(r, x, y))
 			}
-			// Trees grow on land, off the ways; a tall one needs land above
-			// it too.
-			isLand := func(dy int) bool { return r.at(x, y+dy) == cLand && !r.wayAt(x, y+dy) }
-			if isLand(0) {
-				if bottom, _, ok := e.land.treeAt(seed, b, wx, wy, isLand(-1)); ok {
+			// Trees grow on land, off the ways and village buildings, and
+			// sparsely in villages; a tall one needs free land above it too.
+			free := func(dy int) bool {
+				if r.at(x, y+dy) != cLand || r.wayAt(x, y+dy) {
+					return false
+				}
+				c := r.siteAt(x, y+dy)
+				return c == infra.Outside || c == infra.Open || c == infra.Water
+			}
+			grows := func(dy int) bool {
+				if !free(dy) {
+					return false
+				}
+				if r.siteAt(x, y+dy) != infra.Open {
+					return true
+				}
+				tx, ty := b.Wrap(wx, wy+int64(dy))
+				return Hash(seed^0x76696c6c, tx, ty)%4 == 0 // "vill": a quarter of the trees
+			}
+			if grows(0) {
+				if bottom, _, ok := e.land.treeAt(seed, b, wx, wy, free(-1)); ok {
 					b.Set(world.LayerDeco, lx, ly, bottom)
 				}
 			}
-			if isLand(0) && isLand(1) {
+			if free(0) && grows(1) {
 				bx, by := b.Wrap(wx, wy+1)
 				if _, top, ok := e.land.treeAt(seed, b, bx, by, true); ok && !top.Empty() {
 					b.Set(world.LayerOverhead, lx, ly, top)
 				}
+			}
+		}
+	}
+	e.buildings(b, r)
+}
+
+// buildings puts the villages' prefabs, doors and lamps into the chunk.
+func (e *Earth) buildings(b *world.ChunkBuilder, r *region) {
+	cx, cy := b.CX*world.ChunkSize, b.CY*world.ChunkSize
+	// local converts a main-map position to chunk coordinates.
+	local := func(x, y int64) (int, int, bool) {
+		lx, ly := geom.WrapDelta(cx, x, b.W()), geom.WrapDelta(cy, y, b.H())
+		return int(lx), int(ly), lx >= 0 && ly >= 0 && lx < world.ChunkSize && ly < world.ChunkSize
+	}
+	for _, s := range r.sites {
+		for _, bd := range s.Buildings {
+			p := e.prefabs[bd.Prefab]
+			for py := int64(0); py < p.H; py++ {
+				for px := int64(0); px < p.W; px++ {
+					lx, ly, ok := local(bd.X+px, bd.Y+py)
+					if !ok {
+						continue
+					}
+					for l := 0; l < world.NumLayers; l++ {
+						if t := p.Tile(l, px, py); !t.Empty() {
+							b.Set(l, lx, ly, t)
+						}
+					}
+				}
+			}
+			for _, o := range p.Objects {
+				lx, ly, ok := local(bd.X+o.Pos.X, bd.Y+o.Pos.Y)
+				if !ok {
+					continue
+				}
+				if o.Props.Bool("solid") {
+					b.Block(lx, ly)
+				}
+				if d := o.Props.String("bump"); d != "" {
+					b.Bump(lx, ly, d)
+				}
+			}
+		}
+		if e.lamp[0].Empty() {
+			continue
+		}
+		for _, l := range s.Lamps {
+			if lx, ly, ok := local(l.X, l.Y); ok {
+				b.Set(world.LayerDeco, lx, ly, e.lamp[0])
+			}
+			if lx, ly, ok := local(l.X, l.Y-1); ok {
+				b.Set(world.LayerOverhead, lx, ly, e.lamp[1])
 			}
 		}
 	}
@@ -199,6 +321,7 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 	r := &region{
 		x0: b.CX*world.ChunkSize - margin, y0: b.CY*world.ChunkSize - margin, n: n,
 		class: make([]uint8, n*n), fixed: make([]bool, n*n), raw: make([]bool, n*n), way: make([]uint8, n*n),
+		site: make([]infra.SiteCell, n*n),
 	}
 	for y := 0; y < n; y++ {
 		for x := 0; x < n; x++ {
@@ -247,6 +370,37 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 			}
 		})
 	}
+	// Villages: the square and footpaths are cobbles; buildings and their
+	// yards need land.
+	if e.infra != nil {
+		r.sites = e.infra.SitesIn(r.x0, r.y0, int64(n), int64(n))
+		for _, s := range r.sites {
+			for y := 0; y < n; y++ {
+				for x := 0; x < n; x++ {
+					i := y*n + x
+					wx, wy := b.Wrap(r.x0+int64(x), r.y0+int64(y))
+					dx, dy := geom.WrapDelta(s.X0, wx, b.W()), geom.WrapDelta(s.Y0, wy, b.H())
+					c := s.At(dx, dy)
+					if c == infra.Outside || r.fixed[i] {
+						continue
+					}
+					r.site[i] = c
+					switch c {
+					case infra.Square, infra.Foot:
+						r.way[i] = uint8(infra.Road) + 1
+						r.class[i] = cLand
+					case infra.Lane:
+						if r.way[i] == 0 {
+							r.way[i] = uint8(infra.Path) + 1
+						}
+						r.class[i] = cLand
+					case infra.Built, infra.Yard:
+						r.class[i] = cLand
+					}
+				}
+			}
+		}
+	}
 	// 1. Water must come in 2x2 blocks: no one-tile channels or ponds.
 	r.open(func(c uint8) bool { return c != cLand }, cLand)
 	// 2. Land likewise: no one-tile spits or islets.
@@ -294,8 +448,8 @@ func (r *region) openWays() {
 	next := append([]uint8(nil), r.way...)
 	for y := 0; y < n; y++ {
 		for x := 0; x < n; x++ {
-			if r.way[y*n+x] == 0 {
-				continue
+			if w := r.way[y*n+x]; w == 0 || w == uint8(infra.Road)+1 {
+				continue // cobbles need no 2x2 blocks
 			}
 			keep := false
 			for _, d := range [4][2]int{{-1, -1}, {0, -1}, {-1, 0}, {0, 0}} {

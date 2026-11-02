@@ -15,6 +15,8 @@ type Chunk struct {
 	layers  [NumLayers][chunkCells]Tile
 	solid   [chunkCells]bool
 	terrain [chunkCells]Terrain
+	blocked [chunkCells]bool // solid whatever the tiles say (generated objects)
+	bumps   map[int32]string // generated objects' bump dialogs by cell
 }
 
 // Tile returns the tile at local coordinates in a layer.
@@ -23,7 +25,7 @@ func (c *Chunk) Tile(layer, lx, ly int) Tile { return c.layers[layer][ly*ChunkSi
 // computeDerived fills collision and terrain from the tiles.
 func (c *Chunk) computeDerived(ts *Tilesets) {
 	for i := range c.solid {
-		c.solid[i] = ts.Solid(c.layers[LayerGround][i]) || ts.Solid(c.layers[LayerDeco][i])
+		c.solid[i] = ts.Solid(c.layers[LayerGround][i]) || ts.Solid(c.layers[LayerDeco][i]) || c.blocked[i]
 		c.terrain[i] = ts.Terrain(c.layers[LayerGround][i])
 	}
 }
@@ -75,6 +77,25 @@ func (b *ChunkBuilder) Surround(x, y int64) (kind string, dist int64, ok bool) {
 // Set places tile t at local coordinates in a layer.
 func (b *ChunkBuilder) Set(layer, lx, ly int, t Tile) { b.c.layers[layer][ly*ChunkSize+lx] = t }
 
+// W and H are the main map's size (for wrapping offsets).
+func (b *ChunkBuilder) W() int64 { return b.ww }
+
+// H is the main map's height.
+func (b *ChunkBuilder) H() int64 { return b.wh }
+
+// Block makes a cell solid whatever its tiles (a generated object such as
+// a locked door).
+func (b *ChunkBuilder) Block(lx, ly int) { b.c.blocked[ly*ChunkSize+lx] = true }
+
+// Bump gives a cell a bump dialog: walking into it shows the dialog's
+// first line as a passive notice (like the "bump" property of objects).
+func (b *ChunkBuilder) Bump(lx, ly int, dialog string) {
+	if b.c.bumps == nil {
+		b.c.bumps = map[int32]string{}
+	}
+	b.c.bumps[int32(ly*ChunkSize+lx)] = dialog
+}
+
 // Get returns the tile at local coordinates in a layer.
 func (b *ChunkBuilder) Get(layer, lx, ly int) Tile { return b.c.layers[layer][ly*ChunkSize+lx] }
 
@@ -84,6 +105,7 @@ type GenInfo struct {
 	W, H     int64 // main map size in tiles; noise must repeat with these periods
 	Seed     uint64
 	Patches  []PatchInfo // the hand-made patches (not the pool)
+	Prefabs  []*Prefab   // pieces for generators to place, sorted by name
 }
 
 // Generator produces the procedural base of main-map chunks. It must be a

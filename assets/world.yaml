@@ -20,5 +20,8 @@ details: maps/detail
 # Pool patches: hand-made pieces (small islands) the world places by itself,
 # at most one per 512x512 area, where the generator finds open sea.
 pool: maps/pool
+# Prefabs: hand-made pieces (houses, gardens, the well) that the generator
+# places in villages.
+prefabs: maps/prefabs
 # Where a new game starts (a spawn on the main map).
 start: start

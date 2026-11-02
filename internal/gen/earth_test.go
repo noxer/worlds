@@ -8,6 +8,7 @@ import (
 	"github.com/noxer/worlds/internal/content"
 	"github.com/noxer/worlds/internal/gen"
 	"github.com/noxer/worlds/internal/geom"
+	"github.com/noxer/worlds/internal/infra"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -238,5 +239,82 @@ func TestPathsFromBrookhaven(t *testing.T) {
 		if far < 60 {
 			t.Errorf("%s gate: the path ends %d tiles out", gate.name, far)
 		}
+	}
+}
+
+// nearestVillage returns the layout of the generated village nearest
+// Brookhaven.
+func nearestVillage(t *testing.T) (*world.World, *infra.Infra, *infra.Site) {
+	t.Helper()
+	c, err := content.Load(assets.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	town, _ := c.World.PatchOrigin("town")
+	var best *infra.Site
+	bestD := int64(-1)
+	for _, s := range c.Infra.SitesIn(town.X-6000, town.Y-6000, 12000, 12000) {
+		dx, dy, _ := c.World.Delta(town, world.Pos{Map: world.Main, X: s.S.X, Y: s.S.Y})
+		if d := dx*dx + dy*dy; bestD < 0 || d < bestD {
+			best, bestD = s, d
+		}
+	}
+	if best == nil {
+		t.Fatal("no generated village near Brookhaven")
+	}
+	return c.World, c.Infra, best
+}
+
+// TestVillageTiles: in the generated village nearest Brookhaven, every
+// house door is locked (solid, with a bump message) and its front step
+// can be reached on foot from the square.
+func TestVillageTiles(t *testing.T) {
+	w, _, site := nearestVillage(t)
+	walkable := func(p world.Pos) bool { return !w.Solid(p) && w.Terrain(p) == world.Land }
+	// Flood from the square's corner (next to the well) through the village.
+	sq := world.Pos{Map: world.Main, X: site.S.X - 2, Y: site.S.Y - 2}
+	if !walkable(sq) {
+		t.Fatalf("the square at %v is not walkable", sq)
+	}
+	reach := map[world.Pos]bool{sq: true}
+	queue := []world.Pos{sq}
+	for len(queue) > 0 && len(reach) < 200000 {
+		p := queue[0]
+		queue = queue[1:]
+		dx, dy, _ := w.Delta(sq, p)
+		if max(geom.Abs(dx), geom.Abs(dy)) > site.N {
+			continue
+		}
+		for _, d := range world.Dirs {
+			if q, ok := w.Neighbor(p, d); ok && !reach[q] && walkable(q) {
+				reach[q] = true
+				queue = append(queue, q)
+			}
+		}
+	}
+	houses := 0
+	for _, b := range site.Buildings {
+		pf := w.Prefabs()[b.Prefab]
+		for _, o := range pf.Objects {
+			if o.Type != "door" {
+				continue
+			}
+			houses++
+			door := world.Pos{Map: world.Main, X: b.X + o.Pos.X, Y: b.Y + o.Pos.Y}
+			door, _ = w.Normalize(door)
+			if !w.Solid(door) {
+				t.Errorf("%s at %v: the door is not solid", pf.Name, door)
+			}
+			if id, ok := w.Bump(door); !ok || id != "house_locked" {
+				t.Errorf("%s at %v: door bump %q", pf.Name, door, id)
+			}
+			step, _ := w.Neighbor(door, world.Down)
+			if !reach[step] {
+				t.Errorf("%s at %v: the front step can't be reached from the square", pf.Name, step)
+			}
+		}
+	}
+	if houses < 4 {
+		t.Errorf("only %d houses", houses)
 	}
 }
