@@ -248,13 +248,16 @@ chunks stay independent.
 
 **1. Settlements (world level).** A hierarchy of grids, one per tier:
 
-| Tier | One candidate per | Apart on foot | On the planet | Gets |
-|---|---|---|---|---|
-| Metropolis | 131072² tiles | 10 h | about 10 | airport, harbour, rail hub |
-| City | 65536² tiles | 5 h | about 40 | rail station, harbour on the coast |
-| Town | 16384² tiles | 75 min | about 600 | bus stop, maybe a ferry |
-| Village | 4096² tiles | 20 min | about 10,000 | dirt road |
-| Point of interest | 1024² tiles | 5 min | about 150,000 | farm, camp, ruin, cave entrance, shrine |
+| Tier | One candidate per | Apart on foot | On the planet | Across | Gets |
+|---|---|---|---|---|---|
+| Metropolis | 131072² tiles | 10 h | about 10 | up to 20,000 tiles (625 chunks) | airport, harbour, rail hub, metro |
+| City | 65536² tiles | 5 h | about 40 | 5,000–8,000 tiles | rail station, harbour on the coast, metro or trams |
+| Town | 16384² tiles | 75 min | about 600 | 1,000–2,000 tiles | bus stop, maybe a ferry |
+| Village | 4096² tiles | 20 min | about 10,000 | 200–400 tiles | dirt road |
+| Point of interest | 1024² tiles | 5 min | about 150,000 | a few chunks at most | farm, camp, ruin, cave entrance, shrine |
+
+A tile is taken as about a metre (a person fills one), so a megacity is
+about 20 km across: 90 minutes to cross on foot.
 
 Walking covers 3.75 tiles per second, so villages are about 20 minutes
 apart on foot (10 by bike); beyond that, public transport is the way to
@@ -267,6 +270,10 @@ networks. Pool patches (ponds, islets) stay at their finer grid.
   the seed hash and scores them with `Preview`: flat land, coast, river or
   valley, climate. The best one wins, or none (ocean, desert, mountains).
 - **Cost:** "which settlements are near (x, y)" is O(1) anywhere.
+- **Footprints:** a settlement has a centre, a size from its tier and seed,
+  and an outline distorted by noise and clipped by coast and steep terrain.
+  A bigger settlement wins over smaller candidates its footprint touches;
+  villages inside a city's footprint become old-town districts instead.
 - **Hand-made towns** (Brookhaven) register as fixed settlements of a tier
   and suppress generated candidates nearby, as patch surroundings do today.
 
@@ -305,18 +312,53 @@ settlements, computed on demand and cached in the area cache.
   highways or run straight between cities. Decoration only.
 - Painted patch cells win over generated tiles.
 
-**4. Cities (area level, per settlement).** A footprint sized by tier,
-laid out once and cached:
-1. Streets grow from where network routes enter the footprint: a grid for
-   cities, organic for villages.
-2. Blocks between streets are split into plots.
-3. Plots are filled from a pool of hand-made building prefabs (small
-   patches like the pool islands, each with a door warp).
-4. Each building's interior is an instance of a detail-map template,
-   numbered from its position, so every generated house has its own inside
-   (see interiors as instances).
-5. Landmarks are prefabs placed by rule: the station where the rail line
-   enters, the harbour on the shore, a town hall, shops.
+**4. Cities: procedural, at every size.** A megacity covers about 390,000
+chunks, so no layout is computed for a whole city. It is a hierarchy where
+every level can be evaluated locally, from the seed and the level above:
+1. **City** (O(1)): footprint, centre, and a density that falls from the
+   centre outwards (towers downtown, houses in the suburbs, farms at the
+   edge).
+2. **Districts:** cells of a jittered grid inside the footprint (about
+   1,000–2,000 tiles), each a Voronoi region with a type chosen from its
+   position, terrain and density: downtown, residential, industrial, port
+   (on the coast), parks, old town (an absorbed village), the station
+   quarter.
+3. **Arterial roads:** a relative neighbourhood graph over the district
+   centres, plus ring roads at fixed distances from the centre, routed like
+   the world networks and cached per edge. Highways and rail lines entering
+   the footprint join them.
+4. **Streets and blocks:** each district has its own block size (small in
+   the old town, large in industrial areas) and offset. Streets are
+   axis-aligned (4-directional movement), between arterials; the blocks
+   between them are computed per district cell, so a chunk only looks at
+   the few blocks it overlaps.
+5. **Plots:** a block is split recursively along its longer side down to
+   the plot sizes of its district type.
+6. **Buildings:** plots are filled from pools of hand-made building
+   prefabs per district type and density: towers with tall façades (tops on
+   the overhead layer), shops, houses, warehouses, parks and plazas.
+7. **Interiors:** buildings are detail-map instances numbered by position.
+   Most doors are just locked; enterable buildings (shops, stations, homes
+   with quests, apartment blocks with a generated floor) are chosen by rule
+   and density, so the content stays manageable.
+8. **Landmarks** by rule: the central station where the main rail line
+   enters, the harbour on the shore, the airport at the edge, a town hall
+   and market per district.
+
+The chunk level draws streets, sidewalks and buildings from the plots and
+blocks overlapping the chunk, with the autotiler for junctions and kerbs.
+- **Getting around:** crossing a megacity on foot takes 90 minutes, so
+  cities carry their own transit, generated from the same graph: metro
+  lines along arterials with underground stations (detail maps reached by
+  stairs), trams or buses on the surface. Taxis everywhere.
+- **Life:** pedestrians and traffic are ambient: spawned around the party
+  from the district's density and dropped out of reach, not scheduled.
+  Only named NPCs have schedules.
+- **Navigation:** the long-range planner's corridor search must know about
+  cities: the preview for city cells comes from the block level (street or
+  building), which is cheap to evaluate.
+- **Villages and towns** use the same pipeline with one or a few districts
+  and organic streets, so there is one generator, not one per size.
 
 **5. Hand-made content.** Patches mark their gates with connection objects
 (`road_end`, `rail_end`, with a network name). The router must end there and
@@ -646,8 +688,11 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    1. settlements and network graphs, shown by `cmd/worldmap` only;
    2. roads as tiles, with Brookhaven's gates connected to the next
       generated village;
-   3. generated villages from a prefab pool;
-   4. rail and harbours (with rail art of our own).
+   3. generated villages from a prefab pool (the city pipeline with one
+      district);
+   4. rail and harbours (with rail art of our own);
+   5. towns and cities: districts, arterials, blocks, urban art, city
+      transit.
 6. Public transport on the networks: routes, stops and timetables; dynamic
    warps; interiors as instances; window view; taxis.
 
@@ -688,9 +733,9 @@ together with the world seed.
 - Settlement spacing is set by villages about 20 minutes apart on foot;
   the other tiers are derived from that and may need tuning once
   `cmd/worldmap` draws them.
-- Cities: fully procedural layouts filled with prefabs (the current plan),
-  or mostly hand-made city patches from a pool with procedural villages
-  only.
+- Urban art: Tiny Town is village art. Cities need streets, sidewalks,
+  towers and shop fronts; candidates are Kenney's 16×16 urban packs (to be
+  checked for style), otherwise art of our own.
 
 - Art: proper deep water with transitions to shallow water, rails, public
   transport vehicles, and riding sprites (the bicycle and scooter are
