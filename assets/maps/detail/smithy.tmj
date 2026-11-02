@@ -11,7 +11,7 @@
  "tilewidth": 16,
  "tileheight": 16,
  "nextlayerid": 5,
- "nextobjectid": 4,
+ "nextobjectid": 5,
  "layers": [
   {
    "id": 1,
@@ -373,6 +373,24 @@
        "value": "down"
       }
      ]
+    },
+    {
+     "name": "counter",
+     "type": "spawn",
+     "rotation": 0,
+     "visible": true,
+     "x": 96,
+     "y": 48,
+     "width": 16,
+     "height": 16,
+     "properties": [
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "left"
+      }
+     ],
+     "id": 4
     }
    ]
   }

@@ -16,6 +16,7 @@ import (
 	"github.com/noxer/worlds/internal/gfx"
 	"github.com/noxer/worlds/internal/input"
 	"github.com/noxer/worlds/internal/nav"
+	"github.com/noxer/worlds/internal/sim"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -34,6 +35,11 @@ const (
 type NPC struct {
 	entity.Actor
 	Dialog string
+
+	schedule sim.Schedule // daily routine; empty: stays put
+	active   bool         // in the party's reach (always true without schedule)
+	path     []nav.Move
+	wait     int
 }
 
 // Explore is the exploration scene: the party walks the world in real time.
@@ -63,7 +69,8 @@ type Explore struct {
 
 	turnWait int
 	riding   bool // the party rides bicycles and scooters
-	fade     int  // >0 fading out, <0 fading in
+	clock    sim.Clock
+	fade     int // >0 fading out, <0 fading in
 	warp     *world.Warp
 
 	// Camera: top-left pixel of the view in the coordinates of the leader's
@@ -83,6 +90,7 @@ type ExploreConfig struct {
 	Dialogs dialog.Library
 	Party   *entity.Party
 	Start   world.Spawn
+	Clock   sim.Clock // game time at the start
 }
 
 // NewExplore creates the exploration scene and spawns NPCs from all maps.
@@ -93,6 +101,7 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		sheets:  cfg.Sheets,
 		dialogs: cfg.Dialogs,
 		party:   cfg.Party,
+		clock:   cfg.Clock,
 		signs:   map[world.Pos]string{},
 		bumps:   map[world.Pos]string{},
 	}
@@ -103,10 +112,17 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 				return nil, fmt.Errorf("%v: npc %q must be a tile object", o.Pos, o.Name)
 			}
 			facing, _ := world.ParseDir(o.Props.String("facing"))
-			n := &NPC{Dialog: o.Props.String("dialog")}
+			n := &NPC{Dialog: o.Props.String("dialog"), active: true}
 			n.Name = o.Name
 			n.Sprite = entity.Sprite{Sheet: e.w.Tilesets().Get(o.Tile.Set()).Name, Index: o.Tile.Index()}
 			n.Place(o.Pos, facing)
+			if s := o.Props.String("schedule"); s != "" {
+				sch, err := sim.ParseSchedule(e.w, s)
+				if err != nil {
+					return nil, fmt.Errorf("%v: npc %q: %w", o.Pos, o.Name, err)
+				}
+				n.schedule, n.active = sch, false // placed when in reach
+			}
 			e.npcs = append(e.npcs, n)
 		case "sign":
 			e.signs[o.Pos] = o.Props.String("dialog")
@@ -134,7 +150,7 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 
 func (e *Explore) npcAt(p world.Pos) *NPC {
 	for _, n := range e.npcs {
-		if n.Pos == p {
+		if n.active && n.Pos == p {
 			return n
 		}
 	}
@@ -217,6 +233,7 @@ func (e *Explore) Update(ctx *Context) {
 	}
 
 	arrived := e.party.Update()
+	e.updateNPCs()
 	leader := e.party.Leader()
 	if arrived {
 		if wp := e.w.WarpAt(leader.Pos); wp != nil {
@@ -270,6 +287,7 @@ func (e *Explore) updateFade() {
 				facing = e.warp.Facing
 			}
 			e.party.PlaceAll(e.warp.To, facing)
+			e.refreshReach() // while the screen is black
 			e.riding = false // everyone gets off at a door
 			e.warp = nil
 			e.path = nil // the next leg is planned from the new position
@@ -758,7 +776,9 @@ func (e *Explore) drawActors(screen *ebiten.Image, m world.MapRef, s, offX, offY
 		ds = append(ds, d)
 	}
 	for _, n := range e.npcs {
-		add(&n.Actor, 0, nil)
+		if n.active {
+			add(&n.Actor, 0, nil)
+		}
 	}
 	for i, a := range e.party.Members {
 		var vehicle *ebiten.Image
@@ -838,6 +858,7 @@ func (e *Explore) drawDebug(dst *ebiten.Image) {
 	l := e.party.Leader()
 	st := e.w.Stats()
 	lines := []string{
+		e.clock.String(),
 		fmt.Sprintf("%s chunk(%d,%d)", l.Pos,
 			geom.FloorDiv(l.Pos.X, world.ChunkSize), geom.FloorDiv(l.Pos.Y, world.ChunkSize)),
 		fmt.Sprintf("chunks %d  bg %d  sync %d  %.0f fps", e.w.CachedChunks(), st.Prefetched, st.SyncBuilt, ebiten.ActualFPS()),

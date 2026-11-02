@@ -329,11 +329,29 @@ than a fixed tile.
     `sync` for on demand.
   - **Eviction:** distant chunks are evicted (least recently used). Detail
     maps in use are fully loaded.
-- **Full simulation** (actors moving tile by tile) runs only in loaded chunks
-  and the current detail map.
-- **Elsewhere, entities are simulated abstractly:** NPC schedules and vehicles
-  on routes compute their position from time, and become concrete actors when
-  their chunk loads.
+- **World clock (implemented):** `sim.Clock` counts ticks; one game minute
+  passes per real second (a day takes 24 real minutes). A new game starts on
+  day 1 at 08:00. The clock runs with the exploration scene and stands still
+  while a dialog or menu is open and during door fades.
+- **Schedules (implemented):** an NPC object with a `schedule` property
+  follows a daily routine, e.g. `06:00 lina_home; 08:30 square;
+  11:00 smithy/counter`. Places are spawn points: plain names on the main
+  map, `template/name` in detail maps. An NPC leaves for the next place at
+  the given time and walks there on foot, through doors if need be.
+- **Two lives (implemented):** an NPC is *active* while it is on the party's
+  map and, on the main map, within 64 tiles (Chebyshev; 72 before an active
+  one is dropped, so it doesn't flicker at the border). Active NPCs walk
+  their routine tile by tile, block the way and keep off the party's tiles.
+  Out of reach they aren't simulated at all: `sim.Where` computes from the
+  clock where the routine puts them (the route from the previous place,
+  as far as the time since leaving allows). Inactive NPCs are checked every
+  half second and placed there when they come into reach. That's far
+  outside the screen while walking or riding; after a door the check runs
+  at once, while the screen is black. Both directions are therefore
+  invisible to the player.
+- **Still to come:** vehicles on routes use the same idea. `Where` plans
+  the route each time it is asked; with many NPCs it should cache the route
+  per schedule leg.
 
 ## Navigation
 
@@ -441,7 +459,7 @@ internal/
   gen/               generation levels, biome generators, autotiler, noise
   nav/               local A*, chunk portal graph, warp graph
   entity/            actors, party, vehicles
-  sim/               world clock, abstract simulation, streaming
+  sim/               world clock, schedules, abstract positions
   dialog/ quest/ script/ combat/ save/
   input/ gfx/ scene/ game/ platform/
 ```
@@ -507,7 +525,9 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    budget in the browser, tests for identical results and for no on-demand
    builds at riding speed, race detector in CI), long-distance planning
    (**done**: chunk corridors from the preview, stretches, learned dead
-   ends), abstract simulation.
+   ends), abstract simulation (**done**: world clock, NPC schedules,
+   activation in reach, `sim.Where` out of reach; Lina in Brookhaven walks
+   her routine between home, the square, the smithy and the pond).
 5. Public transport: routes, stops and timetables; dynamic warps; interiors as
    instances; window view; taxis.
 

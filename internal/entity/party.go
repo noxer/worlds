@@ -115,6 +115,17 @@ func (p *Party) Busy() bool {
 	return false
 }
 
+// Reserves reports whether any member stands on pos or is about to step
+// onto it.
+func (p *Party) Reserves(pos world.Pos) bool {
+	for _, m := range p.Members {
+		if m.Reserves(pos) {
+			return true
+		}
+	}
+	return false
+}
+
 // Occupies reports whether any member stands on pos.
 func (p *Party) Occupies(pos world.Pos) bool {
 	for _, m := range p.Members {

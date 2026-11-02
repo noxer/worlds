@@ -15,6 +15,7 @@ import (
 	"github.com/noxer/worlds/internal/gfx"
 	"github.com/noxer/worlds/internal/input"
 	"github.com/noxer/worlds/internal/scene"
+	"github.com/noxer/worlds/internal/sim"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -38,7 +39,6 @@ type Game struct {
 	// the physical screen, and the letterbox offset.
 	w, h, scale int
 	offX, offY  int
-	worldImg    *ebiten.Image // the world at game resolution, plus a margin
 	uiImg       *ebiten.Image // dialogs, notices, overlays
 	lastUpdate  time.Time
 }
@@ -68,6 +68,7 @@ func New(fsys fs.FS) (*Game, error) {
 
 	explore, err := scene.NewExplore(scene.ExploreConfig{
 		World: c.World, Sheets: sheets, Dialogs: c.Dialogs, Party: party, Start: c.Start,
+		Clock: sim.NewClock(1, 8, 0),
 	})
 	if err != nil {
 		return nil, err

@@ -49,6 +49,20 @@ func (a *Actor) Busy() bool { return a.stepping || len(a.queue) > 0 }
 // Backlog is the number of queued steps not started yet.
 func (a *Actor) Backlog() int { return len(a.queue) }
 
+// Reserves reports whether the actor stands on p or has a queued step onto
+// it: other movers must keep off such tiles.
+func (a *Actor) Reserves(p world.Pos) bool {
+	if a.Pos == p {
+		return true
+	}
+	for _, q := range a.queue {
+		if q.to == p {
+			return true
+		}
+	}
+	return false
+}
+
 // Dest returns where the actor will stand once its queued steps are done.
 func (a *Actor) Dest() world.Pos {
 	if n := len(a.queue); n > 0 {
