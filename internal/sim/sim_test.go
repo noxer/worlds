@@ -100,3 +100,42 @@ func TestWhere(t *testing.T) {
 		t.Error("clock string")
 	}
 }
+
+func TestLightAt(t *testing.T) {
+	if got := sim.LightAt(12 * 60); got != sim.Daylight {
+		t.Errorf("noon: %v, want daylight", got)
+	}
+	if got := sim.LightAt(0); got != sim.Night {
+		t.Errorf("midnight: %v, want night", got)
+	}
+	if got := sim.LightAt(3 * 60); got != sim.Night {
+		t.Errorf("03:00: %v, want night", got)
+	}
+	if d := sim.LightAt(0).Darkness(); d != 1 {
+		t.Errorf("darkness at night = %v, want 1", d)
+	}
+	if d := sim.LightAt(12 * 60).Darkness(); d != 0 {
+		t.Errorf("darkness at noon = %v, want 0", d)
+	}
+	// Dusk is between day and night, and warmer than both.
+	dusk := sim.LightAt(19 * 60)
+	if b := dusk.Brightness(); b <= sim.Night.Brightness() || b >= 1 {
+		t.Errorf("19:00 brightness %v should be between night and day", b)
+	}
+	if dusk.R <= dusk.B {
+		t.Errorf("19:00 should be warm, got %v", dusk)
+	}
+	// No visible jumps: from one game minute to the next, light changes
+	// only a little, across midnight too.
+	for m := int64(0); m <= sim.MinutesPerDay; m++ {
+		a, b := sim.LightAt(m), sim.LightAt(m+1)
+		for _, d := range []float32{a.R - b.R, a.G - b.G, a.B - b.B} {
+			if d > 0.01 || d < -0.01 {
+				t.Fatalf("light jumps at minute %d: %v -> %v", m, a, b)
+			}
+		}
+	}
+	if sim.LightAt(-60) != sim.LightAt(sim.MinutesPerDay-60) {
+		t.Error("negative minutes should wrap")
+	}
+}

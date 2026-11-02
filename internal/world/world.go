@@ -386,6 +386,9 @@ func (w *World) loadTemplates(fsys fs.FS, dir string) error {
 		if src.id == MainMap {
 			return fmt.Errorf("detail map may not be called %q", MainMap)
 		}
+		if _, err := ParseLighting(src.props.String("lighting")); err != nil {
+			return fmt.Errorf("detail map %s: %w", src.id, err)
+		}
 		t := &template{src: src, chunks: map[[2]int64]*Chunk{}}
 		for cy := int64(0); cy*ChunkSize < src.h; cy++ {
 			for cx := int64(0); cx*ChunkSize < src.w; cx++ {

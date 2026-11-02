@@ -660,6 +660,16 @@
      "name": "solid",
      "type": "bool",
      "value": true
+    },
+    {
+     "name": "light",
+     "type": "float",
+     "value": 1.25
+    },
+    {
+     "name": "light_color",
+     "type": "color",
+     "value": "#ffffd890"
     }
    ]
   },
@@ -670,6 +680,16 @@
      "name": "solid",
      "type": "bool",
      "value": true
+    },
+    {
+     "name": "light",
+     "type": "float",
+     "value": 1.25
+    },
+    {
+     "name": "light_color",
+     "type": "color",
+     "value": "#ffffd890"
     }
    ]
   },

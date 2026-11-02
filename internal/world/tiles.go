@@ -20,6 +20,7 @@ type Tileset struct {
 	terrain   []Terrain
 	anims     map[int]*Animation
 	names     map[string]int // tile property "name"
+	lights    map[int]Light  // tile properties "light", "light_color"
 }
 
 // Named returns the tile with the given "name" property.
@@ -210,6 +211,7 @@ func (ts *Tilesets) load(fsys fs.FS, name string) (int, error) {
 		terrain:   make([]Terrain, tt.TileCount),
 		anims:     map[int]*Animation{},
 		names:     map[string]int{},
+		lights:    map[int]Light{},
 	}
 	for i := range set.above {
 		set.above[i] = -1
@@ -230,6 +232,11 @@ func (ts *Tilesets) load(fsys fs.FS, name string) (int, error) {
 				return 0, fmt.Errorf("%s: tile %d: duplicate tile name %q", name, t.ID, n)
 			}
 			set.names[n] = t.ID
+		}
+		if l, ok, err := parseLight(props); err != nil {
+			return 0, fmt.Errorf("%s: tile %d: %w", name, t.ID, err)
+		} else if ok {
+			set.lights[t.ID] = l
 		}
 		if a := props.Int("above", -1); a >= 0 {
 			if a >= tt.TileCount || a == t.ID {

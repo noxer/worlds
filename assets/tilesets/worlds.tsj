@@ -5,12 +5,43 @@
  "name": "worlds",
  "tilewidth": 16,
  "tileheight": 16,
- "tilecount": 2,
- "columns": 2,
+ "tilecount": 4,
+ "columns": 4,
  "image": "../tiles/worlds.png",
- "imagewidth": 32,
+ "imagewidth": 64,
  "imageheight": 16,
  "margin": 0,
  "spacing": 0,
- "tiles": []
+ "tiles": [
+  {
+   "id": 2,
+   "properties": [
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    },
+    {
+     "name": "above",
+     "type": "int",
+     "value": 3
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "value": "lamp_post"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "properties": [
+    {
+     "name": "light",
+     "type": "float",
+     "value": 3.5
+    }
+   ]
+  }
+ ]
 }

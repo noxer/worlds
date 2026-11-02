@@ -80,6 +80,8 @@ type Explore struct {
 	viewW, viewH int64 // logical screen size, for the camera
 	// Layers of the world image for drawing (see DrawWorld).
 	groundImg, overImg *ebiten.Image
+	lightImg           *ebiten.Image             // light map, see light.go
+	glows              map[float64]*ebiten.Image // glow images by radius
 	debug              bool
 }
 
@@ -219,6 +221,9 @@ func (e *Explore) Update(ctx *Context) {
 	if in.Pressed(input.Debug) {
 		e.debug = !e.debug
 		debugOverlay = e.debug
+	}
+	if e.debug && in.Pressed(input.DebugTime) {
+		e.clock.Advance(60)
 	}
 	if e.fade != 0 {
 		e.updateFade()
@@ -629,7 +634,8 @@ const worldMargin = 2
 // Tiles are drawn pixel-perfect at game resolution into two layers (ground
 // and decoration; overhead), each scaled up and shifted by the camera's
 // fraction of a pixel. Actors are drawn between them at their exact
-// positions, at screen resolution.
+// positions, at screen resolution. Last, the light map of the time of day
+// is multiplied over everything (see light.go).
 func (e *Explore) DrawWorld(screen *ebiten.Image, scale, offX, offY int, alpha float64) {
 	m := int64(worldMargin)
 	w, h := int(e.viewW+2*m), int(e.viewH+2*m)
@@ -644,18 +650,22 @@ func (e *Explore) DrawWorld(screen *ebiten.Image, scale, offX, offY int, alpha f
 	e.drawLayers(e.groundImg, mp, false)
 	e.overImg.Clear()
 	e.drawLayers(e.overImg, mp, true)
+	lit := e.drawLight(mp, w, h)
 	e.camX, e.camY = saveX, saveY
 
 	s := float64(scale)
-	layer := func(img *ebiten.Image) {
-		op := &ebiten.DrawImageOptions{}
+	layer := func(img *ebiten.Image, blend ebiten.Blend) {
+		op := &ebiten.DrawImageOptions{Blend: blend}
 		op.GeoM.Scale(s, s)
 		op.GeoM.Translate(float64(offX)+math.Round((ix-cx-float64(m))*s), float64(offY)+math.Round((iy-cy-float64(m))*s))
 		screen.DrawImage(img, op)
 	}
-	layer(e.groundImg)
+	layer(e.groundImg, ebiten.BlendSourceOver)
 	e.drawActors(screen, mp, s, float64(offX), float64(offY), alpha)
-	layer(e.overImg)
+	layer(e.overImg, ebiten.BlendSourceOver)
+	if lit {
+		layer(e.lightImg, multiply)
+	}
 }
 
 func ensureImage(img *ebiten.Image, w, h int) *ebiten.Image {
@@ -858,7 +868,7 @@ func (e *Explore) drawDebug(dst *ebiten.Image) {
 	l := e.party.Leader()
 	st := e.w.Stats()
 	lines := []string{
-		e.clock.String(),
+		fmt.Sprintf("%s  light %d%%", e.clock, int(e.ambient().Brightness()*100+0.5)),
 		fmt.Sprintf("%s chunk(%d,%d)", l.Pos,
 			geom.FloorDiv(l.Pos.X, world.ChunkSize), geom.FloorDiv(l.Pos.Y, world.ChunkSize)),
 		fmt.Sprintf("chunks %d  bg %d  sync %d  %.0f fps", e.w.CachedChunks(), st.Prefetched, st.SyncBuilt, ebiten.ActualFPS()),

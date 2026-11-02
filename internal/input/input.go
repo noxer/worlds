@@ -25,20 +25,23 @@ const (
 	Menu
 	Ride
 	Debug
+	// DebugTime skips an hour while the debug overlay is on.
+	DebugTime
 	// NumActions is the number of actions.
 	NumActions
 )
 
 var keys = [NumActions][]ebiten.Key{
-	Up:      {ebiten.KeyArrowUp, ebiten.KeyW},
-	Down:    {ebiten.KeyArrowDown, ebiten.KeyS},
-	Left:    {ebiten.KeyArrowLeft, ebiten.KeyA},
-	Right:   {ebiten.KeyArrowRight, ebiten.KeyD},
-	Confirm: {ebiten.KeySpace, ebiten.KeyEnter, ebiten.KeyE, ebiten.KeyZ},
-	Cancel:  {ebiten.KeyEscape, ebiten.KeyBackspace, ebiten.KeyX},
-	Menu:    {ebiten.KeyTab, ebiten.KeyM},
-	Ride:    {ebiten.KeyR},
-	Debug:   {ebiten.KeyF3, ebiten.KeyBackquote},
+	Up:        {ebiten.KeyArrowUp, ebiten.KeyW},
+	Down:      {ebiten.KeyArrowDown, ebiten.KeyS},
+	Left:      {ebiten.KeyArrowLeft, ebiten.KeyA},
+	Right:     {ebiten.KeyArrowRight, ebiten.KeyD},
+	Confirm:   {ebiten.KeySpace, ebiten.KeyEnter, ebiten.KeyE, ebiten.KeyZ},
+	Cancel:    {ebiten.KeyEscape, ebiten.KeyBackspace, ebiten.KeyX},
+	Menu:      {ebiten.KeyTab, ebiten.KeyM},
+	Ride:      {ebiten.KeyR},
+	Debug:     {ebiten.KeyF3, ebiten.KeyBackquote},
+	DebugTime: {ebiten.KeyN},
 }
 
 var pads = [NumActions][]ebiten.StandardGamepadButton{
