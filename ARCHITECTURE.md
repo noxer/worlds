@@ -736,9 +736,13 @@ together with the world seed.
 - Settlement spacing is set by villages about 20 minutes apart on foot;
   the other tiers are derived from that and may need tuning once
   `cmd/worldmap` draws them.
-- Urban art: Tiny Town is village art. Cities need streets, sidewalks,
-  towers and shop fronts; candidates are Kenney's 16×16 urban packs (to be
-  checked for style), otherwise art of our own.
+- Urban art: Kenney's RPG Urban Pack (`rpgurban`, 486 tiles) is chosen
+  for towns and cities: streets with markings and crossings, sidewalks,
+  building façades and roofs, street furniture, taxis, buses and cars (for
+  public transport), and characters with four-direction walk animations.
+  Its style is softer than Tiny Town (no dark outlines); villages and
+  hand-made places keep Tiny Town. Tile properties (solid, above, names
+  for the autotiler) are added as the generator needs them.
 
 - Art: proper deep water with transitions to shallow water, rails, public
   transport vehicles, and riding sprites (the bicycle and scooter are

@@ -1,4 +1,5 @@
-Tiny Town, Tiny Dungeon and Tiny Battle by Kenney (www.kenney.nl), downloaded from opengameart.org/users/kenney.
+Tiny Town, Tiny Dungeon, Tiny Battle and RPG Urban Pack by Kenney (www.kenney.nl),
+downloaded from opengameart.org/users/kenney. All CC0.
 
 	
 
@@ -23,3 +24,12 @@ Tiny Town, Tiny Dungeon and Tiny Battle by Kenney (www.kenney.nl), downloaded fr
 
 	Follow on Twitter for updates:
 	http://twitter.com/KenneyNL
+	------------------------------
+
+	RPG Urban Pack 1.0 (rpgurban.png: Tilemap/tilemap_packed.png of the pack)
+
+	Created/distributed by Kenney (www.kenney.nl)
+	Creation date: 05-01-2019
+
+	License: (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/

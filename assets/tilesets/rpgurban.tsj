@@ -1,0 +1,16 @@
+{
+ "type": "tileset",
+ "version": "1.10",
+ "tiledversion": "1.11.0",
+ "name": "rpgurban",
+ "tilewidth": 16,
+ "tileheight": 16,
+ "tilecount": 486,
+ "columns": 27,
+ "image": "../tiles/rpgurban.png",
+ "imagewidth": 432,
+ "imageheight": 288,
+ "margin": 0,
+ "spacing": 0,
+ "tiles": []
+}

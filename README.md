@@ -2,7 +2,7 @@
 
 A 2D open-world RPG experiment in Go with [Ebitengine](https://ebitengine.org):
 exploration, puzzles, dialogs and quests, and turn-based tactical fights.
-Art by [Kenney](https://kenney.nl) (Tiny Town, Tiny Dungeon, Tiny Battle; CC0),
+Art by [Kenney](https://kenney.nl) (Tiny Town, Tiny Dungeon, Tiny Battle, RPG Urban Pack; CC0),
 plus placeholder tiles drawn for this project (`assets/tiles/worlds.png`).
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
