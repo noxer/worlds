@@ -250,14 +250,15 @@ chunks stay independent.
 
 | Tier | One candidate per | Apart on foot | On the planet | Across | Gets |
 |---|---|---|---|---|---|
-| Metropolis | 131072² tiles | 10 h | about 10 | up to 20,000 tiles (625 chunks) | airport, harbour, rail hub, metro |
-| City | 65536² tiles | 5 h | about 40 | 5,000–8,000 tiles | rail station, harbour on the coast, metro or trams |
-| Town | 16384² tiles | 75 min | about 600 | 1,000–2,000 tiles | bus stop, maybe a ferry |
-| Village | 4096² tiles | 20 min | about 10,000 | 200–400 tiles | dirt road |
+| Metropolis | 131072² tiles | 10 h | about 10 | up to 2,000 tiles (63 chunks) | airport, harbour, rail hub, a metro line |
+| City | 65536² tiles | 5 h | about 40 | 800–1,200 tiles | rail station, harbour on the coast, trams |
+| Town | 16384² tiles | 75 min | about 600 | 300–600 tiles | bus stop, maybe a ferry |
+| Village | 4096² tiles | 20 min | about 10,000 | 100–200 tiles | dirt road |
 | Point of interest | 1024² tiles | 5 min | about 150,000 | a few chunks at most | farm, camp, ruin, cave entrance, shrine |
 
 A tile is taken as about a metre (a person fills one), so a megacity is
-about 20 km across: 90 minutes to cross on foot.
+about 2 km across: 9 minutes to cross on foot. Settlements are dense
+islands in wide countryside.
 
 Walking covers 3.75 tiles per second, so villages are about 20 minutes
 apart on foot (10 by bike); beyond that, public transport is the way to
@@ -312,14 +313,15 @@ settlements, computed on demand and cached in the area cache.
   highways or run straight between cities. Decoration only.
 - Painted patch cells win over generated tiles.
 
-**4. Cities: procedural, at every size.** A megacity covers about 390,000
-chunks, so no layout is computed for a whole city. It is a hierarchy where
-every level can be evaluated locally, from the seed and the level above:
+**4. Cities: procedural, at every size.** A megacity covers about 4,000
+chunks (4 million tiles). Rather than computing a whole city at once, the
+layout is a hierarchy where every level can be evaluated locally, from the
+seed and the level above, so a chunk only pays for what it overlaps:
 1. **City** (O(1)): footprint, centre, and a density that falls from the
    centre outwards (towers downtown, houses in the suburbs, farms at the
    edge).
 2. **Districts:** cells of a jittered grid inside the footprint (about
-   1,000–2,000 tiles), each a Voronoi region with a type chosen from its
+   250–500 tiles), each a Voronoi region with a type chosen from its
    position, terrain and density: downtown, residential, industrial, port
    (on the coast), parks, old town (an absorbed village), the station
    quarter.
@@ -347,10 +349,11 @@ every level can be evaluated locally, from the seed and the level above:
 
 The chunk level draws streets, sidewalks and buildings from the plots and
 blocks overlapping the chunk, with the autotiler for junctions and kerbs.
-- **Getting around:** crossing a megacity on foot takes 90 minutes, so
-  cities carry their own transit, generated from the same graph: metro
-  lines along arterials with underground stations (detail maps reached by
-  stairs), trams or buses on the surface. Taxis everywhere.
+- **Getting around:** a megacity takes 9 minutes to cross on foot (4 by
+  bike), so walking works. Transit adds variety more than necessity, and
+  is generated from the same graph: trams or buses along arterials, and in
+  a metropolis a metro line with underground stations (detail maps reached
+  by stairs). Taxis everywhere.
 - **Life:** pedestrians and traffic are ambient: spawned around the party
   from the district's density and dropped out of reach, not scheduled.
   Only named NPCs have schedules.
