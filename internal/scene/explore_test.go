@@ -553,3 +553,38 @@ func TestUnreachableClickExplains(t *testing.T) {
 		t.Fatalf("notice = %+v", h.e.notice)
 	}
 }
+
+// TestCameraShift checks the drawing-time interpolation: right after a tick
+// of walking right, the world is drawn one game pixel further right (where
+// the camera was a tick ago), sliding to no shift by the next tick. Door
+// warps are not interpolated.
+func TestCameraShift(t *testing.T) {
+	h := newHarness(t)
+	h.press(input.Right) // turn
+	h.runUntil("idle", 50, h.idle)
+	var f input.Frame
+	f.Held[input.Right] = true
+	for i := 0; i < 5; i++ {
+		h.tick(f)
+	}
+	if sx, sy := h.e.CameraShift(0); sx != 1 || sy != 0 {
+		t.Fatalf("shift at the start of a tick = %v,%v, want 1,0", sx, sy)
+	}
+	if sx, _ := h.e.CameraShift(0.75); sx != 0.25 {
+		t.Fatalf("shift three quarters into a tick = %v, want 0.25", sx)
+	}
+	if sx, _ := h.e.CameraShift(1.5); sx != 0 {
+		t.Fatalf("late frames must not overshoot: %v", sx)
+	}
+	// Through the smithy door: no interpolation across the jump.
+	goal := world.Pos{Map: world.Detail("smithy"), X: 6, Y: 3}
+	h.e.goTo(goal)
+	for i := 0; i < 3000 && h.leader().Pos.Map != goal.Map; i++ {
+		h.tick(input.Frame{})
+		if h.leader().Pos.Map == goal.Map {
+			if sx, sy := h.e.CameraShift(0); sx != 0 || sy != 0 {
+				t.Fatalf("shift across the door = %v,%v", sx, sy)
+			}
+		}
+	}
+}

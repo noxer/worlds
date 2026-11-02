@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"sort"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
@@ -68,7 +69,10 @@ type Explore struct {
 	// map. On the main map it is not wrapped; everything drawn is placed
 	// relative to it with wrap-aware deltas.
 	camX, camY int64
-	debug      bool
+	// Camera of the previous tick, for drawing between ticks (see
+	// CameraShift).
+	camPrevX, camPrevY int64
+	debug              bool
 }
 
 // ExploreConfig holds everything the exploration scene needs.
@@ -197,6 +201,7 @@ func (e *Explore) Update(ctx *Context) {
 	in := ctx.Input
 	if in.Pressed(input.Debug) {
 		e.debug = !e.debug
+		debugOverlay = e.debug
 	}
 	if e.fade != 0 {
 		e.updateFade()
@@ -505,6 +510,7 @@ func (e *Explore) screen(m world.MapRef, px, py int64) (int, int) {
 }
 
 func (e *Explore) updateCamera(ctx *Context) {
+	e.camPrevX, e.camPrevY = e.camX, e.camY
 	l := e.party.Leader()
 	x, y := e.pixel(l)
 	e.camX = x + tile/2 - int64(ctx.W)/2
@@ -524,13 +530,40 @@ func clampCam(c, size, view int64) int64 {
 	return max(0, min(c, size-view))
 }
 
-// Draw implements Scene.
-func (e *Explore) Draw(dst *ebiten.Image) {
+// CameraShift returns how far, in game pixels, the world image (drawn for
+// the current tick's camera) must be moved to show the camera where it was
+// at a fraction alpha (0..1) of the way from the previous tick to this one.
+// Drawing with it makes scrolling follow real time even when the display's
+// frames don't line up with the game's 60 ticks per second. Jumps (doors,
+// the wrap seam) are not interpolated.
+func (e *Explore) CameraShift(alpha float64) (sx, sy float64) {
+	alpha = min(max(alpha, 0), 1)
+	dx, dy := e.camX-e.camPrevX, e.camY-e.camPrevY
+	if w, h, wraps := e.w.Size(e.party.Leader().Pos.Map); wraps {
+		dx = geom.WrapDelta(e.camPrevX, e.camX, w*tile)
+		dy = geom.WrapDelta(e.camPrevY, e.camY, h*tile)
+	}
+	if geom.Abs(dx) > 2*tile || geom.Abs(dy) > 2*tile {
+		return 0, 0
+	}
+	return (1 - alpha) * float64(dx), (1 - alpha) * float64(dy)
+}
+
+// DrawWorld draws the map and its actors, without UI, into dst, which is
+// the screen plus margin game pixels on every side (room for CameraShift).
+func (e *Explore) DrawWorld(dst *ebiten.Image, margin int) {
+	e.camX, e.camY = e.camX-int64(margin), e.camY-int64(margin)
+	defer func() { e.camX, e.camY = e.camX+int64(margin), e.camY+int64(margin) }()
 	dst.Fill(gfx.ColorVoid)
 	m := e.party.Leader().Pos.Map
 	e.drawLayers(dst, m, false)
 	e.drawActors(dst, m)
 	e.drawLayers(dst, m, true)
+}
+
+// Draw implements Scene. It draws only the UI of exploring (notices, the
+// debug overlay, fades); the game draws the world with DrawWorld.
+func (e *Explore) Draw(dst *ebiten.Image) {
 	if e.notice != nil {
 		e.drawNotice(dst)
 	}
@@ -715,6 +748,7 @@ func (e *Explore) drawDebug(dst *ebiten.Image) {
 		fmt.Sprintf("%s chunk(%d,%d)", l.Pos,
 			geom.FloorDiv(l.Pos.X, world.ChunkSize), geom.FloorDiv(l.Pos.Y, world.ChunkSize)),
 		fmt.Sprintf("chunks %d  bg %d  sync %d  %.0f fps", e.w.CachedChunks(), st.Prefetched, st.SyncBuilt, ebiten.ActualFPS()),
+		fmt.Sprintf("worst ms: chunks %.1f update %.1f draw %.1f", ms(Perf.Pump), ms(Perf.Update), ms(Perf.Draw)),
 	}
 	w := 0
 	for _, s := range lines {
@@ -725,6 +759,13 @@ func (e *Explore) drawDebug(dst *ebiten.Image) {
 		gfx.Text(dst, s, 2, i*gfx.LineHeight, color.White)
 	}
 }
+
+var debugOverlay bool
+
+// DebugOverlay reports whether the debug overlay (F3) is on.
+func DebugOverlay() bool { return debugOverlay }
+
+func ms(d time.Duration) float64 { return float64(d) / float64(time.Millisecond) }
 
 func abs(v int) int {
 	if v < 0 {

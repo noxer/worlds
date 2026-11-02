@@ -79,6 +79,10 @@ type State struct {
 
 	tap    image.Point
 	tapped bool
+
+	// ToLogical converts a pointer position on the screen to game pixels.
+	// Nil means they are the same.
+	ToLogical func(image.Point) image.Point
 }
 
 // Update samples all devices. Call once per tick before scenes update.
@@ -121,6 +125,9 @@ func (s *State) sample() Frame {
 	s.touch = inpututil.AppendJustPressedTouchIDs(s.touch[:0])
 	if len(s.touch) > 0 {
 		f.Tap, f.Tapped = image.Pt(ebiten.TouchPosition(s.touch[0])), true
+	}
+	if f.Tapped && s.ToLogical != nil {
+		f.Tap = s.ToLogical(f.Tap)
 	}
 	return f
 }

@@ -448,6 +448,18 @@ internal/
 
 ## Platforms and screen
 
+**Rendering:** the game renders at the screen's physical resolution. The
+world is drawn pixel-perfect at game resolution (plus a 3-pixel margin),
+then scaled up by the integer scale and shifted by a fraction of a game
+pixel: the camera position interpolated between the last two ticks by the
+time since the last update (`Explore.CameraShift`). Scrolling thus follows
+real time even when the display's frames don't line up with 60 updates per
+second (frames with two updates or none, 120/144 Hz screens). Jumps
+(doors, the wrap seam) aren't interpolated. The UI (dialogs, notices, the
+debug overlay) is drawn on its own layer, unshifted. F3 shows the worst
+chunk, update and draw times of the last second; ticks over 8 ms are logged
+to the console while the overlay is on.
+
 **Screen size:** the logical screen is at least 240×180 pixels. It is scaled
 by the largest whole-number factor that fits, and leftover space shows more of
 the world (320×180 at 1280×720 and 1920×1080).
