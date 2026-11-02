@@ -248,12 +248,20 @@ chunks stay independent.
 
 **1. Settlements (world level).** A hierarchy of grids, one per tier:
 
-| Tier | One candidate per | Gets |
-|---|---|---|
-| Metropolis | 16384² tiles | airport, harbour, rail hub |
-| City | 4096² tiles | rail station, harbour on the coast |
-| Town | 1024² tiles | bus stop, maybe a ferry |
-| Village | 256² tiles | dirt road |
+| Tier | One candidate per | Apart on foot | On the planet | Gets |
+|---|---|---|---|---|
+| Metropolis | 131072² tiles | 10 h | about 10 | airport, harbour, rail hub |
+| City | 65536² tiles | 5 h | about 40 | rail station, harbour on the coast |
+| Town | 16384² tiles | 75 min | about 600 | bus stop, maybe a ferry |
+| Village | 4096² tiles | 20 min | about 10,000 | dirt road |
+| Point of interest | 1024² tiles | 5 min | about 150,000 | farm, camp, ruin, cave entrance, shrine |
+
+Walking covers 3.75 tiles per second, so villages are about 20 minutes
+apart on foot (10 by bike); beyond that, public transport is the way to
+travel. Counts assume about a third of the planet is land. Points of
+interest keep the walk between villages from being empty: small prefabs
+(and later quest hooks) on a dirt path or none, not part of the transport
+networks. Pool patches (ponds, islets) stay at their finer grid.
 
 - **Choosing a site:** each grid cell derives a few candidate spots from
   the seed hash and scores them with `Preview`: flat land, coast, river or
@@ -677,8 +685,9 @@ together with the world seed.
 
 ## Open questions
 
-- Settlement spacing: villages about every 256 tiles is roughly one per
-  minute on foot. Tune with `cmd/worldmap` once it draws them.
+- Settlement spacing is set by villages about 20 minutes apart on foot;
+  the other tiers are derived from that and may need tuning once
+  `cmd/worldmap` draws them.
 - Cities: fully procedural layouts filled with prefabs (the current plan),
   or mostly hand-made city patches from a pool with procedural villages
   only.
