@@ -95,6 +95,9 @@ func (p *Planner) Plan(from, goal world.Pos, m Mode, blocked Blocked) (moves []M
 		return nil, false
 	}
 	m = effective(from, m)
+	if from.Map == goal.Map && p.enclosed(from, goal, m) {
+		return nil, false
+	}
 	if p.version != p.w.Version() || len(p.cache) > maxCache {
 		clear(p.cache)
 		clear(p.badEdges)
@@ -127,6 +130,49 @@ func (p *Planner) Plan(from, goal world.Pos, m Mode, blocked Blocked) (moves []M
 		moves[len(moves)-1].Warp = warp
 	}
 	return moves, true
+}
+
+// enclosedLimit bounds the flood fill of enclosed.
+const enclosedLimit = 4096
+
+// enclosed reports that goal lies in a small closed-off area that from is
+// not part of and no warp leads into: a walled-in spot, an island, a pond.
+// Then goal is unreachable, and planning can give up at once instead of
+// searching wide windows and corridors. It floods at most enclosedLimit
+// cells; bigger areas are left to the planner.
+func (p *Planner) enclosed(from, goal world.Pos, m Mode) bool {
+	if _, ok := StepTicks(p.w, goal, m); !ok {
+		return false // not ours to judge (e.g. a warp target); let the planner decide
+	}
+	seen := map[world.Pos]bool{goal: true}
+	queue := []world.Pos{goal}
+	for len(queue) > 0 {
+		if len(seen) > enclosedLimit {
+			return false
+		}
+		c := queue[0]
+		queue = queue[1:]
+		for _, d := range world.Dirs {
+			n, ok := p.w.Neighbor(c, d)
+			if !ok || seen[n] {
+				continue
+			}
+			if n == from {
+				return false
+			}
+			if _, ok := StepTicks(p.w, n, m); !ok {
+				continue
+			}
+			seen[n] = true
+			queue = append(queue, n)
+		}
+	}
+	for _, wp := range p.w.Warps() {
+		if seen[wp.To] {
+			return false // reachable through a door
+		}
+	}
+	return true
 }
 
 // Distance returns the static travel time in ticks between two tiles of the
@@ -251,14 +297,37 @@ func (p *Planner) local(from, to world.Pos, m Mode, blocked Blocked) ([]Move, in
 	return p.search(from, to, func(q world.Pos) bool { return q == to }, m, blocked)
 }
 
+// searchMargins are the margins tried around start and aim, smallest first:
+// most paths fit the small window; detours around a fenced village or a
+// lake need the bigger ones.
+var searchMargins = [...]int64{margin, 96, 160}
+
 // search runs A* from `from` to the first cell satisfying goal. aim is a
 // representative goal position: the search window is the box around from
-// and aim plus a margin, and the heuristic estimates the distance to aim.
-// Goal cells may be warp tiles; other warp tiles are impassable.
+// and aim plus a margin, widened step by step when no path fits, and the
+// heuristic estimates the distance to aim. Goal cells may be warp tiles;
+// other warp tiles are impassable.
 func (p *Planner) search(from, aim world.Pos, goal func(world.Pos) bool, m Mode, blocked Blocked) ([]Move, int, bool) {
+	return p.searchUpTo(from, aim, goal, m, blocked, len(searchMargins))
+}
+
+// searchUpTo is search with at most n window sizes.
+func (p *Planner) searchUpTo(from, aim world.Pos, goal func(world.Pos) bool, m Mode, blocked Blocked, n int) ([]Move, int, bool) {
+	for _, mg := range searchMargins[:n] {
+		moves, cost, ok, whole := p.searchWindow(from, aim, goal, m, blocked, mg)
+		if ok || whole {
+			return moves, cost, ok
+		}
+	}
+	return nil, 0, false
+}
+
+// searchWindow is one A* run with the given margin. whole reports that the
+// window already covered the whole map, so a larger one can't help.
+func (p *Planner) searchWindow(from, aim world.Pos, goal func(world.Pos) bool, m Mode, blocked Blocked, margin int64) (moves []Move, cost int, ok, whole bool) {
 	tx, ty, ok := p.w.Delta(from, aim)
 	if !ok || geom.Abs(tx)+geom.Abs(ty) > p.MaxRange {
-		return nil, 0, false
+		return nil, 0, false, true
 	}
 	// Window in offsets relative to from.
 	minX, maxX := min(0, tx)-margin, max(0, tx)+margin
@@ -267,6 +336,7 @@ func (p *Planner) search(from, aim world.Pos, goal func(world.Pos) bool, m Mode,
 		// Clip to the detail map.
 		minX, maxX = max(minX, -from.X), min(maxX, mw-1-from.X)
 		minY, maxY = max(minY, -from.Y), min(maxY, mh-1-from.Y)
+		whole = minX == -from.X && maxX == mw-1-from.X && minY == -from.Y && maxY == mh-1-from.Y
 	} else {
 		// Never let the window wrap onto itself.
 		if maxX-minX+1 > mw {
@@ -275,6 +345,7 @@ func (p *Planner) search(from, aim world.Pos, goal func(world.Pos) bool, m Mode,
 		if maxY-minY+1 > mh {
 			minY, maxY = -mh/2, mh-1-mh/2
 		}
+		whole = maxX-minX+1 >= mw && maxY-minY+1 >= mh
 	}
 	ww, wh := maxX-minX+1, maxY-minY+1
 	idx := func(x, y int64) int { return int((y-minY)*ww + (x - minX)) }
@@ -338,9 +409,9 @@ func (p *Planner) search(from, aim world.Pos, goal func(world.Pos) bool, m Mode,
 		}
 	}
 	if found < 0 {
-		return nil, 0, false
+		return nil, 0, false, whole
 	}
-	moves := make([]Move, steps[found])
+	moves = make([]Move, steps[found])
 	for i, c := len(moves)-1, found; i >= 0; i-- {
 		pi := int(parent[c])
 		cx, cy := int64(c)%ww+minX, int64(c)/ww+minY
@@ -349,7 +420,7 @@ func (p *Planner) search(from, aim world.Pos, goal func(world.Pos) bool, m Mode,
 		moves[i] = Move{Dir: dirOf(cx-px, cy-py), To: to}
 		c = pi
 	}
-	return moves, int(g[found]), true
+	return moves, int(g[found]), true, whole
 }
 
 func dirOf(dx, dy int64) world.Dir {

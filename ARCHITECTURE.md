@@ -340,9 +340,17 @@ than a fixed tile.
 Every mover uses the same rules: the keyboard, click/tap-to-move, followers,
 NPC schedules, vehicles, and combat.
 
-1. **Local:** A* on tiles over loaded chunks, with a wrap-aware heuristic and
-   the mover's movement mode. Warp tiles count as walls unless they are the
-   target.
+1. **Local:** A* on tiles in a window around start and goal, with a
+   wrap-aware heuristic and the mover's movement mode. Warp tiles count as
+   walls unless they are the target.
+   - **Wider windows:** if no path fits, the window grows step by step
+     (margins 24, 96, 160 tiles), for detours such as walking around a
+     fenced village.
+   - **Enclosure check:** before any search, a small flood fill from the goal
+     (up to 4,096 cells) detects goals in a closed-off area (walled in, an
+     island, a pond) and gives up at once.
+   - **Feedback:** a click on a free spot that can't be reached shows "There's
+     no way there."
 2. **Main map, long range (implemented):** for goals beyond the local
    range (up to `MaxFarRange`, 4,096 tiles), and as a fallback when a near
    goal needs a detour wider than the local window:

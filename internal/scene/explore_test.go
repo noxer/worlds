@@ -3,6 +3,7 @@ package scene
 import (
 	"image"
 	"testing"
+	"time"
 
 	"github.com/noxer/worlds/assets"
 	"github.com/noxer/worlds/internal/content"
@@ -509,4 +510,46 @@ func TestLongTrip(t *testing.T) {
 		h.checkQueue()
 		return h.idle() && h.leader().Pos == goal
 	})
+}
+
+// TestDetourAroundTreeBorder clicks just outside the town's west tree line.
+// The only way there is out through the meadow and around both patches,
+// a detour far wider than the straight distance.
+func TestDetourAroundTreeBorder(t *testing.T) {
+	h := newHarness(t)
+	town, _ := h.w.PatchOrigin("town")
+	inside, _ := h.w.Offset(town, 2, 10)
+	outside, _ := h.w.Offset(town, -2, 10)
+	if h.w.Solid(inside) || h.w.Solid(outside) {
+		t.Fatal("test setup: both tiles must be walkable")
+	}
+	h.e.party.PlaceAll(inside, world.Left)
+	h.e.goTo(outside)
+	if !h.e.hasGoal {
+		t.Fatalf("goTo refused the goal; notice %+v", h.e.notice)
+	}
+	h.runUntil("arrival outside the tree line", 20000, func() bool { return h.idle() && h.leader().Pos == outside })
+}
+
+// TestUnreachableClickExplains: a walkable spot that can't be reached gets
+// a notice instead of silently doing nothing.
+func TestUnreachableClickExplains(t *testing.T) {
+	h := newHarness(t)
+	town, _ := h.w.PatchOrigin("town")
+	spot, _ := h.w.Offset(town, 12, 12)
+	for _, d := range world.Dirs {
+		n, _ := h.w.Neighbor(spot, d)
+		h.w.SetBlocked(n, true)
+	}
+	t0 := time.Now()
+	h.e.goTo(spot)
+	if took := time.Since(t0); took > 200*time.Millisecond {
+		t.Errorf("giving up took %v", took)
+	}
+	if h.e.hasGoal {
+		t.Fatal("walled-in spot accepted as goal")
+	}
+	if h.e.notice == nil || h.e.notice.text != "There's no way there." {
+		t.Fatalf("notice = %+v", h.e.notice)
+	}
 }

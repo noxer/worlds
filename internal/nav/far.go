@@ -65,10 +65,11 @@ func (p *Planner) planFar(from, goal world.Pos, m Mode, blocked Blocked) ([]Move
 		last := min(len(cor)-1, StretchChunks)
 		if last == len(cor)-1 {
 			// The goal is within this stretch: plan to it directly.
-			if moves, _, ok := p.local(from, goal, m, blocked); ok {
+			isGoal := func(q world.Pos) bool { return q == goal }
+			if moves, _, ok := p.searchUpTo(from, goal, isGoal, m, blocked, 1); ok {
 				return moves, true
 			}
-			if moves, _, ok := p.local(from, goal, m, nil); ok {
+			if moves, _, ok := p.searchUpTo(from, goal, isGoal, m, nil, 1); ok {
 				return moves, true
 			}
 			if last == 0 {
@@ -81,10 +82,11 @@ func (p *Planner) planFar(from, goal world.Pos, m Mode, blocked Blocked) ([]Move
 		edge, aim := p.border(t, next, m)
 		if len(edge) > 0 {
 			isGoal := func(q world.Pos) bool { return edge[q] }
-			if moves, _, ok := p.search(from, aim, isGoal, m, blocked); ok && len(moves) > 0 {
+			// The corridor handles big detours; one small window is enough.
+			if moves, _, ok := p.searchUpTo(from, aim, isGoal, m, blocked, 1); ok && len(moves) > 0 {
 				return moves, true
 			}
-			if moves, _, ok := p.search(from, aim, isGoal, m, nil); ok && len(moves) > 0 {
+			if moves, _, ok := p.searchUpTo(from, aim, isGoal, m, nil, 1); ok && len(moves) > 0 {
 				return moves, true
 			}
 		}

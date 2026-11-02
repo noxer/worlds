@@ -353,12 +353,20 @@ func (e *Explore) tapAt(p image.Point) {
 // gets off the bikes first.
 func (e *Explore) goTo(target world.Pos) {
 	e.cancelPath()
-	if e.tryGoTo(target) || !e.riding {
+	if e.tryGoTo(target) {
 		return
 	}
-	e.riding = false
-	if !e.tryGoTo(target) {
+	if e.riding {
+		e.riding = false
+		if e.tryGoTo(target) {
+			return
+		}
 		e.riding = true
+	}
+	// Say why nothing happens, unless the spot itself is plainly blocked
+	// (a tree, a wall, deep water).
+	if e.canArrive(target) || e.npcAt(target) != nil {
+		e.say("There's no way there.")
 	}
 }
 
