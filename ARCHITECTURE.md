@@ -253,8 +253,9 @@ noise fields (temperature, moisture).
 Settlements, roads, rail lines, power lines and cities are generated in
 layers. Implemented (package `infra`, drawn by `cmd/worldmap -infra`):
 settlements, the network graphs with their routes, and paths and roads as
-tiles, villages, rail lines and harbours. Planned: highways as tiles, towns
-and cities, power lines. Each layer is a pure function of the seed, the terrain preview and
+tiles, villages, rail lines, harbours, and towns and cities. Planned:
+highways as tiles, districts with their own block grids, city transit,
+power lines. Each layer is a pure function of the seed, the terrain preview and
 the layers above it, so any place can still be computed on its own and
 chunks stay independent.
 
@@ -446,6 +447,37 @@ blocks overlapping the chunk, with the autotiler for junctions and kerbs.
 - **Villages and towns** use the same pipeline with one or a few districts
   and organic streets, so there is one generator, not one per size.
 
+**Towns and cities (implemented, `infra/city.go`).** Towns, cities and
+metropolises are laid out on a grid of superblocks every A tiles (36, 40,
+44 by tier) around their centre, evaluated tile by tile, so a chunk only
+looks at the superblocks it overlaps (each worked out once and cached).
+This is the first version of the plan above: one grid per city instead of
+districts with their own grids.
+1. **Arterials:** 3 lanes between superblocks, with a centre line and
+   crosswalks next to the junctions, where at least one neighbouring
+   superblock belongs to the city.
+2. **Superblocks** belong to the city if their centre is within the radius
+   and their centre and corners are dry and away from hand-made patches.
+   Style by density (100% at the centre, 0% at the radius): downtown (over
+   55%, cities and metropolises), residential (over 25%), suburb; one in
+   nine is a park (lawn, trees, crossing paths, benches). The centre one is
+   the plaza: with the station on its north side for cities, a square for
+   towns; rows of trees, benches and lamps.
+3. **Blocks:** a minor street (2 wide) down the middle and across, rows of
+   blocks 10, 9 or 8 tall (downtown, residential, suburb). Each block has a
+   kerbed sidewalk round it (the RPG Urban 3×3 set by kerb sides) and a row
+   of buildings along its bottom, centred, facing the sidewalk below;
+   behind them a paved (downtown) or green yard. Lamps at downtown block
+   corners, trees on residential sidewalks.
+4. **Buildings** are prefabs of kind `building` with a `style`, picked by
+   weight to fit; none on a rail line.
+5. **Rail** keeps out of station plazas: lines end at a buffer stop on the
+   plaza's north edge, behind the station, coming from the arterial north
+   of it; the search treats the plaza as impassable and the last legs go
+   round it at right angles.
+6. In chunks, city tiles replace the terrain, paths and roads (rail stays,
+   over the asphalt); wild trees give way to the city's own.
+
 **Villages (implemented, `infra/site.go`).** A generated village's layout
 is planned once on a grid around its centre (radius plus 8 tiles) and
 cached; hand-made settlements keep their own.
@@ -471,8 +503,10 @@ cached; hand-made settlements keep their own.
    patch objects, and confirm opens.
 
 **Prefabs** are hand-made Tiled maps in `assets/maps/prefabs`
-(`prefabs:` in `world.yaml`). Map properties: `kind` (`house`, `garden`
-or `well`) and `weight`. A house has one object of type `door` (with
+(`prefabs:` in `world.yaml`). Map properties: `kind` (`house`, `garden`,
+`well`, or `building` for cities, with `style`: `downtown`, `residential`,
+`suburb` or `station`) and `weight`. A city building's door is in its
+bottom row, opening onto the sidewalk. A house has one object of type `door` (with
 `solid` and `bump: house_locked`) in the row above the bottom row; the
 cell below it is the front step. Empty cells keep the generated ground.
 The starting set: red and grey houses 3–5 wide in Brookhaven's style, a
@@ -825,8 +859,12 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       harbours (piers where sea lanes start); tests for straight rail, the
       track tiles along a real line, a walkable pier, and chunk
       fingerprints with track and a pier;
-   5. towns and cities: districts, arterials, blocks, urban art, city
-      transit.
+   5. **done:** towns and cities: superblock grid with arterials, minor
+      streets, blocks with sidewalks, buildings from RPG Urban prefabs in
+      four styles, parks, the station plaza where rail lines end; tests for
+      the layout (buildings match their tiles, doors open onto sidewalks)
+      and the doors of a real city reachable from its plaza. Still open:
+      districts with their own grids, city transit (with step 6).
 6. Public transport on the networks: routes, stops and timetables; dynamic
    warps; interiors as instances; window view; taxis.
 
@@ -872,8 +910,11 @@ together with the world seed.
   building façades and roofs, street furniture, taxis, buses and cars (for
   public transport), and characters with four-direction walk animations.
   Its style is softer than Tiny Town (no dark outlines); villages and
-  hand-made places keep Tiny Town. Tile properties (solid, above, names
-  for the autotiler) are added as the generator needs them.
+  hand-made places keep Tiny Town. `tools/art/urban.py` adds its tile
+  properties (solid walls, roofs and furniture, two-tile street lamps that
+  light up at night, lit shop windows) and writes the city building
+  prefabs: red or orange brick, tan or grey roofs, downtown (5–8 wide, 6–7
+  tall), shops with awnings, residential, suburban, and the station.
 
 - Art: proper deep water with transitions to shallow water, rails, public
   transport vehicles, and riding sprites (the bicycle and scooter are

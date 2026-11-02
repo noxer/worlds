@@ -239,6 +239,11 @@ func (in *Infra) endpoint(s, t Settlement, n Network) (end, lead Point) {
 		}
 		return end, lead
 	}
+	if r, ok := in.stationRect(n, s); ok {
+		// Behind the station: a buffer stop on the north edge of the
+		// plaza, reached from the arterial road north of it.
+		return in.norm(s.X, r.Y), in.norm(s.X, r.Y-2)
+	}
 	best := int64(-1)
 	for _, g := range in.ends[s.ID] {
 		l := Point{geom.Mod(g.X+g.DX*gateLead, in.w), geom.Mod(g.Y+g.DY*gateLead, in.h)}
@@ -248,6 +253,70 @@ func (in *Infra) endpoint(s, t Settlement, n Network) (end, lead Point) {
 		}
 	}
 	return end, lead
+}
+
+// stationRect returns the station superblock's inside (the plaza) of a
+// generated city, which rail lines keep out of except for their buffer
+// stop on its north edge.
+func (in *Infra) stationRect(n Network, s Settlement) (Rect, bool) {
+	if n != Rail || s.Fixed != "" || s.ID.Tier < City {
+		return Rect{}, false
+	}
+	a := cityPeriod(s.ID.Tier)
+	return Rect{X: s.X - a/2 + arterial, Y: s.Y - a/2 + arterial, W: a - arterial, H: a - arterial}, true
+}
+
+// inRect reports whether tile (x, y) is in r.
+func (in *Infra) inRect(r Rect, x, y int64) bool {
+	dx, dy := in.delta(r.X, r.Y, x, y)
+	return dx >= 0 && dy >= 0 && dx < r.W && dy < r.H
+}
+
+// crosses reports whether the straight leg from p to q passes through one
+// of the rectangles (sampled every 2 tiles).
+func (in *Infra) crosses(rs []Rect, p, q Point) bool {
+	if len(rs) == 0 {
+		return false
+	}
+	dx, dy := in.delta(p.X, p.Y, q.X, q.Y)
+	near := false // the leg's bounding box touches a rectangle
+	for _, r := range rs {
+		ox, oy := in.delta(r.X, r.Y, p.X, p.Y) // p relative to r
+		if min(ox, ox+dx) < r.W && max(ox, ox+dx) >= 0 && min(oy, oy+dy) < r.H && max(oy, oy+dy) >= 0 {
+			near = true
+		}
+	}
+	if !near {
+		return false
+	}
+	n := max(geom.Abs(dx), geom.Abs(dy))/2 + 1
+	for k := int64(0); k <= n; k++ {
+		x, y := p.X+dx*k/n, p.Y+dy*k/n
+		for _, r := range rs {
+			if in.inRect(r, x, y) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// orthoLegs joins p to t with right-angle legs that keep out of r (t is
+// outside r): an L either way round, or round r's side.
+func (in *Infra) orthoLegs(p, t Point, r Rect) []Point {
+	rs := []Rect{r}
+	for _, c := range []Point{{t.X, p.Y}, {p.X, t.Y}} {
+		if !in.crosses(rs, p, c) && !in.crosses(rs, c, t) {
+			return []Point{p, c, t}
+		}
+	}
+	// Round the side of r nearer p.
+	dx, _ := in.delta(r.X, r.Y, p.X, p.Y)
+	x := in.norm(r.X-2, 0).X
+	if dx >= r.W/2 {
+		x = in.norm(r.X+r.W+1, 0).X
+	}
+	return []Point{p, {x, p.Y}, {x, t.Y}, t}
 }
 
 // route finds the route of an edge on the network's grid with A*.
@@ -274,7 +343,24 @@ func (in *Infra) route(e Edge, y *yielder) *Route {
 	for n, c := range cells {
 		mid[n] = Point{geom.Mod(from.X+c[0]*g, in.w), geom.Mod(from.Y+c[1]*g, in.h)}
 	}
-	mid[len(mid)-1] = to // the grid point nearest the end gives way to it
+	toSettlement := e.B
+	if rev {
+		toSettlement = e.A
+	}
+	if r, ok := in.stationRect(e.Net, toSettlement); ok {
+		// Rail arrives round the station: drop the last grid points while
+		// they or their legs touch the plaza, then turn corners to the
+		// approach north of it.
+		rs := []Rect{r}
+		for len(mid) > 1 && (in.inRect(r, mid[len(mid)-1].X, mid[len(mid)-1].Y) ||
+			in.crosses(rs, mid[len(mid)-2], mid[len(mid)-1])) {
+			mid = mid[:len(mid)-1]
+		}
+		last := mid[len(mid)-1]
+		mid = append(mid[:len(mid)-1], in.orthoLegs(last, to, r)...)
+	} else {
+		mid[len(mid)-1] = to // the grid point nearest the end gives way to it
+	}
 	if rev {
 		slices.Reverse(mid)
 	}
@@ -296,6 +382,12 @@ func (in *Infra) search(e Edge, a, b Point, g int64, y *yielder) ([][2]int64, in
 	spec := networks[e.Net]
 	dx, dy := in.delta(a.X, a.Y, b.X, b.Y)
 	gx, gy := roundDiv(dx, g), roundDiv(dy, g)
+	var stations []Rect
+	for _, s := range []Settlement{e.A, e.B} {
+		if r, ok := in.stationRect(e.Net, s); ok {
+			stations = append(stations, r)
+		}
+	}
 
 	// The search area: a box around the straight line, narrowed to a
 	// corridor around the coarse route for long routes.
@@ -366,6 +458,11 @@ func (in *Infra) search(e Edge, a, b Point, g int64, y *yielder) ([][2]int64, in
 			if in.avoided(geom.Mod(a.X+(i+pi)*g/2, in.w), geom.Mod(a.Y+(j+pj)*g/2, in.h), g/4) {
 				return -1
 			}
+		}
+		// Rail keeps out of the station plazas (bar the buffer stops).
+		if len(stations) > 0 && (i != gx || j != gy) && in.crosses(stations,
+			Point{a.X + pi*g, a.Y + pj*g}, Point{a.X + i*g, a.Y + j*g}) {
+			return -1
 		}
 		if spec.water == 0 { // sea lane
 			switch {

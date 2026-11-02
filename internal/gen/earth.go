@@ -35,6 +35,7 @@ type Earth struct {
 	lamp      [2]world.Tile         // lamp post and lantern (the tile above)
 	rail      [16]world.Tile        // track by connected sides (N=1, E=2, S=4, W=8)
 	pier      [16]world.Tile        // pier by connected sides
+	urban     map[int]world.Tile    // RPG Urban tiles cities use, by index
 }
 
 // Sea levels on the elevation scale [0, MaxValue).
@@ -112,6 +113,18 @@ func NewEarth(info world.GenInfo) (world.Generator, error) {
 			return nil, fmt.Errorf("earth: %w", err)
 		}
 	}
+	e.urban = map[int]world.Tile{}
+	for _, i := range append(append([]int{urbanRoad, urbanLineH, urbanLineV, urbanPaved, urbanTree, urbanBench, urbanLampPost, urbanLamp},
+		urbanCrossH[:]...), urbanCrossV[:]...) {
+		if e.urban[i], err = info.Tilesets.Tile("rpgurban", i); err != nil {
+			return nil, fmt.Errorf("earth: %w", err)
+		}
+	}
+	for _, i := range urbanWalk {
+		if e.urban[i], err = info.Tilesets.Tile("rpgurban", i); err != nil {
+			return nil, fmt.Errorf("earth: %w", err)
+		}
+	}
 	specs, err := prefabSpecs(info.Prefabs)
 	if err != nil {
 		return nil, err
@@ -147,7 +160,12 @@ func (e *Earth) Prefetch(x, y int64) {
 func prefabSpecs(ps []*world.Prefab) ([]infra.PrefabSpec, error) {
 	var out []infra.PrefabSpec
 	for _, p := range ps {
-		s := infra.PrefabSpec{Name: string(p.Name), Kind: p.Props.String("kind"), W: p.W, H: p.H, Weight: p.Props.Int("weight", 1)}
+		s := infra.PrefabSpec{Name: string(p.Name), Kind: p.Props.String("kind"), Style: p.Props.String("style"),
+			W: p.W, H: p.H, Weight: p.Props.Int("weight", 1)}
+		doorRow := p.H - 2 // a house's front step is its bottom row
+		if s.Kind == "building" {
+			doorRow = p.H - 1 // a city building opens onto the sidewalk
+		}
 		if s.Weight <= 0 {
 			return nil, fmt.Errorf("prefab %s: weight must be positive", p.Name)
 		}
@@ -156,19 +174,26 @@ func prefabSpecs(ps []*world.Prefab) ([]infra.PrefabSpec, error) {
 			if o.Type == "door" {
 				doors++
 				s.DoorX = o.Pos.X
-				if o.Pos.Y != p.H-2 {
-					return nil, fmt.Errorf("prefab %s: the door must be in the row above the bottom row", p.Name)
+				if o.Pos.Y != doorRow {
+					return nil, fmt.Errorf("prefab %s: the door must be in row %d", p.Name, doorRow)
 				}
 			}
 		}
 		switch s.Kind {
-		case "house":
+		case "house", "building":
 			if doors != 1 {
-				return nil, fmt.Errorf("prefab %s: a house needs exactly one door", p.Name)
+				return nil, fmt.Errorf("prefab %s: a %s needs exactly one door", p.Name, s.Kind)
+			}
+			if s.Kind == "building" {
+				switch s.Style {
+				case "downtown", "residential", "suburb", "station":
+				default:
+					return nil, fmt.Errorf("prefab %s: style must be downtown, residential, suburb or station, not %q", p.Name, s.Style)
+				}
 			}
 		case "garden", "well":
 		default:
-			return nil, fmt.Errorf("prefab %s: kind must be house, garden or well, not %q", p.Name, s.Kind)
+			return nil, fmt.Errorf("prefab %s: kind must be house, garden, well or building, not %q", p.Name, s.Kind)
 		}
 		out = append(out, s)
 	}
@@ -197,7 +222,14 @@ type region struct {
 	site   []infra.SiteCell
 	sites  []*infra.Site // villages overlapping the region
 	rail   []bool        // a rail line on the cell
-	pier   []uint8       // 1: a pier, 2: the land cell a pier starts from
+	city   []infra.CityTile
+	cities []*infra.CityPlan // towns and cities overlapping the region
+	pier   []uint8           // 1: a pier, 2: the land cell a pier starts from
+}
+
+func (r *region) cityAt(x, y int) infra.CityTile {
+	x, y = min(max(x, 0), r.n-1), min(max(y, 0), r.n-1)
+	return r.city[y*r.n+x]
 }
 
 func (r *region) railAt(x, y int) bool {
@@ -268,6 +300,9 @@ func (e *Earth) Generate(seed uint64, b *world.ChunkBuilder) {
 				if r.at(x, y+dy) != cLand || r.wayAt(x, y+dy) || r.railAt(x, y+dy) || r.pierAt(x, y+dy) == 1 {
 					return false
 				}
+				if r.cityAt(x, y+dy).Kind != infra.CNone {
+					return false // cities plant their own trees
+				}
 				c := r.siteAt(x, y+dy)
 				return c == infra.Outside || c == infra.Open || c == infra.Water
 			}
@@ -295,7 +330,93 @@ func (e *Earth) Generate(seed uint64, b *world.ChunkBuilder) {
 		}
 	}
 	e.buildings(b, r)
+	e.cityTiles(b, r)
 	e.railsAndPiers(b, r)
+}
+
+// Tiles of Kenney's RPG Urban Pack used by cities.
+var (
+	urbanCrossH = [3]int{405, 432, 459}
+	urbanCrossV = [3]int{434, 435, 436}
+	// sidewalk by kerb sides (N=1, E=2, S=4, W=8)
+	urbanWalk = map[uint8]int{0: 36, 1: 9, 2: 37, 4: 63, 8: 35, 1 | 8: 8, 1 | 2: 10, 4 | 8: 62, 4 | 2: 64}
+)
+
+const (
+	urbanRoad, urbanLineH, urbanLineV, urbanPaved   = 406, 433, 462, 36
+	urbanTree, urbanBench, urbanLampPost, urbanLamp = 260, 270, 192, 165
+)
+
+// cityTiles draws streets, sidewalks, plazas and street furniture, then
+// the buildings.
+func (e *Earth) cityTiles(b *world.ChunkBuilder, r *region) {
+	if len(r.cities) == 0 {
+		return
+	}
+	u := func(i int) world.Tile { return e.urban[i] }
+	for ly := 0; ly < world.ChunkSize; ly++ {
+		for lx := 0; lx < world.ChunkSize; lx++ {
+			t := r.cityAt(margin+lx, margin+ly)
+			if t.Kind == infra.CNone {
+				continue
+			}
+			var g world.Tile
+			switch t.Kind {
+			case infra.CRoad:
+				g = u(urbanRoad)
+			case infra.CLineH:
+				g = u(urbanLineH)
+			case infra.CLineV:
+				g = u(urbanLineV)
+			case infra.CCrossH:
+				g = u(urbanCrossH[t.Lane%3])
+			case infra.CCrossV:
+				g = u(urbanCrossV[t.Lane%3])
+			case infra.CWalk:
+				w, ok := urbanWalk[t.Edge]
+				if !ok {
+					w = urbanPaved
+				}
+				g = u(w)
+			case infra.CPaved, infra.CBuilt:
+				g = u(urbanPaved)
+			}
+			if !g.Empty() {
+				b.Set(world.LayerGround, lx, ly, g)
+			}
+			b.Set(world.LayerDeco, lx, ly, 0)
+			b.Set(world.LayerOverhead, lx, ly, 0)
+		}
+	}
+	// Street furniture after the clearing, as lamps reach into the tile
+	// above (so the row below the chunk is looked at too).
+	for ly := 0; ly <= world.ChunkSize; ly++ {
+		for lx := 0; lx < world.ChunkSize; lx++ {
+			t := r.cityAt(margin+lx, margin+ly)
+			inChunk := ly < world.ChunkSize
+			switch t.Deco {
+			case infra.DTree:
+				if inChunk {
+					b.Set(world.LayerDeco, lx, ly, u(urbanTree))
+				}
+			case infra.DBench:
+				if inChunk {
+					b.Set(world.LayerDeco, lx, ly, u(urbanBench))
+				}
+			case infra.DLamp:
+				if inChunk {
+					b.Set(world.LayerDeco, lx, ly, u(urbanLampPost))
+				}
+				if ly > 0 {
+					b.Set(world.LayerOverhead, lx, ly-1, u(urbanLamp))
+				}
+			}
+		}
+	}
+	cx, cy := b.CX*world.ChunkSize, b.CY*world.ChunkSize
+	for _, c := range r.cities {
+		e.place(b, c.Buildings(cx, cy, world.ChunkSize, world.ChunkSize))
+	}
 }
 
 // railsAndPiers draws track (deco layer, over whatever ground) and piers
@@ -326,7 +447,30 @@ func (e *Earth) buildings(b *world.ChunkBuilder, r *region) {
 		return int(lx), int(ly), lx >= 0 && ly >= 0 && lx < world.ChunkSize && ly < world.ChunkSize
 	}
 	for _, s := range r.sites {
-		for _, bd := range s.Buildings {
+		e.place(b, s.Buildings)
+		if e.lamp[0].Empty() {
+			continue
+		}
+		for _, l := range s.Lamps {
+			if lx, ly, ok := local(l.X, l.Y); ok {
+				b.Set(world.LayerDeco, lx, ly, e.lamp[0])
+			}
+			if lx, ly, ok := local(l.X, l.Y-1); ok {
+				b.Set(world.LayerOverhead, lx, ly, e.lamp[1])
+			}
+		}
+	}
+}
+
+// place draws prefabs into the chunk, with their objects (doors).
+func (e *Earth) place(b *world.ChunkBuilder, bs []infra.Building) {
+	cx, cy := b.CX*world.ChunkSize, b.CY*world.ChunkSize
+	local := func(x, y int64) (int, int, bool) {
+		lx, ly := geom.WrapDelta(cx, x, b.W()), geom.WrapDelta(cy, y, b.H())
+		return int(lx), int(ly), lx >= 0 && ly >= 0 && lx < world.ChunkSize && ly < world.ChunkSize
+	}
+	{
+		for _, bd := range bs {
 			p := e.prefabs[bd.Prefab]
 			for py := int64(0); py < p.H; py++ {
 				for px := int64(0); px < p.W; px++ {
@@ -354,17 +498,6 @@ func (e *Earth) buildings(b *world.ChunkBuilder, r *region) {
 				}
 			}
 		}
-		if e.lamp[0].Empty() {
-			continue
-		}
-		for _, l := range s.Lamps {
-			if lx, ly, ok := local(l.X, l.Y); ok {
-				b.Set(world.LayerDeco, lx, ly, e.lamp[0])
-			}
-			if lx, ly, ok := local(l.X, l.Y-1); ok {
-				b.Set(world.LayerOverhead, lx, ly, e.lamp[1])
-			}
-		}
 	}
 }
 
@@ -376,6 +509,7 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 		x0: b.CX*world.ChunkSize - margin, y0: b.CY*world.ChunkSize - margin, n: n,
 		class: make([]uint8, n*n), fixed: make([]bool, n*n), raw: make([]bool, n*n), way: make([]uint8, n*n),
 		site: make([]infra.SiteCell, n*n), rail: make([]bool, n*n), pier: make([]uint8, n*n),
+		city: make([]infra.CityTile, n*n),
 	}
 	for y := 0; y < n; y++ {
 		for x := 0; x < n; x++ {
@@ -468,6 +602,27 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 						r.class[i] = cLand
 					case infra.Built, infra.Yard:
 						r.class[i] = cLand
+					}
+				}
+			}
+		}
+	}
+	// Towns and cities: land, their streets instead of paths and roads,
+	// rail kept.
+	if e.infra != nil {
+		r.cities = e.infra.CitiesIn(r.x0, r.y0, int64(n), int64(n))
+		for _, c := range r.cities {
+			for y := 0; y < n; y++ {
+				for x := 0; x < n; x++ {
+					i := y*n + x
+					if r.fixed[i] {
+						continue
+					}
+					wx, wy := b.Wrap(r.x0+int64(x), r.y0+int64(y))
+					if t := c.At(wx, wy); t.Kind != infra.CNone {
+						r.city[i] = t
+						r.class[i] = cLand
+						r.way[i] = 0
 					}
 				}
 			}

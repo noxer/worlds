@@ -41,10 +41,12 @@ func (in *Infra) newWay(n Network, r *Route) *Way {
 		q := [2]int64{dx*sub + sub/2, dy*sub + sub/2}
 		if n == Rail && i > 0 {
 			// Rail stays axis-aligned: a step off the grid (to an end)
-			// turns a corner instead of running diagonally.
+			// turns a corner instead of running diagonally, going north or
+			// south first, so it arrives at a station along the plaza's
+			// north edge.
 			last := pts[len(pts)-1]
 			if last[0] != q[0] && last[1] != q[1] {
-				pts = append(pts, [2]int64{q[0], last[1]})
+				pts = append(pts, [2]int64{last[0], q[1]})
 			}
 		}
 		pts = append(pts, q)

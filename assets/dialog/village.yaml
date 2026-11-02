@@ -6,3 +6,24 @@ house_locked:
     main:
       lines:
         - The door is locked. Nobody seems to be home.
+
+building_locked:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The door is locked.
+
+shop_closed:
+  start: main
+  nodes:
+    main:
+      lines:
+        - "CLOSED  -  Back soon."
+
+station_closed:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The station is closed. No trains are running yet.

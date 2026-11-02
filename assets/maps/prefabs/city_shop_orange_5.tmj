@@ -1,0 +1,196 @@
+{
+ "type": "map",
+ "version": "1.10",
+ "tiledversion": "1.11.0",
+ "orientation": "orthogonal",
+ "renderorder": "right-down",
+ "infinite": false,
+ "compressionlevel": -1,
+ "width": 5,
+ "height": 5,
+ "tilewidth": 16,
+ "tileheight": 16,
+ "nextlayerid": 5,
+ "nextobjectid": 2,
+ "properties": [
+  {
+   "name": "kind",
+   "type": "string",
+   "value": "building"
+  },
+  {
+   "name": "style",
+   "type": "string",
+   "value": "residential"
+  },
+  {
+   "name": "weight",
+   "type": "int",
+   "value": 1
+  }
+ ],
+ "tilesets": [
+  {
+   "firstgid": 1,
+   "source": "../../tilesets/rpgurban.tsj"
+  }
+ ],
+ "layers": [
+  {
+   "id": 1,
+   "name": "ground",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 5,
+   "height": 5,
+   "data": [
+    90,
+    91,
+    91,
+    91,
+    92,
+    144,
+    145,
+    145,
+    145,
+    146,
+    126,
+    127,
+    127,
+    127,
+    128,
+    180,
+    181,
+    181,
+    181,
+    182,
+    207,
+    208,
+    208,
+    208,
+    209
+   ]
+  },
+  {
+   "id": 2,
+   "name": "deco",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 5,
+   "height": 5,
+   "data": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    365,
+    0,
+    365,
+    0,
+    329,
+    330,
+    330,
+    330,
+    331,
+    360,
+    361,
+    413,
+    361,
+    362
+   ]
+  },
+  {
+   "id": 3,
+   "name": "overhead",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 5,
+   "height": 5,
+   "data": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "properties": [
+    {
+     "name": "overhead",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "objects",
+   "type": "objectgroup",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "draworder": "topdown",
+   "objects": [
+    {
+     "id": 1,
+     "name": "door",
+     "type": "door",
+     "x": 32,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "bump",
+       "type": "string",
+       "value": "shop_closed"
+      },
+      {
+       "name": "solid",
+       "type": "bool",
+       "value": true
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

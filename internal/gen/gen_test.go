@@ -27,6 +27,7 @@ func TestFingerprint(t *testing.T) {
 		{2802 / world.ChunkSize, 193995 / world.ChunkSize},  // the square of the village east of it
 		{21704 / world.ChunkSize, 44829 / world.ChunkSize},  // a rail curve
 		{9392 / world.ChunkSize, 203778 / world.ChunkSize},  // a pier
+		{40027 / world.ChunkSize, 90950 / world.ChunkSize},  // a city's station
 	}
 	for _, ch := range chunks {
 		for y := int64(0); y < world.ChunkSize; y++ {
@@ -39,7 +40,7 @@ func TestFingerprint(t *testing.T) {
 			}
 		}
 	}
-	const want = 0x14b5bf72ca43adf9
+	const want = 0x5bf12318727ff47c
 	if got := h.Sum64(); got != want {
 		t.Errorf("fingerprint = %#x, want %#x", got, uint64(want))
 	}

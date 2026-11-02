@@ -194,6 +194,7 @@ type Infra struct {
 	ways   map[edgeKey]*Way
 	sites  map[ID]*Site
 	piers  map[ID]Pier
+	cities map[ID]*CityPlan
 
 	prefetchAt      [2]int64
 	prefetchStarted bool
@@ -238,6 +239,7 @@ func New(cfg Config) (*Infra, error) {
 		prefabs: cfg.Prefabs,
 		sites:   map[ID]*Site{},
 		piers:   map[ID]Pier{},
+		cities:  map[ID]*CityPlan{},
 		ways:    map[edgeKey]*Way{},
 		cells:   map[ID]cellResult{},
 		routes:  map[edgeKey]*Route{},

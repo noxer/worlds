@@ -420,3 +420,75 @@ func TestHarbourPier(t *testing.T) {
 	}
 	t.Fatal("no harbour found")
 }
+
+// TestCityTiles: near the centre of a real city, every door is locked with
+// a message, and its front tile can be reached on foot from the plaza.
+func TestCityTiles(t *testing.T) {
+	c, err := content.Load(assets.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, in := c.World, c.Infra
+	var plan *infra.CityPlan
+	for _, s := range in.Near(0, 193770, 140000, infra.City) {
+		for _, p := range in.CitiesIn(s.X, s.Y, 1, 1) {
+			if p.S.ID == s.ID {
+				plan = p
+			}
+		}
+		if plan != nil {
+			break
+		}
+	}
+	if plan == nil {
+		t.Fatal("no city")
+	}
+	s := plan.S
+	const half = 80
+	walkable := func(p world.Pos) bool { return !w.Solid(p) && w.Terrain(p) == world.Land }
+	start := world.Pos{Map: world.Main, X: s.X, Y: s.Y + 10} // on the plaza
+	if !walkable(start) {
+		t.Fatalf("the plaza at %v is not walkable", start)
+	}
+	reach := map[world.Pos]bool{start: true}
+	queue := []world.Pos{start}
+	for len(queue) > 0 {
+		p := queue[0]
+		queue = queue[1:]
+		for _, d := range world.Dirs {
+			q, ok := w.Neighbor(p, d)
+			if !ok || reach[q] || !walkable(q) {
+				continue
+			}
+			if dx, dy, _ := w.Delta(start, q); geom.Abs(dx) > half+20 || geom.Abs(dy) > half+20 {
+				continue
+			}
+			reach[q] = true
+			queue = append(queue, q)
+		}
+	}
+	doors := 0
+	for _, b := range plan.Buildings(geom.Mod(s.X-half, w.W), geom.Mod(s.Y-half, w.H), 2*half, 2*half) {
+		pf := w.Prefabs()[b.Prefab]
+		for _, o := range pf.Objects {
+			door, _ := w.Normalize(world.Pos{Map: world.Main, X: b.X + o.Pos.X, Y: b.Y + o.Pos.Y})
+			if dx, dy, _ := w.Delta(start, door); geom.Abs(dx) > half || geom.Abs(dy) > half {
+				continue
+			}
+			doors++
+			if !w.Solid(door) {
+				t.Errorf("%s: door %v is not solid", pf.Name, door)
+			}
+			if _, ok := w.Bump(door); !ok {
+				t.Errorf("%s: door %v has no message", pf.Name, door)
+			}
+			front, _ := w.Neighbor(door, world.Down)
+			if !reach[front] {
+				t.Errorf("%s: the front of door %v can't be reached from the plaza", pf.Name, door)
+			}
+		}
+	}
+	if doors < 40 {
+		t.Errorf("only %d doors near the centre", doors)
+	}
+}

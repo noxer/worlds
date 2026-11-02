@@ -14,7 +14,8 @@ import (
 // below it, in the prefab's bottom row, is the front step.
 type PrefabSpec struct {
 	Name   string
-	Kind   string // "house", "garden" or "well"
+	Kind   string // "house", "garden", "well" (villages) or "building" (cities)
+	Style  string // buildings: "downtown", "residential", "suburb" or "station"
 	W, H   int64
 	Weight int
 	DoorX  int64 // column of the door (houses)

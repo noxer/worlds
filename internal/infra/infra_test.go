@@ -395,3 +395,84 @@ func TestRailIsStraight(t *testing.T) {
 		t.Fatal("no rail found")
 	}
 }
+
+var cityPrefabs = append(append([]infra.PrefabSpec(nil), testPrefabs...),
+	infra.PrefabSpec{Name: "down6", Kind: "building", Style: "downtown", W: 6, H: 7, Weight: 2, DoorX: 3},
+	infra.PrefabSpec{Name: "down5", Kind: "building", Style: "downtown", W: 5, H: 6, Weight: 1, DoorX: 2},
+	infra.PrefabSpec{Name: "res5", Kind: "building", Style: "residential", W: 5, H: 5, Weight: 1, DoorX: 2},
+	infra.PrefabSpec{Name: "res4", Kind: "building", Style: "residential", W: 4, H: 5, Weight: 1, DoorX: 2},
+	infra.PrefabSpec{Name: "sub4", Kind: "building", Style: "suburb", W: 4, H: 4, Weight: 1, DoorX: 2},
+	infra.PrefabSpec{Name: "station", Kind: "building", Style: "station", W: 12, H: 7, Weight: 1, DoorX: 5},
+)
+
+// TestCityLayout: building tiles are exactly the buildings' footprints,
+// buildings don't overlap, and every door opens onto a sidewalk or the
+// plaza.
+func TestCityLayout(t *testing.T) {
+	in, err := infra.New(infra.Config{Seed: 42, W: testW, H: testH, Relief: relief{}, Prefabs: cityPrefabs})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cities := in.Near(60000, 60000, 60000, infra.City)
+	if len(cities) == 0 {
+		t.Fatal("no city")
+	}
+	s := cities[0]
+	plans := in.CitiesIn(s.X, s.Y, 1, 1)
+	var plan *infra.CityPlan
+	for _, p := range plans {
+		if p.S.ID == s.ID {
+			plan = p
+		}
+	}
+	if plan == nil {
+		t.Fatal("no plan for the city")
+	}
+	const half = 150
+	x0, y0 := s.X-half, s.Y-half
+	tiles := map[[2]int64]infra.CityTile{}
+	for y := y0; y < y0+2*half; y++ {
+		for x := x0; x < x0+2*half; x++ {
+			tiles[[2]int64{x, y}] = plan.At(geom.Mod(x, testW), geom.Mod(y, testH))
+		}
+	}
+	covered := map[[2]int64]bool{}
+	stations, n := 0, 0
+	for _, b := range plan.Buildings(geom.Mod(x0, testW), geom.Mod(y0, testH), 2*half, 2*half) {
+		pf := cityPrefabs[b.Prefab]
+		bx := x0 + geom.WrapDelta(geom.Mod(x0, testW), b.X, testW)
+		by := y0 + geom.WrapDelta(geom.Mod(y0, testH), b.Y, testH)
+		if bx < x0 || by < y0 || bx+pf.W > x0+2*half || by+pf.H > y0+2*half {
+			continue // partly outside the window
+		}
+		n++
+		if pf.Style == "station" {
+			stations++
+		}
+		for y := by; y < by+pf.H; y++ {
+			for x := bx; x < bx+pf.W; x++ {
+				k := [2]int64{x, y}
+				if covered[k] {
+					t.Fatalf("buildings overlap at %v", k)
+				}
+				covered[k] = true
+				if tiles[k].Kind != infra.CBuilt {
+					t.Fatalf("%s at %d,%d: tile %v is %d, not built", pf.Name, bx, by, k, tiles[k].Kind)
+				}
+			}
+		}
+		front := tiles[[2]int64{bx + pf.DoorX, by + pf.H}]
+		if front.Kind != infra.CWalk && front.Kind != infra.CPaved {
+			t.Errorf("%s at %d,%d: the door opens onto tile kind %d", pf.Name, bx, by, front.Kind)
+		}
+	}
+	for k, tile := range tiles {
+		inside := k[0] >= x0+10 && k[1] >= y0+10 && k[0] < x0+2*half-10 && k[1] < y0+2*half-10
+		if inside && tile.Kind == infra.CBuilt && !covered[k] {
+			t.Fatalf("tile %v is built but no building covers it", k)
+		}
+	}
+	if stations != 1 || n < 50 {
+		t.Errorf("%d stations, %d buildings near the centre", stations, n)
+	}
+}
