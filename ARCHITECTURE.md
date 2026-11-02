@@ -138,7 +138,8 @@ is computed for the whole planet up front.
    - The world map is rendered from this level.
 2. **Area level** (blocks of 64×64 chunks, generated on demand and cached):
    anything that needs a view wider than one chunk.
-   - Rivers, roads, rail lines and sea lanes.
+   - Rivers, and the routes of roads, rail lines and sea lanes (see
+     Infrastructure).
    - Placing pool patches.
    - Reserving space around fixed patches, so a generated continent never runs
      into a hand-made island.
@@ -237,6 +238,89 @@ tool for choosing where hand-made content goes.
 Generators are registered by name (`earth`, `grassland`). Later biomes
 (desert, forest, mountains) become land generators chosen from further
 noise fields (temperature, moisture).
+
+### Infrastructure: settlements and networks (planned)
+
+Settlements, roads, rail lines, power lines and cities are generated in
+layers. Each layer is a pure function of the seed, the terrain preview and
+the layers above it, so any place can still be computed on its own and
+chunks stay independent.
+
+**1. Settlements (world level).** A hierarchy of grids, one per tier:
+
+| Tier | One candidate per | Gets |
+|---|---|---|
+| Metropolis | 16384² tiles | airport, harbour, rail hub |
+| City | 4096² tiles | rail station, harbour on the coast |
+| Town | 1024² tiles | bus stop, maybe a ferry |
+| Village | 256² tiles | dirt road |
+
+- **Choosing a site:** each grid cell derives a few candidate spots from
+  the seed hash and scores them with `Preview`: flat land, coast, river or
+  valley, climate. The best one wins, or none (ocean, desert, mountains).
+- **Cost:** "which settlements are near (x, y)" is O(1) anywhere.
+- **Hand-made towns** (Brookhaven) register as fixed settlements of a tier
+  and suppress generated candidates nearby, as patch surroundings do today.
+
+**2. Networks (area level).** One graph per network, each a *relative
+neighbourhood graph* over its tiers: two settlements connect unless a third
+lies closer to both. It looks natural (no criss-cross shortcuts), contains
+the minimum spanning tree (so it is connected), and with a maximum edge
+length per network every edge can be computed from nearby settlements only.
+- **Highways** between cities; **roads** from towns; **dirt roads** to
+  villages.
+- **Rail** between cities and metropolises.
+- **Sea lanes** between harbours, routed over water. They connect islands
+  and continents where the edge length cap ends the road graph.
+- **Flight paths** between airports: straight lines on the torus.
+
+**Route shape:** A* on a coarse grid (cells of about 16 tiles) from the
+terrain preview. Slope costs, rail much more than roads; water is allowed
+only as a short bridge. The result is a polyline per edge, keyed by its two
+settlements, computed on demand and cached in the area cache.
+- A chunk finds the routes crossing it by asking for the edges of the
+  settlements within the maximum edge length plus a margin, and keeping
+  those whose bounding box touches it.
+- **Layering is allowed, cycles are not:** roads may be computed after
+  highways and treat them as cheap (so they merge into them), but a network
+  never depends on itself, or the result would depend on which chunk asked
+  first.
+- A fingerprint test covers settlements and route polylines, like the
+  terrain one.
+
+**3. Tiles (chunk level).**
+- Roads and rails: the segments crossing the chunk are drawn as bands of
+  fixed width. The autotiler picks curves, junctions, bridges and level
+  crossings from tileset terrain sets, as it does for coasts.
+- Power lines: pylons at fixed distances along a line's length (so they
+  line up across chunk borders), wires on the overhead layer. They follow
+  highways or run straight between cities. Decoration only.
+- Painted patch cells win over generated tiles.
+
+**4. Cities (area level, per settlement).** A footprint sized by tier,
+laid out once and cached:
+1. Streets grow from where network routes enter the footprint: a grid for
+   cities, organic for villages.
+2. Blocks between streets are split into plots.
+3. Plots are filled from a pool of hand-made building prefabs (small
+   patches like the pool islands, each with a door warp).
+4. Each building's interior is an instance of a detail-map template,
+   numbered from its position, so every generated house has its own inside
+   (see interiors as instances).
+5. Landmarks are prefabs placed by rule: the station where the rail line
+   enters, the harbour on the shore, a town hall, shops.
+
+**5. Hand-made content.** Patches mark their gates with connection objects
+(`road_end`, `rail_end`, with a network name). The router must end there and
+never cuts through painted cells. Brookhaven's tree gaps become road ends.
+Station and harbour objects in a patch register stops.
+
+**6. Public transport** runs on these networks: buses on road edges, trains
+on rail edges, ferries on sea lanes, planes on flight paths. Stops are the
+settlements' landmarks; timetables follow from edge lengths.
+
+`cmd/worldmap` draws settlements and networks over the planet preview, so
+spacing and tiers can be tuned before any tile exists.
 
 ### Determinism
 
@@ -550,8 +634,14 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    activation in reach, `sim.Where` out of reach; Lina in Brookhaven walks
    her routine between home, the square, the smithy and the pond). Day and
    night (**done**: ambient light by time, light sources, lamp posts).
-5. Public transport: routes, stops and timetables; dynamic warps; interiors as
-   instances; window view; taxis.
+5. Infrastructure (see Infrastructure: settlements and networks):
+   1. settlements and network graphs, shown by `cmd/worldmap` only;
+   2. roads as tiles, with Brookhaven's gates connected to the next
+      generated village;
+   3. generated villages from a prefab pool;
+   4. rail and harbours (with rail art of our own).
+6. Public transport on the networks: routes, stops and timetables; dynamic
+   warps; interiors as instances; window view; taxis.
 
 ## Asset delivery
 
@@ -586,6 +676,12 @@ moves out of the binary:
 together with the world seed.
 
 ## Open questions
+
+- Settlement spacing: villages about every 256 tiles is roughly one per
+  minute on foot. Tune with `cmd/worldmap` once it draws them.
+- Cities: fully procedural layouts filled with prefabs (the current plan),
+  or mostly hand-made city patches from a pool with procedural villages
+  only.
 
 - Art: proper deep water with transitions to shallow water, rails, public
   transport vehicles, and riding sprites (the bicycle and scooter are
