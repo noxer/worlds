@@ -309,10 +309,11 @@ func (w *World) Objects() []Object { return w.objects }
 
 // PatchInfo describes a hand-made patch placed on the main map.
 type PatchInfo struct {
-	Name  MapID
-	X, Y  int64 // normalised top-left corner
-	W, H  int64
-	Props Props // the patch's map properties
+	Name    MapID
+	X, Y    int64 // normalised top-left corner
+	W, H    int64
+	Props   Props    // the patch's map properties
+	Objects []Object // positions relative to the top-left corner
 }
 
 // Patches lists the hand-made patches of main.world (not pool patches).
@@ -320,7 +321,7 @@ func (w *World) Patches() []PatchInfo {
 	var ps []PatchInfo
 	for _, p := range w.patches {
 		if !p.pool {
-			ps = append(ps, PatchInfo{Name: p.src.id, X: p.x, Y: p.y, W: p.src.w, H: p.src.h, Props: p.src.props})
+			ps = append(ps, PatchInfo{Name: p.src.id, X: p.x, Y: p.y, W: p.src.w, H: p.src.h, Props: p.src.props, Objects: p.src.objects})
 		}
 	}
 	return ps
@@ -375,7 +376,7 @@ func Load(fsys fs.FS, cfg Config) (*World, error) {
 		}
 	}
 	if cfg.Generator != nil {
-		g, err := cfg.Generator(GenInfo{Tilesets: w.tilesets, W: w.W, H: w.H})
+		g, err := cfg.Generator(GenInfo{Tilesets: w.tilesets, W: w.W, H: w.H, Seed: w.Seed, Patches: w.Patches()})
 		if err != nil {
 			return nil, fmt.Errorf("generator: %w", err)
 		}

@@ -133,6 +133,9 @@ func (w *World) Prefetch(anchor Pos, dir Dir, moving bool) {
 		return
 	}
 	s.last = req
+	if p, ok := w.gen.(Prefetcher); ok {
+		p.Prefetch(anchor.X, anchor.Y)
+	}
 
 	type want struct {
 		key  [2]int64

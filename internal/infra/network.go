@@ -3,6 +3,7 @@ package infra
 import (
 	"container/heap"
 	"fmt"
+	"slices"
 
 	"github.com/noxer/worlds/internal/geom"
 )
@@ -173,22 +174,27 @@ type Route struct {
 	Cost   int64
 }
 
+// routeCacheLimit bounds the route cache (routes are large).
+const routeCacheLimit = 8192
+
 // noRoute marks edges without a route in the cache.
 var noRoute = &Route{}
 
 // Route returns the route of an edge, or nil if there is none.
-func (in *Infra) Route(e Edge) *Route {
+func (in *Infra) Route(e Edge) *Route { return in.routeWith(e, nil) }
+
+func (in *Infra) routeWith(e Edge, y *yielder) *Route {
 	k := e.key()
 	in.mu.Lock()
 	r, ok := in.routes[k]
 	in.mu.Unlock()
 	if !ok {
-		r = in.route(e)
+		r = in.route(e, y)
 		if r == nil {
 			r = noRoute
 		}
 		in.mu.Lock()
-		if len(in.routes) >= cacheLimit {
+		if len(in.routes) >= routeCacheLimit {
 			clear(in.routes)
 		}
 		in.routes[k] = r
@@ -218,32 +224,71 @@ const (
 // smaller search. It is part of the world: changing it changes routes.
 const heuristicWeight = 120
 
-// route finds the route of an edge on the network's grid with A*.
-func (in *Infra) route(e Edge) *Route {
-	spec := networks[e.Net]
-	dx, dy := in.delta(e.A.X, e.A.Y, e.B.X, e.B.Y)
-	if spec.grid == 0 {
-		return &Route{Points: []Point{{e.A.X, e.A.Y}, {e.B.X, e.B.Y}}, Cost: isqrt(dx*dx + dy*dy)}
+// gateLead is how far outside a gate routes start, so they arrive head on.
+const gateLead = 4
+
+// endpoint is where the route from s towards t starts: the centre, or for
+// a hand-made settlement the gate nearest t. lead is where the search
+// starts: gateLead tiles outside the gate (or the centre).
+func (in *Infra) endpoint(s, t Settlement) (end, lead Point) {
+	end = Point{s.X, s.Y}
+	lead = end
+	best := int64(-1)
+	for _, g := range in.ends[s.ID] {
+		l := Point{geom.Mod(g.X+g.DX*gateLead, in.w), geom.Mod(g.Y+g.DY*gateLead, in.h)}
+		dx, dy := in.delta(l.X, l.Y, t.X, t.Y)
+		if d := dx*dx + dy*dy; best < 0 || d < best {
+			end, lead, best = g.Point, l, d
+		}
 	}
-	cells, cost, ok := in.search(e, spec.grid)
+	return end, lead
+}
+
+// route finds the route of an edge on the network's grid with A*.
+func (in *Infra) route(e Edge, y *yielder) *Route {
+	spec := networks[e.Net]
+	a, la := in.endpoint(e.A, e.B)
+	b, lb := in.endpoint(e.B, e.A)
+	if spec.grid == 0 {
+		dx, dy := in.delta(a.X, a.Y, b.X, b.Y)
+		return &Route{Points: []Point{a, b}, Cost: isqrt(dx*dx + dy*dy)}
+	}
+	g := spec.grid
+	// The search grid starts exactly at its first point, and only gets
+	// near the last; so it starts at a gate if there is one.
+	from, to, rev := la, lb, false
+	if lb != b && la == a {
+		from, to, rev = lb, la, true
+	}
+	cells, cost, ok := in.search(e, from, to, g, y)
 	if !ok {
 		return nil
 	}
-	pts := make([]Point, len(cells))
+	mid := make([]Point, len(cells))
 	for n, c := range cells {
-		pts[n] = Point{geom.Mod(e.A.X+c[0]*spec.grid, in.w), geom.Mod(e.A.Y+c[1]*spec.grid, in.h)}
+		mid[n] = Point{geom.Mod(from.X+c[0]*g, in.w), geom.Mod(from.Y+c[1]*g, in.h)}
 	}
-	// The grid point nearest B is replaced by B itself.
-	pts[len(pts)-1] = Point{e.B.X, e.B.Y}
+	mid[len(mid)-1] = to // the grid point nearest the end gives way to it
+	if rev {
+		slices.Reverse(mid)
+	}
+	var pts []Point
+	if a != la {
+		pts = append(pts, a) // from the gate
+	}
+	pts = append(pts, mid...)
+	if b != lb {
+		pts = append(pts, b) // to the gate
+	}
 	return &Route{Points: pts, Cost: cost}
 }
 
-// search finds the cheapest path of grid cells (offsets from A in cells of
-// g tiles) from A to the cell nearest B. Grid offsets cross the seams like
-// any others.
-func (in *Infra) search(e Edge, g int64) ([][2]int64, int64, bool) {
+// search finds the cheapest path of grid cells (offsets from a in cells of
+// g tiles) from a to the cell nearest b, the ends of edge e. Grid offsets
+// cross the seams like any others.
+func (in *Infra) search(e Edge, a, b Point, g int64, y *yielder) ([][2]int64, int64, bool) {
 	spec := networks[e.Net]
-	dx, dy := in.delta(e.A.X, e.A.Y, e.B.X, e.B.Y)
+	dx, dy := in.delta(a.X, a.Y, b.X, b.Y)
 	gx, gy := roundDiv(dx, g), roundDiv(dy, g)
 
 	// The search area: a box around the straight line, narrowed to a
@@ -254,7 +299,7 @@ func (in *Infra) search(e Edge, g int64) ([][2]int64, int64, bool) {
 	cols, rows := maxX-minX+1, maxY-minY+1
 	var allowed []bool
 	if max(geom.Abs(gx), geom.Abs(gy)) > coarseFrom {
-		coarse, _, ok := in.search(e, g*coarseFactor)
+		coarse, _, ok := in.search(e, a, b, g*coarseFactor, y)
 		if !ok {
 			return nil, 0, false
 		}
@@ -278,7 +323,7 @@ func (in *Infra) search(e Edge, g int64) ([][2]int64, int64, bool) {
 		if v, ok := samples[k]; ok {
 			return v
 		}
-		x, y := geom.Mod(e.A.X+i*g, in.w), geom.Mod(e.A.Y+j*g, in.h)
+		x, y := geom.Mod(a.X+i*g, in.w), geom.Mod(a.Y+j*g, in.h)
 		v := sample{elev: in.elev(x, y), height: in.relief.Height(in.seed, x, y)}
 		if spec.wiggle > 0 {
 			// By absolute position, so every edge crossing it sees the
@@ -292,18 +337,30 @@ func (in *Infra) search(e Edge, g int64) ([][2]int64, int64, bool) {
 		return v
 	}
 	// Near the ends, sea lanes may cross land (the harbour is in town) and
-	// land routes may cross water (a town on the shore).
-	endR := func(s Settlement) int64 { return s.Radius/g + 2 }
-	ra, rb := endR(e.A), endR(e.B)
+	// land routes may cross water (a town on the shore). The search may run
+	// either way, so both ends get the bigger radius.
+	ra := max(e.A.Radius, e.B.Radius)/g + 2
+	rb := ra
 	nearEnd := func(i, j int64) bool {
 		return i*i+j*j <= ra*ra || (i-gx)*(i-gx)+(j-gy)*(j-gy) <= rb*rb
 	}
-	// stepCost is the cost of entering (i, j) from smooth height from, for
-	// a step of length 10 (straight) or 14 (diagonal), or -1 if impassable.
-	// Flat land costs 100 per unit of length.
-	stepCost := func(i, j, from, l int64) int64 {
+	// stepCost is the cost of a step from (pi, pj), at smooth height from,
+	// to (i, j), of length 10 (straight) or 14 (diagonal), or -1 if
+	// impassable. Flat land costs 100 per unit of length.
+	stepCost := func(pi, pj, i, j, from, l int64) int64 {
 		s := at(i, j)
 		h := s.elev
+		// Round hand-made patches: neither the cell (unless it is an end)
+		// nor the middle of the step may be near one.
+		if len(in.avoid) > 0 {
+			end := (i == 0 && j == 0) || (i == gx && j == gy)
+			if !end && in.avoided(geom.Mod(a.X+i*g, in.w), geom.Mod(a.Y+j*g, in.h), g/2) {
+				return -1
+			}
+			if in.avoided(geom.Mod(a.X+(i+pi)*g/2, in.w), geom.Mod(a.Y+(j+pj)*g/2, in.h), g/4) {
+				return -1
+			}
+		}
 		if spec.water == 0 { // sea lane
 			switch {
 			case h < in.deep:
@@ -347,6 +404,9 @@ func (in *Infra) search(e Edge, g int64) ([][2]int64, int64, bool) {
 		}
 		closed[k] = true
 		expanded++
+		if expanded%256 == 0 {
+			y.maybeYield()
+		}
 		if expanded > maxExpand {
 			return nil, 0, false
 		}
@@ -374,7 +434,7 @@ func (in *Infra) search(e Edge, g int64) ([][2]int64, int64, bool) {
 			if closed[nk] || (allowed != nil && !allowed[nk]) {
 				continue
 			}
-			c := stepCost(ni, nj, h0, dd[2])
+			c := stepCost(it.i, it.j, ni, nj, h0, dd[2])
 			if c < 0 {
 				continue
 			}

@@ -3,7 +3,9 @@ package infra_test
 import (
 	"fmt"
 	"hash/fnv"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/noxer/worlds/assets"
 	"github.com/noxer/worlds/internal/content"
@@ -233,7 +235,7 @@ func TestFingerprint(t *testing.T) {
 			fmt.Fprint(h, e.A.ID, e.B.ID, in.Route(e).Points)
 		}
 	}
-	const want = 0xfe2360b618e16898
+	const want = 0x18eebef10879c7d5
 	if got := h.Sum64(); got != want {
 		t.Errorf("infrastructure fingerprint %#x, want %#x", got, uint64(want))
 	}
@@ -258,5 +260,31 @@ func TestConcurrent(t *testing.T) {
 		if fmt.Sprint(<-done) != first {
 			t.Error("goroutines saw different edges")
 		}
+	}
+}
+
+// TestPrefetch: blocks prepared in the background give the same ways as
+// blocks computed on demand.
+func TestPrefetch(t *testing.T) {
+	bg, direct := newInfra(t, relief{}), newInfra(t, relief{})
+	const x, y = 20000, 30000
+	bg.Prefetch(x, y)
+	deadline := time.Now().Add(20 * time.Second)
+	for !bg.BlockReady(x, y) || !bg.BlockReady(x+infra.BlockSize, y+infra.BlockSize) {
+		if time.Now().After(deadline) {
+			t.Fatal("the blocks around the anchor never got ready")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	ways := func(in *infra.Infra) string {
+		var out []string
+		for _, w := range in.WaysIn(x-1500, y-1500, 3000, 3000) {
+			out = append(out, fmt.Sprint(w.Net, w.OX, w.OY, w.Pts))
+		}
+		sort.Strings(out)
+		return fmt.Sprint(out)
+	}
+	if a, b := ways(bg), ways(direct); a != b || a == "[]" {
+		t.Errorf("prefetched ways differ from direct ones (or there are none):\n%.200s\n%.200s", a, b)
 	}
 }

@@ -32,6 +32,13 @@ type Placer interface {
 	Suitable(seed uint64, x, y, w, h, margin int64) bool
 }
 
+// Prefetcher is implemented by generators that prepare data for an area
+// ahead of time (in the background). World.Prefetch calls it when the
+// anchor enters another chunk.
+type Prefetcher interface {
+	Prefetch(x, y int64)
+}
+
 // Previewer is implemented by generators that can estimate the terrain of
 // any position cheaply, for overview and world maps.
 type Previewer interface {

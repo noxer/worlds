@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/noxer/worlds/internal/geom"
+	"github.com/noxer/worlds/internal/world"
 )
 
 // Tier is the size class of a settlement.
@@ -107,6 +108,58 @@ type Fixed struct {
 	Tier   Tier
 	X, Y   int64 // centre
 	Radius int64
+	// Ends are the gates where routes start (objects of type "road_end");
+	// without any, routes start at the centre.
+	Ends []Gate
+}
+
+// Gate is where routes enter a hand-made settlement: a tile on the border
+// of its patch, and the outward direction.
+type Gate struct {
+	Point
+	DX, DY int64
+}
+
+// Rect is a rectangle of tiles on the main map.
+type Rect struct{ X, Y, W, H int64 }
+
+// FixedFrom collects the hand-made settlements among the patches: those
+// with the property "settlement" (a tier name), centred on the patch, with
+// their "road_end" objects as gates.
+func FixedFrom(patches []world.PatchInfo) ([]Fixed, error) {
+	var out []Fixed
+	for _, p := range patches {
+		s := p.Props.String("settlement")
+		if s == "" {
+			continue
+		}
+		t, err := ParseTier(s)
+		if err != nil {
+			return nil, fmt.Errorf("patch %s: %w", p.Name, err)
+		}
+		f := Fixed{Name: string(p.Name), Tier: t, X: p.X + p.W/2, Y: p.Y + p.H/2, Radius: max(p.W, p.H) / 2}
+		for _, o := range p.Objects {
+			if o.Type != "road_end" {
+				continue
+			}
+			g := Gate{Point: Point{p.X + o.Pos.X, p.Y + o.Pos.Y}}
+			switch {
+			case o.Pos.Y == 0:
+				g.DY = -1
+			case o.Pos.Y == p.H-1:
+				g.DY = 1
+			case o.Pos.X == 0:
+				g.DX = -1
+			case o.Pos.X == p.W-1:
+				g.DX = 1
+			default:
+				return nil, fmt.Errorf("patch %s: road_end %q must be on the patch border", p.Name, o.Name)
+			}
+			f.Ends = append(f.Ends, g)
+		}
+		out = append(out, f)
+	}
+	return out, nil
 }
 
 // Config configures the infrastructure of a world.
@@ -115,6 +168,7 @@ type Config struct {
 	W, H   int64
 	Relief Relief
 	Fixed  []Fixed
+	Avoid  []Rect // hand-made patches: routes go round them
 }
 
 // Infra answers questions about settlements and networks. It is safe for
@@ -126,10 +180,30 @@ type Infra struct {
 	sea, deep int64
 	fixed     []Settlement
 	fixedAt   map[ID]Settlement
+	ends      map[ID][]Gate // gates of hand-made settlements
+	avoid     []Rect
 
 	mu     sync.Mutex
 	cells  map[ID]cellResult
 	routes map[edgeKey]*Route
+	blocks map[[2]int64][]*Way
+	ways   map[edgeKey]*Way
+
+	prefetchAt      [2]int64
+	prefetchStarted bool
+	prefetchQueue   chan [2]int64
+}
+
+// avoided reports whether tile (x, y) is within m tiles of a hand-made
+// patch.
+func (in *Infra) avoided(x, y, m int64) bool {
+	for _, r := range in.avoid {
+		dx, dy := in.delta(r.X, r.Y, x, y)
+		if dx >= -m && dx < r.W+m && dy >= -m && dy < r.H+m {
+			return true
+		}
+	}
+	return false
 }
 
 type cellResult struct {
@@ -153,8 +227,12 @@ func New(cfg Config) (*Infra, error) {
 	in := &Infra{
 		seed: cfg.Seed, w: cfg.W, h: cfg.H, relief: cfg.Relief,
 		fixedAt: map[ID]Settlement{},
+		ends:    map[ID][]Gate{},
+		avoid:   cfg.Avoid,
+		ways:    map[edgeKey]*Way{},
 		cells:   map[ID]cellResult{},
 		routes:  map[edgeKey]*Route{},
+		blocks:  map[[2]int64][]*Way{},
 	}
 	in.sea, in.deep = cfg.Relief.Levels()
 	for _, f := range cfg.Fixed {
@@ -167,6 +245,10 @@ func New(cfg Config) (*Infra, error) {
 		s.Coastal = in.coastal(x, y, f.Radius)
 		in.fixedAt[id] = s
 		in.fixed = append(in.fixed, s)
+		for _, g := range f.Ends {
+			g.X, g.Y = geom.Mod(g.X, cfg.W), geom.Mod(g.Y, cfg.H)
+			in.ends[id] = append(in.ends[id], g)
+		}
 	}
 	return in, nil
 }
@@ -384,4 +466,11 @@ func (in *Infra) InRect(x, y, w, h int64, minTier Tier) []Settlement {
 		}
 	}
 	return out
+}
+
+// Supports reports whether a world of w x h tiles can have infrastructure:
+// its size must be a multiple of every tier's grid.
+func Supports(w, h int64) bool {
+	c := tierCell[NumTiers-1]
+	return w > 0 && h > 0 && w%c == 0 && h%c == 0
 }

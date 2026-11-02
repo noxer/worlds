@@ -84,28 +84,10 @@ func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 	return &Content{World: w, Infra: in, Dialogs: lib, Start: start}, nil
 }
 
-// loadInfra sets up settlements and networks for generators with a relief.
-// Patches with the property "settlement" (a tier name) are hand-made
-// settlements, centred on the patch.
+// loadInfra returns the infrastructure of the world's generator, if any.
 func loadInfra(w *world.World) (*infra.Infra, error) {
-	rel, ok := w.Generator().(infra.Relief)
-	if !ok {
-		return nil, nil
+	if g, ok := w.Generator().(interface{ Infra() *infra.Infra }); ok {
+		return g.Infra(), nil
 	}
-	cfg := infra.Config{Seed: w.Seed, W: w.W, H: w.H, Relief: rel}
-	for _, p := range w.Patches() {
-		s := p.Props.String("settlement")
-		if s == "" {
-			continue
-		}
-		t, err := infra.ParseTier(s)
-		if err != nil {
-			return nil, fmt.Errorf("patch %s: %w", p.Name, err)
-		}
-		cfg.Fixed = append(cfg.Fixed, infra.Fixed{
-			Name: string(p.Name), Tier: t,
-			X: p.X + p.W/2, Y: p.Y + p.H/2, Radius: max(p.W, p.H) / 2,
-		})
-	}
-	return infra.New(cfg)
+	return nil, nil
 }

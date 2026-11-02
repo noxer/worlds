@@ -7,6 +7,7 @@ import (
 	"github.com/noxer/worlds/assets"
 	"github.com/noxer/worlds/internal/content"
 	"github.com/noxer/worlds/internal/gen"
+	"github.com/noxer/worlds/internal/geom"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -190,5 +191,52 @@ func TestGenerationSpeed(t *testing.T) {
 	t.Logf("%v per chunk", per)
 	if per > 20*time.Millisecond {
 		t.Errorf("generating a chunk takes %v", per)
+	}
+}
+
+// TestPathsFromBrookhaven: dirt paths leave the town through both gates,
+// with Tiny Town's dirt tiles, walkable and connected for at least 60
+// tiles away from the gate.
+func TestPathsFromBrookhaven(t *testing.T) {
+	w := loadWorld(t)
+	town, _ := w.PatchOrigin("town")
+	dirt := map[world.Tile]bool{}
+	for _, i := range []int{12, 13, 14, 24, 25, 26, 36, 37, 38, 39, 40, 41, 42} {
+		dirt[w.Tilesets().MustTile("tinytown", i)] = true
+	}
+	for _, gate := range []struct {
+		name string
+		x, y int64 // the gate tile in the patch
+		dy   int64 // outwards
+	}{{"north", 14, 0, -1}, {"south", 14, 19, 1}} {
+		g, _ := w.Offset(town, gate.x, gate.y)
+		start, _ := w.Offset(g, 0, gate.dy)
+		if !dirt[w.Tile(start, world.LayerGround)] {
+			t.Errorf("%s gate: no path right outside (tile %v)", gate.name, w.Tile(start, world.LayerGround))
+			continue
+		}
+		// Flood along dirt from the gate.
+		seen := map[world.Pos]bool{start: true}
+		queue := []world.Pos{start}
+		far := int64(0)
+		for len(queue) > 0 && far < 60 {
+			p := queue[0]
+			queue = queue[1:]
+			if w.Solid(p) {
+				t.Fatalf("%s path: solid dirt at %v", gate.name, p)
+			}
+			dx, dy, _ := w.Delta(g, p)
+			far = max(far, max(geom.Abs(dx), geom.Abs(dy)))
+			for _, d := range world.Dirs {
+				q, ok := w.Neighbor(p, d)
+				if ok && !seen[q] && dirt[w.Tile(q, world.LayerGround)] {
+					seen[q] = true
+					queue = append(queue, q)
+				}
+			}
+		}
+		if far < 60 {
+			t.Errorf("%s gate: the path ends %d tiles out", gate.name, far)
+		}
 	}
 }

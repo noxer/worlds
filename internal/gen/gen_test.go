@@ -21,8 +21,9 @@ func TestFingerprint(t *testing.T) {
 	h := fnv.New64a()
 	chunks := [][2]int64{
 		{0, 0}, {12345, 6789}, {w.W/world.ChunkSize - 1, w.H/world.ChunkSize - 1}, // inland
-		{1, 193824 / world.ChunkSize}, // Gull Isle: a patch with generated shores
-		{3, 193920 / world.ChunkSize}, // coast and open sea south of the start
+		{1, 193824 / world.ChunkSize},                       // Gull Isle: a patch with generated shores
+		{3, 193920 / world.ChunkSize},                       // coast and open sea south of the start
+		{w.W/world.ChunkSize - 1, 193792 / world.ChunkSize}, // the path from Brookhaven's south gate
 	}
 	for _, ch := range chunks {
 		for y := int64(0); y < world.ChunkSize; y++ {
@@ -35,7 +36,7 @@ func TestFingerprint(t *testing.T) {
 			}
 		}
 	}
-	const want = 0xcf96761de04e15ad
+	const want = 0x2f804628de7cf38
 	if got := h.Sum64(); got != want {
 		t.Errorf("fingerprint = %#x, want %#x", got, uint64(want))
 	}

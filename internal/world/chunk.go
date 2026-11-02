@@ -82,6 +82,8 @@ func (b *ChunkBuilder) Get(layer, lx, ly int) Tile { return b.c.layers[layer][ly
 type GenInfo struct {
 	Tilesets *Tilesets
 	W, H     int64 // main map size in tiles; noise must repeat with these periods
+	Seed     uint64
+	Patches  []PatchInfo // the hand-made patches (not the pool)
 }
 
 // Generator produces the procedural base of main-map chunks. It must be a

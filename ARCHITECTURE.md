@@ -111,6 +111,10 @@ The result of resolving a chunk:
   | any object with `bump: <dialog>` | walking into it shows that dialog's first line as a passive notice: no confirmation, it disappears when the party moves or turns away (e.g. a locked door) |
   | `reserve` | the generator places no features here |
   | `pool` | an area where pool patches (below) may be placed |
+  | `road_end` | a gate on the patch border where generated paths and roads arrive (see Infrastructure) |
+
+  Patch properties: `surround` and `margin` (below), and `settlement` (a
+  tier: the patch is a hand-made settlement, see Infrastructure).
 
 - **Surroundings:** a patch can set `surround: land` or `surround: ocean`
   with a `margin` (tiles, default 8). Within the margin the generator puts
@@ -243,8 +247,8 @@ noise fields (temperature, moisture).
 
 Settlements, roads, rail lines, power lines and cities are generated in
 layers. Implemented (package `infra`, drawn by `cmd/worldmap -infra`):
-settlements and the network graphs with their routes. Planned: tiles,
-cities, power lines. Each layer is a pure function of the seed, the terrain preview and
+settlements, the network graphs with their routes, and paths and roads as
+tiles. Planned: highways, rail and sea lanes as tiles, cities, power lines. Each layer is a pure function of the seed, the terrain preview and
 the layers above it, so any place can still be computed on its own and
 chunks stay independent.
 
@@ -324,11 +328,23 @@ edge, keyed by its two settlements, computed on demand and cached.
   coarse route. The heuristic is weighted by 1.2 (weighted A*, no
   reopening): routes are at most 20% costlier than the best, the searches
   far smaller. A path takes about 1–100 ms, a highway up to about 0.2 s;
-  the planet's long-distance networks take about 8 s on 4 cores. In the
-  game, routes will be computed in the background with chunk streaming.
-- A chunk finds the routes crossing it by asking for the edges of the
-  settlements within the maximum edge length plus a margin, and keeping
-  those whose bounding box touches it.
+  the planet's long-distance networks take about 8 s on 4 cores.
+- **Patches:** routes go round hand-made patches (grid cells within half a
+  cell of one, and steps whose middle is close to one, are impassable),
+  except where they end at a patch's gate.
+- **Ways by block:** the routes that cross a block of 1024×1024 tiles are
+  found from the graph edges with an end within the maximum edge length
+  of it, filtered cheaply first (the search box, or for long routes the
+  corridor of the coarse route) so only routes that can come near the block
+  are computed. Routes are smoothed into *ways* and cached per edge, the
+  ways per block.
+- **Background:** computing a new block takes up to about 0.2 s (desktop).
+  When the party enters another chunk, `World.Prefetch` asks the generator
+  (`world.Prefetcher`) to prepare the 3×3 blocks around it on a background
+  goroutine, so chunks find their ways cached. In the browser, where Go
+  has one thread and only hands control back to the browser when every
+  goroutine waits, that goroutine sleeps for a millisecond every 2 ms of
+  work. A block that isn't ready is computed when a chunk needs it.
 - **Layering is allowed, cycles are not:** roads may be computed after
   highways and treat them as cheap (so they merge into them), but a network
   never depends on itself, or the result would depend on which chunk asked
@@ -337,9 +353,20 @@ edge, keyed by its two settlements, computed on demand and cached.
   terrain one.
 
 **3. Tiles (chunk level).**
-- Roads and rails: the segments crossing the chunk are drawn as bands of
-  fixed width. The autotiler picks curves, junctions, bridges and level
-  crossings from tileset terrain sets, as it does for coasts.
+- **Paths and roads (implemented):** ways are smoothed with two rounds of
+  Chaikin's corner cutting in integer arithmetic (1/16 tile fixed point),
+  so every CPU gets the same tiles. A cell is on the way if its centre is
+  within the half width of the line: 1.1 tiles for paths (2 wide), 1.6 for
+  roads (3 wide). The earth generator paints them before its cleanup:
+  - shallow water under a way becomes land, a causeway (bridges need art);
+    deep water and painted patch cells are never painted;
+  - way cells must come in 2×2 blocks, which the dirt art needs;
+  - paths are Tiny Town dirt, autotiled from which neighbours are ways
+    (edges, outer corners 12–38, inner corners 39–42); roads are cobbles
+    (tile 43, as in Brookhaven); roads paint over paths;
+  - no trees on ways.
+- Highways and rails (with RPG Urban art): bands of fixed width, with
+  curves, junctions, bridges and level crossings from the autotiler.
 - Power lines: pylons at fixed distances along a line's length (so they
   line up across chunk borders), wires on the overhead layer. They follow
   highways or run straight between cities. Decoration only.
@@ -395,10 +422,12 @@ blocks overlapping the chunk, with the autotiler for junctions and kerbs.
 - **Villages and towns** use the same pipeline with one or a few districts
   and organic streets, so there is one generator, not one per size.
 
-**5. Hand-made content.** Patches mark their gates with connection objects
-(`road_end`, `rail_end`, with a network name). The router must end there and
-never cuts through painted cells. Brookhaven's tree gaps become road ends.
-Station and harbour objects in a patch register stops.
+**5. Hand-made content.** Patches mark their gates with `road_end`
+objects on the patch border (implemented; later also `rail_end`). A route
+to a hand-made settlement ends at the gate nearest the other end, arriving
+head on: the search starts 4 tiles outside the gate, in the direction the
+border faces. Brookhaven's north and south gaps are its gates. Later:
+station and harbour objects in a patch register stops.
 
 **6. Public transport** runs on these networks: buses on road edges, trains
 on rail edges, ferries on sea lanes, planes on flight paths. Stops are the
@@ -725,8 +754,11 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       network; tests for spacing, determinism, graph symmetry and
       connectivity, routes across the seam and around deep sea, and a
       fingerprint;
-   2. roads as tiles, with Brookhaven's gates connected to the next
-      generated village;
+   2. **done:** paths (dirt) and roads (cobbles) as tiles, with causeways
+      through shallow water; Brookhaven's gates connected to its two
+      neighbour villages; routes round patches; ways cached per block and
+      prepared in the background; tests for the paths from the gates and a
+      chunk fingerprint with a path;
    3. generated villages from a prefab pool (the city pipeline with one
       district);
    4. rail and harbours (with rail art of our own);

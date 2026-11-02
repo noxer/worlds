@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/noxer/worlds/internal/infra"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -25,6 +26,10 @@ type Earth struct {
 	land      *Grassland
 	shore     map[string]world.Tile // Kenney Tiny Battle water tiles, by name
 	deep      map[string]world.Tile // deep water and transitions, by name
+	infra     *infra.Infra          // settlements and networks; nil for odd world sizes
+	dirt      [16]world.Tile        // dirt path tiles by grass edges (see dirtTile)
+	dirtInner [4]world.Tile         // dirt with grass in one corner: nw, ne, se, sw
+	cobble    world.Tile            // road
 }
 
 // Sea levels on the elevation scale [0, MaxValue).
@@ -73,8 +78,50 @@ func NewEarth(info world.GenInfo) (world.Generator, error) {
 			return nil, fmt.Errorf("earth: %w", err)
 		}
 	}
+	// Tiny Town's dirt: the index of the tile by which sides have grass
+	// (bits n=1, e=2, s=4, w=8), and the inner corners.
+	town := func(i int) world.Tile {
+		t, e2 := info.Tilesets.Tile("tinytown", i)
+		if e2 != nil && err == nil {
+			err = e2
+		}
+		return t
+	}
+	for mask, i := range map[int]int{0: 25, 1: 13, 2: 26, 4: 37, 8: 24, 1 | 8: 12, 1 | 2: 14, 4 | 8: 36, 4 | 2: 38} {
+		e.dirt[mask] = town(i)
+	}
+	e.dirtInner = [4]world.Tile{town(39), town(40), town(41), town(42)}
+	e.cobble = town(43)
+	if err != nil {
+		return nil, fmt.Errorf("earth: %w", err)
+	}
+	if infra.Supports(info.W, info.H) {
+		fixed, err := infra.FixedFrom(info.Patches)
+		if err != nil {
+			return nil, err
+		}
+		var avoid []infra.Rect
+		for _, p := range info.Patches {
+			avoid = append(avoid, infra.Rect{X: p.X, Y: p.Y, W: p.W, H: p.H})
+		}
+		if e.infra, err = infra.New(infra.Config{Seed: info.Seed, W: info.W, H: info.H, Relief: e, Fixed: fixed, Avoid: avoid}); err != nil {
+			return nil, err
+		}
+	}
 	return e, nil
 }
+
+// Prefetch implements world.Prefetcher: it prepares the paths and roads
+// around the party in the background.
+func (e *Earth) Prefetch(x, y int64) {
+	if e.infra != nil {
+		e.infra.Prefetch(x, y)
+	}
+}
+
+// Infra returns the world's settlements and networks (nil if the world
+// size doesn't allow them).
+func (e *Earth) Infra() *infra.Infra { return e.infra }
 
 // Terrain classes during generation.
 const (
@@ -88,8 +135,14 @@ type region struct {
 	x0, y0 int64 // main-map position of cell (0, 0)
 	n      int   // edge length
 	class  []uint8
-	fixed  []bool // painted by a patch: never changed by cleanup
-	raw    []bool // elevation (or surroundings) asks for deep water
+	fixed  []bool  // painted by a patch: never changed by cleanup
+	raw    []bool  // elevation (or surroundings) asks for deep water
+	way    []uint8 // 0, or 1 + the network of a path or road on the cell
+}
+
+func (r *region) wayAt(x, y int) bool {
+	x, y = min(max(x, 0), r.n-1), min(max(y, 0), r.n-1)
+	return r.way[y*r.n+x] != 0
 }
 
 func (r *region) at(x, y int) uint8 {
@@ -105,16 +158,25 @@ func (e *Earth) Generate(seed uint64, b *world.ChunkBuilder) {
 		for lx := 0; lx < world.ChunkSize; lx++ {
 			x, y := ox+lx, oy+ly
 			wx, wy := b.Wrap(r.x0+int64(x), r.y0+int64(y))
+			way := r.way[y*r.n+x]
 			switch r.at(x, y) {
 			case cLand:
-				e.land.ground(seed, b, lx, ly, wx, wy)
+				switch way {
+				case 0:
+					e.land.ground(seed, b, lx, ly, wx, wy)
+				case uint8(infra.Road) + 1:
+					b.Set(world.LayerGround, lx, ly, e.cobble)
+				default:
+					b.Set(world.LayerGround, lx, ly, e.dirtTile(r, x, y))
+				}
 			case cWater:
 				b.Set(world.LayerGround, lx, ly, e.shoreTile(r, x, y))
 			case cDeep:
 				b.Set(world.LayerGround, lx, ly, e.deepTile(r, x, y))
 			}
-			// Trees grow on land; a tall one needs land above it too.
-			isLand := func(dy int) bool { return r.at(x, y+dy) == cLand }
+			// Trees grow on land, off the ways; a tall one needs land above
+			// it too.
+			isLand := func(dy int) bool { return r.at(x, y+dy) == cLand && !r.wayAt(x, y+dy) }
 			if isLand(0) {
 				if bottom, _, ok := e.land.treeAt(seed, b, wx, wy, isLand(-1)); ok {
 					b.Set(world.LayerDeco, lx, ly, bottom)
@@ -136,7 +198,7 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 	n := world.ChunkSize + 2*margin
 	r := &region{
 		x0: b.CX*world.ChunkSize - margin, y0: b.CY*world.ChunkSize - margin, n: n,
-		class: make([]uint8, n*n), fixed: make([]bool, n*n), raw: make([]bool, n*n),
+		class: make([]uint8, n*n), fixed: make([]bool, n*n), raw: make([]bool, n*n), way: make([]uint8, n*n),
 	}
 	for y := 0; y < n; y++ {
 		for x := 0; x < n; x++ {
@@ -176,6 +238,15 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 			}
 		}
 	}
+	// 0. Paths and roads, on land; through shallow water as causeways.
+	if e.infra != nil {
+		e.infra.Paint(r.x0, r.y0, n, func(i int, net infra.Network) {
+			if !r.fixed[i] && !r.raw[i] {
+				r.way[i] = uint8(net) + 1
+				r.class[i] = cLand
+			}
+		})
+	}
 	// 1. Water must come in 2x2 blocks: no one-tile channels or ponds.
 	r.open(func(c uint8) bool { return c != cLand }, cLand)
 	// 2. Land likewise: no one-tile spits or islets.
@@ -206,7 +277,63 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 	r.class = next
 	// 4. Deep water in 2x2 blocks too.
 	r.open(func(c uint8) bool { return c == cDeep }, cWater)
+	// 5. Ways only on land, and in 2x2 blocks, which the dirt art needs.
+	for i := range r.way {
+		if r.class[i] != cLand {
+			r.way[i] = 0
+		}
+	}
+	r.openWays()
 	return r
+}
+
+// openWays keeps a way cell only if some 2x2 block containing it is all
+// way, like open does for terrain.
+func (r *region) openWays() {
+	n := r.n
+	next := append([]uint8(nil), r.way...)
+	for y := 0; y < n; y++ {
+		for x := 0; x < n; x++ {
+			if r.way[y*n+x] == 0 {
+				continue
+			}
+			keep := false
+			for _, d := range [4][2]int{{-1, -1}, {0, -1}, {-1, 0}, {0, 0}} {
+				bx, by := x+d[0], y+d[1]
+				if r.wayAt(bx, by) && r.wayAt(bx+1, by) && r.wayAt(bx, by+1) && r.wayAt(bx+1, by+1) {
+					keep = true
+					break
+				}
+			}
+			if !keep {
+				next[y*n+x] = 0
+			}
+		}
+	}
+	r.way = next
+}
+
+// dirtTile picks the dirt tile for a path cell from which neighbours are
+// ways too.
+func (e *Earth) dirtTile(r *region, x, y int) world.Tile {
+	mask := 0
+	for bit, d := range [4][2]int{{0, -1}, {1, 0}, {0, 1}, {-1, 0}} {
+		if !r.wayAt(x+d[0], y+d[1]) {
+			mask |= 1 << bit
+		}
+	}
+	if mask == 0 {
+		// Grass in a single corner: an inner corner.
+		for k, d := range [4][2]int{{-1, -1}, {1, -1}, {1, 1}, {-1, 1}} {
+			if !r.wayAt(x+d[0], y+d[1]) {
+				return e.dirtInner[k]
+			}
+		}
+	}
+	if t := e.dirt[mask]; !t.Empty() {
+		return t
+	}
+	return e.dirt[0] // no art for this shape (the 2x2 rule makes it rare)
 }
 
 // open keeps a non-fixed cell matching `in` only if some 2x2 block containing
