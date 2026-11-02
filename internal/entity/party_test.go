@@ -177,3 +177,40 @@ func TestFollowDelayScalesWithSpeed(t *testing.T) {
 		t.Fatalf("last follower started %d ticks after the leader, want under one step (8)", ticks)
 	}
 }
+
+// TestFollowersCatchUpAfterSwimming walks without stopping out of the water
+// (24-tick steps) onto land (16-tick steps), three times. The leader leaves
+// the water first, so each follower briefly falls behind; on land it must
+// catch up instead of keeping the gap.
+func TestFollowersCatchUpAfterSwimming(t *testing.T) {
+	w := worldtest.Load(t, worldtest.Spec{Width: 256, Height: 64, Fill: '.'})
+	p := newParty(entity.MaxFollowers)
+	p.PlaceAll(pos("main", 0, 10), world.Right)
+	ticks := func(q world.Pos) int {
+		if q.X%30 < 8 {
+			return 24 // water
+		}
+		return 16
+	}
+	pixel := func(a *entity.Actor) int {
+		dx, _ := a.Offset()
+		return int(a.Pos.X)*world.TileSize + dx
+	}
+	for steps := 0; steps < 90; {
+		if !p.Leader().Moving() {
+			to, _ := w.Neighbor(p.Leader().Pos, world.Right)
+			p.Step(w, world.Right, to, ticks)
+			steps++
+			// Well after each exit from the water, on land, the queue must
+			// be as tight as when it entered.
+			if x := p.Leader().Pos.X % 30; x == 28 {
+				for i := 1; i < len(p.Members); i++ {
+					if gap := pixel(p.Members[i-1]) - pixel(p.Members[i]); gap > world.TileSize+2*entity.FollowDelay {
+						t.Errorf("step %d: member %d trails %d px behind the one ahead", steps, i, gap)
+					}
+				}
+			}
+		}
+		p.Update()
+	}
+}

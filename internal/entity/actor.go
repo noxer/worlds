@@ -46,6 +46,9 @@ func (a *Actor) Moving() bool { return a.stepping }
 // Busy reports whether the actor is moving or has queued steps.
 func (a *Actor) Busy() bool { return a.stepping || len(a.queue) > 0 }
 
+// Backlog is the number of queued steps not started yet.
+func (a *Actor) Backlog() int { return len(a.queue) }
+
 // Dest returns where the actor will stand once its queued steps are done.
 func (a *Actor) Dest() world.Pos {
 	if n := len(a.queue); n > 0 {
@@ -102,7 +105,15 @@ func (a *Actor) Update() (arrived bool) {
 	if !a.stepping && len(a.queue) > 0 && a.queue[0].wait <= 0 {
 		q := a.queue[0]
 		a.queue = a.queue[1:]
-		a.BeginStep(q.dir, q.to, q.ticks)
+		// A step that starts later than scheduled (the previous one took
+		// longer, e.g. still swimming while the leader is already on land)
+		// is made shorter by the delay, at most down to double speed, so
+		// followers catch up instead of keeping the gap.
+		ticks := q.ticks
+		if late := -q.wait; late > 0 {
+			ticks = max(q.ticks-late, q.ticks/2)
+		}
+		a.BeginStep(q.dir, q.to, ticks)
 	}
 	return arrived
 }
