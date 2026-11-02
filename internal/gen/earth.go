@@ -33,6 +33,8 @@ type Earth struct {
 	cobble    world.Tile            // road
 	prefabs   []*world.Prefab       // by the index of infra.Building.Prefab
 	lamp      [2]world.Tile         // lamp post and lantern (the tile above)
+	rail      [16]world.Tile        // track by connected sides (N=1, E=2, S=4, W=8)
+	pier      [16]world.Tile        // pier by connected sides
 }
 
 // Sea levels on the elevation scale [0, MaxValue).
@@ -101,6 +103,14 @@ func NewEarth(info world.GenInfo) (world.Generator, error) {
 	if t, err2 := info.Tilesets.Named("worlds", "lamp_post"); err2 == nil {
 		top, _ := info.Tilesets.Above(t)
 		e.lamp = [2]world.Tile{t, top}
+	}
+	for m := range 16 {
+		if e.rail[m], err = info.Tilesets.Named("worlds", fmt.Sprintf("rail %d", m)); err != nil {
+			return nil, fmt.Errorf("earth: %w", err)
+		}
+		if e.pier[m], err = info.Tilesets.Named("worlds", fmt.Sprintf("pier %d", m)); err != nil {
+			return nil, fmt.Errorf("earth: %w", err)
+		}
 	}
 	specs, err := prefabSpecs(info.Prefabs)
 	if err != nil {
@@ -186,6 +196,30 @@ type region struct {
 	way    []uint8 // 0, or 1 + the network of a path or road on the cell
 	site   []infra.SiteCell
 	sites  []*infra.Site // villages overlapping the region
+	rail   []bool        // a rail line on the cell
+	pier   []uint8       // 1: a pier, 2: the land cell a pier starts from
+}
+
+func (r *region) railAt(x, y int) bool {
+	return x >= 0 && y >= 0 && x < r.n && y < r.n && r.rail[y*r.n+x]
+}
+
+func (r *region) pierAt(x, y int) uint8 {
+	if x < 0 || y < 0 || x >= r.n || y >= r.n {
+		return 0
+	}
+	return r.pier[y*r.n+x]
+}
+
+// mask4 returns which of the four neighbours match: N=1, E=2, S=4, W=8.
+func mask4(x, y int, match func(x, y int) bool) int {
+	m := 0
+	for bit, d := range [4][2]int{{0, -1}, {1, 0}, {0, 1}, {-1, 0}} {
+		if match(x+d[0], y+d[1]) {
+			m |= 1 << bit
+		}
+	}
+	return m
 }
 
 // siteAt is the village layout's kind of a cell (Outside if none).
@@ -231,7 +265,7 @@ func (e *Earth) Generate(seed uint64, b *world.ChunkBuilder) {
 			// Trees grow on land, off the ways and village buildings, and
 			// sparsely in villages; a tall one needs free land above it too.
 			free := func(dy int) bool {
-				if r.at(x, y+dy) != cLand || r.wayAt(x, y+dy) {
+				if r.at(x, y+dy) != cLand || r.wayAt(x, y+dy) || r.railAt(x, y+dy) || r.pierAt(x, y+dy) == 1 {
 					return false
 				}
 				c := r.siteAt(x, y+dy)
@@ -261,6 +295,26 @@ func (e *Earth) Generate(seed uint64, b *world.ChunkBuilder) {
 		}
 	}
 	e.buildings(b, r)
+	e.railsAndPiers(b, r)
+}
+
+// railsAndPiers draws track (deco layer, over whatever ground) and piers
+// (ground layer, over the water).
+func (e *Earth) railsAndPiers(b *world.ChunkBuilder, r *region) {
+	for ly := 0; ly < world.ChunkSize; ly++ {
+		for lx := 0; lx < world.ChunkSize; lx++ {
+			x, y := margin+lx, margin+ly
+			if r.railAt(x, y) {
+				b.Set(world.LayerDeco, lx, ly, e.rail[mask4(x, y, r.railAt)])
+				b.Set(world.LayerOverhead, lx, ly, 0)
+			}
+			if r.pierAt(x, y) == 1 {
+				m := mask4(x, y, func(x, y int) bool { return r.pierAt(x, y) != 0 })
+				b.Set(world.LayerGround, lx, ly, e.pier[m])
+				b.Set(world.LayerDeco, lx, ly, 0)
+			}
+		}
+	}
 }
 
 // buildings puts the villages' prefabs, doors and lamps into the chunk.
@@ -321,7 +375,7 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 	r := &region{
 		x0: b.CX*world.ChunkSize - margin, y0: b.CY*world.ChunkSize - margin, n: n,
 		class: make([]uint8, n*n), fixed: make([]bool, n*n), raw: make([]bool, n*n), way: make([]uint8, n*n),
-		site: make([]infra.SiteCell, n*n),
+		site: make([]infra.SiteCell, n*n), rail: make([]bool, n*n), pier: make([]uint8, n*n),
 	}
 	for y := 0; y < n; y++ {
 		for x := 0; x < n; x++ {
@@ -364,11 +418,29 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 	// 0. Paths and roads, on land; through shallow water as causeways.
 	if e.infra != nil {
 		e.infra.Paint(r.x0, r.y0, n, func(i int, net infra.Network) {
-			if !r.fixed[i] && !r.raw[i] {
-				r.way[i] = uint8(net) + 1
-				r.class[i] = cLand
+			if r.fixed[i] || r.raw[i] {
+				return
 			}
+			if net == infra.Rail {
+				r.rail[i] = true // on an embankment through shallow water
+			} else {
+				r.way[i] = uint8(net) + 1
+			}
+			r.class[i] = cLand
 		})
+		// Piers: on the water, joined to the shore at their root.
+		for _, p := range e.infra.PiersIn(r.x0, r.y0, int64(n), int64(n)) {
+			mark := func(pt infra.Point, v uint8) {
+				dx, dy := geom.WrapDelta(r.x0, pt.X, b.W()), geom.WrapDelta(r.y0, pt.Y, b.H())
+				if dx >= 0 && dy >= 0 && dx < int64(n) && dy < int64(n) && !r.fixed[dy*int64(n)+dx] {
+					r.pier[dy*int64(n)+dx] = v
+				}
+			}
+			mark(p.Root, 2)
+			for _, c := range p.Cells {
+				mark(c, 1)
+			}
+		}
 	}
 	// Villages: the square and footpaths are cobbles; buildings and their
 	// yards need land.

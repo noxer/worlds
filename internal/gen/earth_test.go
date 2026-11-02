@@ -1,6 +1,7 @@
 package gen_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -317,4 +318,105 @@ func TestVillageTiles(t *testing.T) {
 	if houses < 4 {
 		t.Errorf("only %d houses", houses)
 	}
+}
+
+// TestRailTiles: along a real rail line, every track tile matches its
+// neighbours: it connects exactly to the two track cells next to it.
+func TestRailTiles(t *testing.T) {
+	c, err := content.Load(assets.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, in := c.World, c.Infra
+	rails := map[world.Tile]int{}
+	for m := range 16 {
+		tile, err := w.Tilesets().Named("worlds", fmt.Sprintf("rail %d", m))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rails[tile] = m
+	}
+	var route *infra.Route
+	for _, s := range in.Near(0, 193770, 140000, infra.City) {
+		if es := in.Edges(infra.Rail, s); len(es) > 0 {
+			route = in.Route(es[0])
+			break
+		}
+	}
+	if route == nil {
+		t.Fatal("no rail line found")
+	}
+	// Follow the line's first 400 tiles from its start.
+	start := route.Points[0]
+	isRail := func(p world.Pos) (int, bool) {
+		m, ok := rails[w.Tile(p, world.LayerDeco)]
+		return m, ok
+	}
+	p := world.Pos{Map: world.Main, X: start.X, Y: start.Y}
+	if _, ok := isRail(p); !ok {
+		t.Fatalf("no track at the start of the line %v", p)
+	}
+	seen := map[world.Pos]bool{p: true}
+	for steps := 0; steps < 400; steps++ {
+		m, _ := isRail(p)
+		var next []world.Pos
+		for bit, d := range []world.Dir{world.Up, world.Right, world.Down, world.Left} {
+			q, _ := w.Neighbor(p, d)
+			_, rail := isRail(q)
+			if rail != (m&(1<<bit) != 0) {
+				t.Fatalf("track at %v (mask %d) doesn't match its neighbour %v", p, m, q)
+			}
+			if rail && !seen[q] {
+				next = append(next, q)
+			}
+		}
+		if w.Solid(p) {
+			t.Fatalf("track at %v is solid", p)
+		}
+		if len(next) == 0 {
+			break
+		}
+		p = next[0]
+		seen[p] = true
+	}
+	if len(seen) < 100 {
+		t.Errorf("followed only %d track tiles", len(seen))
+	}
+}
+
+// TestHarbourPier: a harbour's pier can be walked from the shore to its
+// end, and its sea lanes start off the end.
+func TestHarbourPier(t *testing.T) {
+	c, err := content.Load(assets.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, in := c.World, c.Infra
+	for _, s := range in.Near(0, 193770, 40000, infra.Town) {
+		p, ok := in.Harbour(s)
+		if !ok {
+			continue
+		}
+		pos := func(pt infra.Point) world.Pos { return world.Pos{Map: world.Main, X: pt.X, Y: pt.Y} }
+		if w.Solid(pos(p.Root)) || w.Terrain(pos(p.Root)) != world.Land {
+			t.Errorf("harbour of %v: the pier's root %v is not walkable land", s.ID, p.Root)
+		}
+		for _, cell := range p.Cells {
+			if w.Solid(pos(cell)) || w.Terrain(pos(cell)) != world.Land {
+				t.Errorf("harbour of %v: pier cell %v can't be walked on", s.ID, cell)
+			}
+		}
+		if w.Terrain(pos(p.Tip)) == world.Land {
+			t.Errorf("harbour of %v: the tip %v is not on the water", s.ID, p.Tip)
+		}
+		lanes := in.Edges(infra.SeaLane, s)
+		for _, e := range lanes {
+			r := in.Route(e)
+			if r.Points[0] != p.Tip && r.Points[len(r.Points)-1] != p.Tip {
+				t.Errorf("sea lane %v-%v doesn't start at the pier", e.A.ID, e.B.ID)
+			}
+		}
+		return
+	}
+	t.Fatal("no harbour found")
 }

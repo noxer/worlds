@@ -16,7 +16,7 @@ const sub = 16
 const BlockSize = 1024
 
 // Drawn lists the networks drawn as tiles on the main map.
-var Drawn = []Network{Path, Road}
+var Drawn = []Network{Path, Road, Rail}
 
 // halfWidth is the half width of a network's band of tiles, in 1/16 tile:
 // a cell belongs to the way if its centre is that close to the line.
@@ -35,12 +35,24 @@ type Way struct {
 // integer arithmetic so every platform gets the same tiles.
 func (in *Infra) newWay(n Network, r *Route) *Way {
 	o := r.Points[0]
-	pts := make([][2]int64, len(r.Points))
+	pts := make([][2]int64, 0, len(r.Points)+2)
 	for i, p := range r.Points {
 		dx, dy := in.delta(o.X, o.Y, p.X, p.Y)
-		pts[i] = [2]int64{dx*sub + sub/2, dy*sub + sub/2}
+		q := [2]int64{dx*sub + sub/2, dy*sub + sub/2}
+		if n == Rail && i > 0 {
+			// Rail stays axis-aligned: a step off the grid (to an end)
+			// turns a corner instead of running diagonally.
+			last := pts[len(pts)-1]
+			if last[0] != q[0] && last[1] != q[1] {
+				pts = append(pts, [2]int64{q[0], last[1]})
+			}
+		}
+		pts = append(pts, q)
 	}
 	for range 2 {
+		if n == Rail {
+			break // tracks keep their right angles
+		}
 		if len(pts) < 3 {
 			break
 		}
@@ -190,8 +202,8 @@ func (in *Infra) edgesNear(n Network, x, y, w, h int64) []Edge {
 func (in *Infra) mayCross(e Edge, x, y, w, h int64, yl *yielder) bool {
 	spec := networks[e.Net]
 	g := spec.grid
-	_, a := in.endpoint(e.A, e.B)
-	_, b := in.endpoint(e.B, e.A)
+	_, a := in.endpoint(e.A, e.B, e.Net)
+	_, b := in.endpoint(e.B, e.A, e.Net)
 	dx, dy := in.delta(a.X, a.Y, b.X, b.Y)
 	gx, gy := roundDiv(dx, g), roundDiv(dy, g)
 	// The rectangle relative to a, in tiles.
@@ -226,6 +238,20 @@ func (in *Infra) Paint(x, y int64, n int, set func(i int, net Network)) {
 	for _, w := range ways {
 		hw := halfWidth[w.Net]
 		lx, ly := in.local(w, x, y) // the region's corner relative to the way
+		if w.Net == Rail {
+			// A chain of single cells along the axis-aligned segments.
+			for k := 0; k+1 < len(w.Pts); k++ {
+				a, b := w.Pts[k], w.Pts[k+1]
+				ax, ay := geom.FloorDiv(a[0], sub)-lx, geom.FloorDiv(a[1], sub)-ly
+				bx, by := geom.FloorDiv(b[0], sub)-lx, geom.FloorDiv(b[1], sub)-ly
+				for j := max(min(ay, by), 0); j <= min(max(ay, by), int64(n-1)); j++ {
+					for i := max(min(ax, bx), 0); i <= min(max(ax, bx), int64(n-1)); i++ {
+						set(int(j)*n+int(i), w.Net)
+					}
+				}
+			}
+			continue
+		}
 		for k := 0; k+1 < len(w.Pts); k++ {
 			a, b := w.Pts[k], w.Pts[k+1]
 			// Cells whose centres are within hw of the segment.

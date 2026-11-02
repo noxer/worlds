@@ -211,7 +211,10 @@ deep-to-shallow transitions (4 edges, 4 rounded outer corners, 4 inner
 corners, named after where the shallow water is: `deep n`, `deep nw`,
 `deep inner nw`, ...). The script prints the tile index of each name; the
 coastline autotiler of the generator will use these sets. `worlds_sheet.py`
-draws the project's own placeholder tiles. `prefabs.py` writes the
+draws the project's own tiles and writes `worlds.tsj`: bicycle, scooter,
+lamp post, and the rail and pier sets, generated for all 16 combinations of
+connected sides (named `rail <mask>`, `pier <mask>`, N=1, E=2, S=4,
+W=8). `prefabs.py` writes the
 starting set of village prefabs (`assets/maps/prefabs`), which are ordinary
 Tiled maps from then on.
 
@@ -250,7 +253,7 @@ noise fields (temperature, moisture).
 Settlements, roads, rail lines, power lines and cities are generated in
 layers. Implemented (package `infra`, drawn by `cmd/worldmap -infra`):
 settlements, the network graphs with their routes, and paths and roads as
-tiles, and villages. Planned: highways, rail and sea lanes as tiles, towns
+tiles, villages, rail lines and harbours. Planned: highways as tiles, towns
 and cities, power lines. Each layer is a pure function of the seed, the terrain preview and
 the layers above it, so any place can still be computed on its own and
 chunks stay independent.
@@ -322,6 +325,10 @@ edge, keyed by its two settlements, computed on demand and cached.
   detail) and cost extra percent per unit climbed per tile: paths 18, roads
   26, highways 35, rail 70. Sea lanes prefer deep water and may cross land
   only near their harbours.
+- **Rail** is searched in 4 directions only (with the Manhattan
+  heuristic) and not smoothed: lines run straight and turn at right angles,
+  which the track art can draw. A step off the grid to an end turns a
+  corner instead of running diagonally.
 - **Meandering:** a random extra cost from the seed by absolute position,
   mostly per block of 16 grid cells, a little per cell (paths up to 60%,
   rail 5%), so routes bend instead of running in straight grid lines, and
@@ -368,8 +375,22 @@ edge, keyed by its two settlements, computed on demand and cached.
     (edges, outer corners 12–38, inner corners 39–42); roads are cobbles
     (tile 43, as in Brookhaven); roads paint over paths;
   - no trees on ways.
-- Highways and rails (with RPG Urban art): bands of fixed width, with
-  curves, junctions, bridges and level crossings from the autotiler.
+- **Rail (implemented):** a chain of single cells along the line, track
+  tiles on the deco layer chosen by which neighbours are track (straights,
+  curves, junctions, buffer stops: one tile per combination of sides).
+  The tiles are transparent round the track, so a line over a path or road
+  is a level crossing without extra art. Shallow water under the track
+  becomes an embankment; no trees on it; village layouts keep houses,
+  lanes and footpaths off it. Track is walkable.
+- **Harbours (implemented):** a coastal town or bigger with sea lanes gets
+  a wooden pier where the shore is nearest its centre along one of the four
+  axes: from the last land cell out over the water for up to 10 tiles (at
+  least 3), with open water beyond. Sea lanes start off its tip. Pier tiles
+  replace the water on the ground layer (walkable), chosen by which sides
+  continue the pier or the shore; the cells stay water for the shore art
+  around them.
+- Highways (with RPG Urban art): bands of fixed width, with curves,
+  junctions, bridges and level crossings from the autotiler.
 - Power lines: pylons at fixed distances along a line's length (so they
   line up across chunk borders), wires on the overhead layer. They follow
   highways or run straight between cities. Decoration only.
@@ -799,7 +820,11 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       houses and gardens from prefabs with footpaths, locked doors with a
       message; tests for the layouts, reachability of every door in the
       real world, the door notice, and a chunk fingerprint with a village;
-   4. rail and harbours (with rail art of our own);
+   4. **done:** rail lines (4-direction routes, track art of our own for
+      every combination of sides, level crossings, embankments) and
+      harbours (piers where sea lanes start); tests for straight rail, the
+      track tiles along a real line, a walkable pier, and chunk
+      fingerprints with track and a pier;
    5. towns and cities: districts, arterials, blocks, urban art, city
       transit.
 6. Public transport on the networks: routes, stops and timetables; dynamic

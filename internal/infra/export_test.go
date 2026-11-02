@@ -13,3 +13,4 @@ func (in *Infra) BlockReady(x, y int64) bool {
 	_, ok := in.blocks[[2]int64{x / BlockSize, y / BlockSize}]
 	return ok
 }
+func (in *Infra) WayOf(e Edge) *Way { return in.way(e, nil) }

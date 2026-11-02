@@ -29,6 +29,7 @@ const (
 	Water                   // not dry enough to build on
 	Street                  // a way (path or road) through the village
 	Lane                    // a village lane from the square (dirt, like paths)
+	Track                   // a rail line through the village
 	Square                  // the village square (cobbles)
 	Foot                    // a footpath from a front step to a street (cobbles)
 	Built                   // covered by a prefab or a lamp
@@ -145,8 +146,11 @@ func (in *Infra) layout(s Settlement) *Site {
 		}
 	}
 	// 2. The ways through it are its streets.
-	in.Paint(site.X0, site.Y0, int(n), func(k int, _ Network) {
-		if site.Cells[k] == Open {
+	in.Paint(site.X0, site.Y0, int(n), func(k int, net Network) {
+		switch {
+		case net == Rail && site.Cells[k] != Outside:
+			site.Cells[k] = Track
+		case site.Cells[k] == Open:
 			site.Cells[k] = Street
 		}
 	})

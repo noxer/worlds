@@ -235,7 +235,7 @@ func TestFingerprint(t *testing.T) {
 			fmt.Fprint(h, e.A.ID, e.B.ID, in.Route(e).Points)
 		}
 	}
-	const want = 0x18eebef10879c7d5
+	const want = 0x46c253698ce491b6
 	if got := h.Sum64(); got != want {
 		t.Errorf("infrastructure fingerprint %#x, want %#x", got, uint64(want))
 	}
@@ -369,4 +369,29 @@ func reachesStreet(site *infra.Site, i, j int64) bool {
 		}
 	}
 	return false
+}
+
+// TestRailIsStraight: rail ways run along the axes, so the track art
+// needs only right-angle curves.
+func TestRailIsStraight(t *testing.T) {
+	in := newInfra(t, relief{})
+	n := 0
+	for _, s := range in.Near(60000, 60000, 70000, infra.City) {
+		for _, e := range in.Edges(infra.Rail, s) {
+			w := in.WayOf(e)
+			n++
+			for k := 1; k < len(w.Pts); k++ {
+				a, b := w.Pts[k-1], w.Pts[k]
+				if a[0] != b[0] && a[1] != b[1] {
+					t.Fatalf("rail way %v-%v runs diagonally from %v to %v", e.A.ID, e.B.ID, a, b)
+				}
+			}
+		}
+		if n >= 3 {
+			break
+		}
+	}
+	if n == 0 {
+		t.Fatal("no rail found")
+	}
 }

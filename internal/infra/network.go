@@ -230,9 +230,15 @@ const gateLead = 4
 // endpoint is where the route from s towards t starts: the centre, or for
 // a hand-made settlement the gate nearest t. lead is where the search
 // starts: gateLead tiles outside the gate (or the centre).
-func (in *Infra) endpoint(s, t Settlement) (end, lead Point) {
+func (in *Infra) endpoint(s, t Settlement, n Network) (end, lead Point) {
 	end = Point{s.X, s.Y}
 	lead = end
+	if n == SeaLane {
+		if p, ok := in.Harbour(s); ok {
+			return p.Tip, p.Tip // sea lanes start off the end of the pier
+		}
+		return end, lead
+	}
 	best := int64(-1)
 	for _, g := range in.ends[s.ID] {
 		l := Point{geom.Mod(g.X+g.DX*gateLead, in.w), geom.Mod(g.Y+g.DY*gateLead, in.h)}
@@ -247,8 +253,8 @@ func (in *Infra) endpoint(s, t Settlement) (end, lead Point) {
 // route finds the route of an edge on the network's grid with A*.
 func (in *Infra) route(e Edge, y *yielder) *Route {
 	spec := networks[e.Net]
-	a, la := in.endpoint(e.A, e.B)
-	b, lb := in.endpoint(e.B, e.A)
+	a, la := in.endpoint(e.A, e.B, e.Net)
+	b, lb := in.endpoint(e.B, e.A, e.Net)
 	if spec.grid == 0 {
 		dx, dy := in.delta(a.X, a.Y, b.X, b.Y)
 		return &Route{Points: []Point{a, b}, Cost: isqrt(dx*dx + dy*dy)}
@@ -381,9 +387,16 @@ func (in *Infra) search(e Edge, a, b Point, g int64, y *yielder) ([][2]int64, in
 		}
 		return c + l*spec.slope*geom.Abs(s.height-from)/g
 	}
-	dirs := [8][3]int64{{1, 0, 10}, {-1, 0, 10}, {0, 1, 10}, {0, -1, 10}, {1, 1, 14}, {1, -1, 14}, {-1, 1, 14}, {-1, -1, 14}}
+	dirs := [][3]int64{{1, 0, 10}, {-1, 0, 10}, {0, 1, 10}, {0, -1, 10}, {1, 1, 14}, {1, -1, 14}, {-1, 1, 14}, {-1, -1, 14}}
+	straight := e.Net == Rail // rail runs in 4 directions, so the track art has only right-angle curves
+	if straight {
+		dirs = dirs[:4]
+	}
 	heur := func(i, j int64) int64 {
 		ax, ay := geom.Abs(gx-i), geom.Abs(gy-j)
+		if straight {
+			return 100 * 10 * (ax + ay) * heuristicWeight / 100
+		}
 		return 100 * (10*max(ax, ay) + 4*min(ax, ay)) * heuristicWeight / 100
 	}
 	start, goal := idx(0, 0), idx(gx, gy)
