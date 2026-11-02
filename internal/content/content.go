@@ -10,6 +10,7 @@ import (
 
 	"github.com/noxer/worlds/internal/dialog"
 	"github.com/noxer/worlds/internal/gen"
+	"github.com/noxer/worlds/internal/infra"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -29,6 +30,7 @@ type WorldFile struct {
 // Content is everything loaded from the assets.
 type Content struct {
 	World   *world.World
+	Infra   *infra.Infra // settlements and networks; nil without a relief generator
 	Dialogs dialog.Library
 	Start   world.Spawn
 }
@@ -75,5 +77,35 @@ func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load dialogs: %w", err)
 	}
-	return &Content{World: w, Dialogs: lib, Start: start}, nil
+	in, err := loadInfra(w)
+	if err != nil {
+		return nil, err
+	}
+	return &Content{World: w, Infra: in, Dialogs: lib, Start: start}, nil
+}
+
+// loadInfra sets up settlements and networks for generators with a relief.
+// Patches with the property "settlement" (a tier name) are hand-made
+// settlements, centred on the patch.
+func loadInfra(w *world.World) (*infra.Infra, error) {
+	rel, ok := w.Generator().(infra.Relief)
+	if !ok {
+		return nil, nil
+	}
+	cfg := infra.Config{Seed: w.Seed, W: w.W, H: w.H, Relief: rel}
+	for _, p := range w.Patches() {
+		s := p.Props.String("settlement")
+		if s == "" {
+			continue
+		}
+		t, err := infra.ParseTier(s)
+		if err != nil {
+			return nil, fmt.Errorf("patch %s: %w", p.Name, err)
+		}
+		cfg.Fixed = append(cfg.Fixed, infra.Fixed{
+			Name: string(p.Name), Tier: t,
+			X: p.X + p.W/2, Y: p.Y + p.H/2, Radius: max(p.W, p.H) / 2,
+		})
+	}
+	return infra.New(cfg)
 }

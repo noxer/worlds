@@ -1,0 +1,8 @@
+package infra
+
+// Exports for the external tests.
+
+func Member(n Network, s Settlement) bool    { return member(n, s) }
+func (in *Infra) Dist(a, b Settlement) int64 { return isqrt(in.dist2(a, b)) }
+func Gap(t Tier) int64                       { return gap(t) }
+func (n Network) Grid() int64                { return networks[n].grid }

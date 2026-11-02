@@ -239,10 +239,12 @@ Generators are registered by name (`earth`, `grassland`). Later biomes
 (desert, forest, mountains) become land generators chosen from further
 noise fields (temperature, moisture).
 
-### Infrastructure: settlements and networks (planned)
+### Infrastructure: settlements and networks
 
 Settlements, roads, rail lines, power lines and cities are generated in
-layers. Each layer is a pure function of the seed, the terrain preview and
+layers. Implemented (package `infra`, drawn by `cmd/worldmap -infra`):
+settlements and the network graphs with their routes. Planned: tiles,
+cities, power lines. Each layer is a pure function of the seed, the terrain preview and
 the layers above it, so any place can still be computed on its own and
 chunks stay independent.
 
@@ -250,10 +252,10 @@ chunks stay independent.
 
 | Tier | One candidate per | Apart on foot | On the planet | Across | Gets |
 |---|---|---|---|---|---|
-| Metropolis | 131072² tiles | 10 h | about 10 | up to 2,000 tiles (63 chunks) | airport, harbour, rail hub, a metro line |
-| City | 65536² tiles | 5 h | about 40 | 800–1,200 tiles | rail station, harbour on the coast, trams |
-| Town | 16384² tiles | 75 min | about 600 | 300–600 tiles | bus stop, maybe a ferry |
-| Village | 4096² tiles | 20 min | about 10,000 | 100–200 tiles | dirt road |
+| Metropolis | 131072² tiles | 10 h | 28 | up to 2,000 tiles (63 chunks) | airport, harbour, rail hub, a metro line |
+| City | 65536² tiles | 5 h | 87 | 800–1,200 tiles | rail station, harbour on the coast, trams |
+| Town | 16384² tiles | 75 min | 1,229 | 300–600 tiles | bus stop, maybe a ferry |
+| Village | 4096² tiles | 20 min | 16,405 | 100–200 tiles | dirt road |
 | Point of interest | 1024² tiles | 5 min | about 150,000 | a few chunks at most | farm, camp, ruin, cave entrance, shrine |
 
 A tile is taken as about a metre (a person fills one), so a megacity is
@@ -262,21 +264,29 @@ islands in wide countryside.
 
 Walking covers 3.75 tiles per second, so villages are about 20 minutes
 apart on foot (10 by bike); beyond that, public transport is the way to
-travel. Counts assume about a third of the planet is land. Points of
+travel. The counts are those of the shipped seed (52% of the planet is
+land). Points of
 interest keep the walk between villages from being empty: small prefabs
 (and later quest hooks) on a dirt path or none, not part of the transport
 networks. Pool patches (ponds, islets) stay at their finer grid.
 
-- **Choosing a site:** each grid cell derives a few candidate spots from
-  the seed hash and scores them with `Preview`: flat land, coast, river or
-  valley, climate. The best one wins, or none (ocean, desert, mountains).
+- **Choosing a site:** each grid cell derives six candidate spots from the
+  seed hash, kept 15% away from the cell border (so a tier's settlements
+  are at least 30% of a cell apart), and scores them from the elevation:
+  dry centre, at least 13 of 16 samples around the footprint on land, flat,
+  a bonus by the coast. The best one wins, or none; small tiers also leave
+  some cells empty by chance (points of interest 30%, villages 10%).
+  Later: rivers, valleys, climate.
 - **Cost:** "which settlements are near (x, y)" is O(1) anywhere.
 - **Footprints:** a settlement has a centre, a size from its tier and seed,
   and an outline distorted by noise and clipped by coast and steep terrain.
-  A bigger settlement wins over smaller candidates its footprint touches;
-  villages inside a city's footprint become old-town districts instead.
-- **Hand-made towns** (Brookhaven) register as fixed settlements of a tier
-  and suppress generated candidates nearby, as patch surroundings do today.
+  A bigger settlement wins over smaller candidates closer than both radii
+  plus a quarter of the smaller tier's cell (bigger tiers are looked up
+  first, recursively, and cached). Later, villages inside a city's
+  footprint become old-town districts instead.
+- **Hand-made towns** register as fixed settlements of a tier with the
+  patch property `settlement` (Brookhaven: `village`), centred on the patch,
+  and suppress generated candidates of their tier and smaller nearby.
 
 **2. Networks (area level).** One graph per network, each a *relative
 neighbourhood graph* over its tiers: two settlements connect unless a third
@@ -290,10 +300,32 @@ length per network every edge can be computed from nearby settlements only.
   and continents where the edge length cap ends the road graph.
 - **Flight paths** between airports: straight lines on the torus.
 
-**Route shape:** A* on a coarse grid (cells of about 16 tiles) from the
-terrain preview. Slope costs, rail much more than roads; water is allowed
-only as a short bridge. The result is a polyline per edge, keyed by its two
-settlements, computed on demand and cached in the area cache.
+Maximum edge lengths: paths 10,240 tiles, roads 40,960, highways
+163,840, rail 131,072, sea lanes 40,960; flights any. An edge also needs a
+route, so land networks end at deep sea. A sea lane is only kept where at
+least 60% of the straight line is water (along a coast, roads do the job).
+
+**Route shape:** A* on a grid of 32 tiles (paths), 64 (roads) or 128
+(highways, rail, sea lanes), 8 directions. The result is a polyline per
+edge, keyed by its two settlements, computed on demand and cached.
+- **Costs:** flat land 100 per unit of length; shallow water 6–12 times
+  that (bridges); deep water impassable for land networks except at the
+  ends (a town on the shore). Slopes are measured on the relief's smooth
+  height (only the octaves of 2,048 tiles and up, without the coastline
+  detail) and cost extra percent per unit climbed per tile: paths 18, roads
+  26, highways 35, rail 70. Sea lanes prefer deep water and may cross land
+  only near their harbours.
+- **Meandering:** a random extra cost from the seed by absolute position,
+  mostly per block of 16 grid cells, a little per cell (paths up to 60%,
+  rail 5%), so routes bend instead of running in straight grid lines, and
+  every edge crossing a place sees the same costs.
+- **Speed:** routes longer than 64 grid cells are first searched on a grid
+  8 times coarser, then on their own grid only within 3 coarse cells of the
+  coarse route. The heuristic is weighted by 1.2 (weighted A*, no
+  reopening): routes are at most 20% costlier than the best, the searches
+  far smaller. A path takes about 1–100 ms, a highway up to about 0.2 s;
+  the planet's long-distance networks take about 8 s on 4 cores. In the
+  game, routes will be computed in the background with chunk streaming.
 - A chunk finds the routes crossing it by asking for the edges of the
   settlements within the maximum edge length plus a margin, and keeping
   those whose bounding box touches it.
@@ -688,7 +720,11 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    her routine between home, the square, the smithy and the pond). Day and
    night (**done**: ambient light by time, light sources, lamp posts).
 5. Infrastructure (see Infrastructure: settlements and networks):
-   1. settlements and network graphs, shown by `cmd/worldmap` only;
+   1. **done:** settlements and network graphs, shown by `cmd/worldmap`
+      only (`-infra`, `-nets`); Brookhaven is a fixed village on the path
+      network; tests for spacing, determinism, graph symmetry and
+      connectivity, routes across the seam and around deep sea, and a
+      fingerprint;
    2. roads as tiles, with Brookhaven's gates connected to the next
       generated village;
    3. generated villages from a prefab pool (the city pipeline with one

@@ -19,6 +19,6 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
       - name: Race detector (chunk streaming)
-        run: go test -race ./internal/world/ ./internal/gen/ ./internal/scene/
+        run: go test -race ./internal/world/ ./internal/gen/ ./internal/scene/ ./internal/infra/
       - run: go build ./cmd/worlds
       - run: make web

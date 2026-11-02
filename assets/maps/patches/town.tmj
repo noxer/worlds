@@ -2114,6 +2114,11 @@
    "name": "margin",
    "type": "int",
    "value": 4
+  },
+  {
+   "name": "settlement",
+   "type": "string",
+   "value": "village"
   }
  ]
 }

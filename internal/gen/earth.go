@@ -450,6 +450,22 @@ func mod(a, n int64) int64 {
 	return m
 }
 
+// Elevation returns the world-level elevation at a main-map position, in
+// [0, MaxValue); see Levels for the water levels.
+func (e *Earth) Elevation(seed uint64, x, y int64) int64 {
+	return e.elevation.At(seed, mod(x, e.elevation.W), mod(y, e.elevation.H))
+}
+
+// Height returns the smooth large-scale height at a main-map position
+// (hills and valleys, without the coastline detail), on the scale of
+// Elevation. Infrastructure routes use it for slopes.
+func (e *Earth) Height(seed uint64, x, y int64) int64 {
+	return e.elevation.AtCoarse(seed, mod(x, e.elevation.W), mod(y, e.elevation.H), 2048)
+}
+
+// Levels returns the sea and deep-water levels of Elevation.
+func (e *Earth) Levels() (sea, deep int64) { return SeaLevel, DeepLevel }
+
 // Preview returns the terrain at a main-map position from the elevation
 // alone (the world level of generation), without patches, cleanup or chunk
 // generation. It is cheap enough for overview maps of the whole planet.

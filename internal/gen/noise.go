@@ -53,6 +53,22 @@ func (f *Field) At(seed uint64, x, y int64) int64 {
 	return sum / f.ampSum
 }
 
+// AtCoarse is At with only the octaves of at least minCell tiles: the
+// field's large-scale shape, without small detail.
+func (f *Field) AtCoarse(seed uint64, x, y, minCell int64) int64 {
+	var sum, amps int64
+	for i, o := range f.Octaves {
+		if o.Cell >= minCell {
+			sum += o.Amp * f.octave(seed, int64(i), o.Cell, x, y)
+			amps += o.Amp
+		}
+	}
+	if amps == 0 {
+		return MaxValue / 2
+	}
+	return sum / amps
+}
+
 func (f *Field) octave(seed uint64, i, cell, x, y int64) int64 {
 	nx, ny := f.W/cell, f.H/cell
 	lx, ly := x/cell, y/cell

@@ -8,6 +8,8 @@
 // other obstacles darker). With a larger step, one pixel stands for step x
 // step tiles and only the cheap elevation preview is used. With -tiles the
 // real tile art is drawn (16x16 pixels per tile, first animation frame).
+// With -infra, settlements and the networks between them are drawn on top
+// (choose networks with -nets).
 package main
 
 import (
@@ -19,6 +21,7 @@ import (
 	"image/png"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/noxer/worlds/assets"
 	"github.com/noxer/worlds/internal/content"
@@ -40,6 +43,8 @@ func main() {
 	seed := flag.Uint64("seed", 0, "override the world seed")
 	out := flag.String("o", "worldmap.png", "output file")
 	tiles := flag.Bool("tiles", false, "draw the tile art (16 px per tile)")
+	withInfra := flag.Bool("infra", false, "draw settlements and networks")
+	nets := flag.String("nets", "path,road,highway,rail,sea lane,flight", "networks to draw with -infra")
 	flag.Parse()
 
 	var opt content.Options
@@ -87,6 +92,12 @@ func main() {
 			counts[t]++
 			img.SetRGBA(px, py, c)
 		}
+	}
+	if *withInfra {
+		if c.Infra == nil {
+			log.Fatal("the generator has no relief, so there is no infrastructure")
+		}
+		drawInfra(img, c.Infra, wd, *x, *y, *w, *h, *step, strings.Split(*nets, ","))
 	}
 	f, err := os.Create(*out)
 	if err != nil {

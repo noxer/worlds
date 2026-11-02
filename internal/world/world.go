@@ -307,6 +307,28 @@ func (w *World) Spawn(m MapID, name string) (Spawn, bool) {
 // on their maps (default instances for templates).
 func (w *World) Objects() []Object { return w.objects }
 
+// PatchInfo describes a hand-made patch placed on the main map.
+type PatchInfo struct {
+	Name  MapID
+	X, Y  int64 // normalised top-left corner
+	W, H  int64
+	Props Props // the patch's map properties
+}
+
+// Patches lists the hand-made patches of main.world (not pool patches).
+func (w *World) Patches() []PatchInfo {
+	var ps []PatchInfo
+	for _, p := range w.patches {
+		if !p.pool {
+			ps = append(ps, PatchInfo{Name: p.src.id, X: p.x, Y: p.y, W: p.src.w, H: p.src.h, Props: p.src.props})
+		}
+	}
+	return ps
+}
+
+// Generator returns the main map's generator (nil if there is none).
+func (w *World) Generator() Generator { return w.gen }
+
 // PatchOrigin returns the main-map position of a patch's top-left corner.
 func (w *World) PatchOrigin(name MapID) (Pos, bool) {
 	for _, p := range w.patches {

@@ -43,4 +43,6 @@ To see the generated world, render it with `cmd/worldmap`:
 ```sh
 go run ./cmd/worldmap -step 1024 -o planet.png                       # whole planet
 go run ./cmd/worldmap -tiles -x -22 -y 193752 -w 72 -h 40 -o start.png # tile art
+go run ./cmd/worldmap -step 1024 -infra -nets highway,rail,"sea lane",flight -o net.png # networks
+go run ./cmd/worldmap -x -12000 -y 186000 -w 24000 -h 16000 -step 24 -infra -o home.png  # around Brookhaven
 ```
