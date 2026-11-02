@@ -2,6 +2,7 @@ package scene
 
 import (
 	"image"
+	"math"
 	"testing"
 	"time"
 
@@ -406,39 +407,41 @@ func TestRidingIndoorsAndThroughDoors(t *testing.T) {
 
 // screenJitter moves the party in direction d for several steps and counts,
 // per member, how often its on-screen position along the direction of travel
-// reverses. A smooth queue drifts at most once or twice (when the party sets
+// reverses. Positions are sampled as drawn: four times per tick, between
+// ticks. A smooth queue drifts at most once or twice (when the party sets
 // off and stops); jitter reverses every few ticks.
 func (h *harness) screenJitter(d input.Action, ticks int, only func(*entity.Actor) bool) []int {
 	h.t.Helper()
 	var f input.Frame
 	f.Held[d] = true
-	flips := make([]int, len(h.e.party.Members))
-	last := make([]int, len(h.e.party.Members))
-	dir := make([]int, len(h.e.party.Members))
-	seen := make([]bool, len(h.e.party.Members))
+	n := len(h.e.party.Members)
+	flips, dir := make([]int, n), make([]int, n)
+	last, seen := make([]float64, n), make([]bool, n)
 	for tick := 0; tick < ticks; tick++ {
 		h.tick(f)
-		for i, a := range h.e.party.Members {
-			if only != nil && !only(a) {
-				seen[i] = false
-				continue
-			}
-			x, y, _ := h.e.placement(a, h.e.riding)
-			v := x
-			if d == input.Up || d == input.Down {
-				v = y
-			}
-			if seen[i] && v != last[i] {
-				s := 1
-				if v < last[i] {
-					s = -1
+		for _, alpha := range []float64{0, 0.25, 0.5, 0.75} {
+			for i, a := range h.e.party.Members {
+				if only != nil && !only(a) {
+					seen[i] = false
+					continue
 				}
-				if dir[i] != 0 && s != dir[i] {
-					flips[i]++
+				x, y, _ := h.e.placement(a, h.e.riding, alpha)
+				v := x
+				if d == input.Up || d == input.Down {
+					v = y
 				}
-				dir[i] = s
+				if seen[i] && math.Abs(v-last[i]) > 1e-9 {
+					s := 1
+					if v < last[i] {
+						s = -1
+					}
+					if dir[i] != 0 && s != dir[i] {
+						flips[i]++
+					}
+					dir[i] = s
+				}
+				last[i], seen[i] = v, true
 			}
-			last[i], seen[i] = v, true
 		}
 	}
 	return flips
@@ -554,37 +557,43 @@ func TestUnreachableClickExplains(t *testing.T) {
 	}
 }
 
-// TestCameraShift checks the drawing-time interpolation: right after a tick
-// of walking right, the world is drawn one game pixel further right (where
-// the camera was a tick ago), sliding to no shift by the next tick. Door
-// warps are not interpolated.
-func TestCameraShift(t *testing.T) {
-	h := newHarness(t)
-	h.press(input.Right) // turn
-	h.runUntil("idle", 50, h.idle)
-	var f input.Frame
-	f.Held[input.Right] = true
-	for i := 0; i < 5; i++ {
-		h.tick(f)
-	}
-	if sx, sy := h.e.CameraShift(0); sx != 1 || sy != 0 {
-		t.Fatalf("shift at the start of a tick = %v,%v, want 1,0", sx, sy)
-	}
-	if sx, _ := h.e.CameraShift(0.75); sx != 0.25 {
-		t.Fatalf("shift three quarters into a tick = %v, want 0.25", sx)
-	}
-	if sx, _ := h.e.CameraShift(1.5); sx != 0 {
-		t.Fatalf("late frames must not overshoot: %v", sx)
-	}
-	// Through the smithy door: no interpolation across the jump.
-	goal := world.Pos{Map: world.Detail("smithy"), X: 6, Y: 3}
-	h.e.goTo(goal)
-	for i := 0; i < 3000 && h.leader().Pos.Map != goal.Map; i++ {
-		h.tick(input.Frame{})
-		if h.leader().Pos.Map == goal.Map {
-			if sx, sy := h.e.CameraShift(0); sx != 0 || sy != 0 {
-				t.Fatalf("shift across the door = %v,%v", sx, sy)
+// TestLeaderStillOnScreen: the camera follows the leader's exact position,
+// so the leader doesn't move on screen at all, between ticks included,
+// whether walking, swimming or riding.
+func TestLeaderStillOnScreen(t *testing.T) {
+	check := func(name string, h *harness, d input.Action, ticks int) {
+		t.Helper()
+		var f input.Frame
+		f.Held[d] = true
+		for i := 0; i < 20; i++ { // set off first
+			h.tick(f)
+		}
+		x0, y0, _ := h.e.placement(h.leader(), h.e.riding, 0)
+		for i := 0; i < ticks; i++ {
+			h.tick(f)
+			for _, alpha := range []float64{0, 0.3, 0.6, 0.9} {
+				x, y, _ := h.e.placement(h.leader(), h.e.riding, alpha)
+				if name == "walking" {
+					y = y0 // walkers hop a pixel per step on purpose
+				}
+				if math.Abs(x-x0) > 1e-6 || math.Abs(y-y0) > 1e-6 {
+					t.Fatalf("%s: leader moved on screen from %v,%v to %v,%v", name, x0, y0, x, y)
+				}
 			}
 		}
 	}
+	h := newHarness(t)
+	town, _ := h.w.PatchOrigin("town")
+	street, _ := h.w.Offset(town, 4, 9)
+	h.e.party.PlaceAll(street, world.Right)
+	check("walking", h, input.Right, 100)
+
+	h = newHarness(t)
+	h.e.party.PlaceAll(h.meadowAt(1, 13), world.Right)
+	check("swimming", h, input.Right, 4*nav.SwimTicks)
+
+	h = newHarness(t)
+	h.e.party.PlaceAll(street, world.Right)
+	h.press(input.Ride)
+	check("riding", h, input.Right, 60)
 }

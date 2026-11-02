@@ -448,17 +448,25 @@ internal/
 
 ## Platforms and screen
 
-**Rendering:** the game renders at the screen's physical resolution. The
-world is drawn pixel-perfect at game resolution (plus a 3-pixel margin),
-then scaled up by the integer scale and shifted by a fraction of a game
-pixel: the camera position interpolated between the last two ticks by the
-time since the last update (`Explore.CameraShift`). Scrolling thus follows
-real time even when the display's frames don't line up with 60 updates per
-second (frames with two updates or none, 120/144 Hz screens). Jumps
-(doors, the wrap seam) aren't interpolated. The UI (dialogs, notices, the
-debug overlay) is drawn on its own layer, unshifted. F3 shows the worst
-chunk, update and draw times of the last second; ticks over 8 ms are logged
-to the console while the overlay is on.
+**Rendering:** the game renders at the screen's physical resolution and
+follows real time between its 60 ticks per second, so scrolling stays smooth
+when display frames don't line up with updates (frames with two updates or
+none, 120/144 Hz screens) and at speeds that aren't a whole number of
+pixels per tick (swimming: 16 px in 24 ticks).
+- **Exact positions:** an actor's exact position between two ticks is known
+  (`Actor.OffsetAt`).
+- **Camera:** follows the leader's exact position, so the leader stays still
+  on screen.
+- **Tiles:** drawn pixel-perfect at game resolution into two layers (ground
+  and decoration; overhead), each scaled up by the integer scale and shifted
+  by the camera's fraction of a game pixel.
+- **Actors:** drawn between those layers at their exact positions, at
+  screen resolution.
+- **UI** (dialogs, notices, the debug overlay): a separate layer at game
+  resolution.
+
+F3 shows the worst chunk, update and draw times of the last second; ticks
+over 8 ms are logged to the console while the overlay is on.
 
 **Screen size:** the logical screen is at least 240×180 pixels. It is scaled
 by the largest whole-number factor that fits, and leftover space shows more of

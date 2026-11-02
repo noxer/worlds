@@ -129,6 +129,20 @@ func (a *Actor) Offset() (dx, dy int) {
 	return -int(ddx) * remaining, -int(ddy) * remaining
 }
 
+// OffsetAt is Offset at a fraction alpha (0..1) of the way to the next tick,
+// in fractional pixels: the actor's exact position between two ticks, for
+// drawing. Actors move continuously at any speed this way, also when a step
+// doesn't cover a whole number of pixels per tick (swimming).
+func (a *Actor) OffsetAt(alpha float64) (dx, dy float64) {
+	if !a.stepping {
+		return 0, 0
+	}
+	t := min(float64(a.tick)+min(max(alpha, 0), 1), float64(a.stepTicks))
+	remaining := (float64(a.stepTicks) - t) * world.TileSize / float64(a.stepTicks)
+	ddx, ddy := a.stepDir.Delta()
+	return -float64(ddx) * remaining, -float64(ddy) * remaining
+}
+
 // Hop returns a small vertical bounce used as walk animation, since the
 // Kenney characters have a single frame.
 func (a *Actor) Hop() int {

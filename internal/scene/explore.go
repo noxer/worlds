@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"math"
 	"sort"
 	"time"
 
@@ -68,10 +69,10 @@ type Explore struct {
 	// Camera: top-left pixel of the view in the coordinates of the leader's
 	// map. On the main map it is not wrapped; everything drawn is placed
 	// relative to it with wrap-aware deltas.
-	camX, camY int64
-	// Camera of the previous tick, for drawing between ticks (see
-	// CameraShift).
-	camPrevX, camPrevY int64
+	camX, camY   int64
+	viewW, viewH int64 // logical screen size, for the camera
+	// Layers of the world image for drawing (see DrawWorld).
+	groundImg, overImg *ebiten.Image
 	debug              bool
 }
 
@@ -510,7 +511,7 @@ func (e *Explore) screen(m world.MapRef, px, py int64) (int, int) {
 }
 
 func (e *Explore) updateCamera(ctx *Context) {
-	e.camPrevX, e.camPrevY = e.camX, e.camY
+	e.viewW, e.viewH = int64(ctx.W), int64(ctx.H)
 	l := e.party.Leader()
 	x, y := e.pixel(l)
 	e.camX = x + tile/2 - int64(ctx.W)/2
@@ -530,35 +531,123 @@ func clampCam(c, size, view int64) int64 {
 	return max(0, min(c, size-view))
 }
 
-// CameraShift returns how far, in game pixels, the world image (drawn for
-// the current tick's camera) must be moved to show the camera where it was
-// at a fraction alpha (0..1) of the way from the previous tick to this one.
-// Drawing with it makes scrolling follow real time even when the display's
-// frames don't line up with the game's 60 ticks per second. Jumps (doors,
-// the wrap seam) are not interpolated.
-func (e *Explore) CameraShift(alpha float64) (sx, sy float64) {
-	alpha = min(max(alpha, 0), 1)
-	dx, dy := e.camX-e.camPrevX, e.camY-e.camPrevY
-	if w, h, wraps := e.w.Size(e.party.Leader().Pos.Map); wraps {
-		dx = geom.WrapDelta(e.camPrevX, e.camX, w*tile)
-		dy = geom.WrapDelta(e.camPrevY, e.camY, h*tile)
+// pixelAt is the exact top-left pixel of an actor at a fraction alpha
+// (0..1) of the way to the next tick, in its map's coordinates (unwrapped),
+// including the walk hop for walkers on land.
+func (e *Explore) pixelAt(a *entity.Actor, alpha float64, riding bool) (x, y float64, swimming bool) {
+	swimming = e.w.Terrain(a.Pos) == world.Shallow
+	dx, dy := a.OffsetAt(alpha)
+	x, y = float64(a.Pos.X*tile)+dx, float64(a.Pos.Y*tile)+dy
+	if !swimming && !riding {
+		y += float64(a.Hop()) // only walkers on land hop
 	}
-	if geom.Abs(dx) > 2*tile || geom.Abs(dy) > 2*tile {
-		return 0, 0
-	}
-	return (1 - alpha) * float64(dx), (1 - alpha) * float64(dy)
+	return x, y, swimming
 }
 
-// DrawWorld draws the map and its actors, without UI, into dst, which is
-// the screen plus margin game pixels on every side (room for CameraShift).
-func (e *Explore) DrawWorld(dst *ebiten.Image, margin int) {
-	e.camX, e.camY = e.camX-int64(margin), e.camY-int64(margin)
-	defer func() { e.camX, e.camY = e.camX+int64(margin), e.camY+int64(margin) }()
-	dst.Fill(gfx.ColorVoid)
-	m := e.party.Leader().Pos.Map
-	e.drawLayers(dst, m, false)
-	e.drawActors(dst, m)
-	e.drawLayers(dst, m, true)
+// cameraAt is the camera's exact top-left pixel at a fraction alpha of the
+// way to the next tick: it follows the leader's exact position, so the
+// leader stays still on screen and the world scrolls evenly at any speed.
+func (e *Explore) cameraAt(alpha float64) (cx, cy float64) {
+	l := e.party.Leader()
+	x, y, _ := e.pixelAt(l, alpha, true) // the camera ignores the hop
+	cx = x + tile/2 - float64(e.viewW)/2
+	cy = y + tile/2 - float64(e.viewH)/2
+	if w, h, wraps := e.w.Size(l.Pos.Map); !wraps {
+		cx = float64(clampCam(int64(math.Floor(cx)), w*tile, e.viewW)) + clampFrac(cx, w*tile, e.viewW)
+		cy = float64(clampCam(int64(math.Floor(cy)), h*tile, e.viewH)) + clampFrac(cy, h*tile, e.viewH)
+	}
+	return cx, cy
+}
+
+// clampFrac keeps the fractional part of a camera coordinate unless the
+// camera is pinned at a detail map's edge (or the map is centred).
+func clampFrac(c float64, size, view int64) float64 {
+	f := c - math.Floor(c)
+	i := int64(math.Floor(c))
+	if size <= view || i <= 0 || i >= size-view {
+		return 0
+	}
+	return f
+}
+
+// screenAt converts a map pixel to a position relative to the camera, the
+// shortest way around the world on the main map.
+func (e *Explore) screenAt(m world.MapRef, px, py, cx, cy float64) (float64, float64) {
+	w, h, wraps := e.w.Size(m)
+	if wraps {
+		return wrapF(px-cx, float64(w*tile)), wrapF(py-cy, float64(h*tile))
+	}
+	return px - cx, py - cy
+}
+
+// wrapF wraps d into [-n/2, n/2).
+func wrapF(d, n float64) float64 {
+	d = math.Mod(d, n)
+	if d < -n/2 {
+		d += n
+	} else if d >= n/2 {
+		d -= n
+	}
+	return d
+}
+
+// placement returns where an actor is drawn relative to the exact camera at
+// alpha, in game pixels, and whether it is swimming.
+func (e *Explore) placement(a *entity.Actor, riding bool, alpha float64) (x, y float64, swimming bool) {
+	px, py, swimming := e.pixelAt(a, alpha, riding)
+	cx, cy := e.cameraAt(alpha)
+	x, y = e.screenAt(a.Pos.Map, px, py, cx, cy)
+	return x, y, swimming
+}
+
+// worldMargin is the extra border of the tile layers, in game pixels.
+const worldMargin = 2
+
+// DrawWorld draws the map and its actors onto the physical screen. scale is
+// the integer size of a game pixel on screen, off the letterbox offset, and
+// alpha the fraction of the way to the next tick (time since the last
+// update), so motion follows real time between ticks.
+//
+// Tiles are drawn pixel-perfect at game resolution into two layers (ground
+// and decoration; overhead), each scaled up and shifted by the camera's
+// fraction of a pixel. Actors are drawn between them at their exact
+// positions, at screen resolution.
+func (e *Explore) DrawWorld(screen *ebiten.Image, scale, offX, offY int, alpha float64) {
+	m := int64(worldMargin)
+	w, h := int(e.viewW+2*m), int(e.viewH+2*m)
+	e.groundImg = ensureImage(e.groundImg, w, h)
+	e.overImg = ensureImage(e.overImg, w, h)
+	cx, cy := e.cameraAt(alpha)
+	ix, iy := math.Floor(cx), math.Floor(cy)
+	saveX, saveY := e.camX, e.camY
+	e.camX, e.camY = int64(ix)-m, int64(iy)-m
+	mp := e.party.Leader().Pos.Map
+	e.groundImg.Fill(gfx.ColorVoid)
+	e.drawLayers(e.groundImg, mp, false)
+	e.overImg.Clear()
+	e.drawLayers(e.overImg, mp, true)
+	e.camX, e.camY = saveX, saveY
+
+	s := float64(scale)
+	layer := func(img *ebiten.Image) {
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Scale(s, s)
+		op.GeoM.Translate(float64(offX)+math.Round((ix-cx-float64(m))*s), float64(offY)+math.Round((iy-cy-float64(m))*s))
+		screen.DrawImage(img, op)
+	}
+	layer(e.groundImg)
+	e.drawActors(screen, mp, s, float64(offX), float64(offY), alpha)
+	layer(e.overImg)
+}
+
+func ensureImage(img *ebiten.Image, w, h int) *ebiten.Image {
+	if img != nil && img.Bounds().Dx() == w && img.Bounds().Dy() == h {
+		return img
+	}
+	if img != nil {
+		img.Deallocate()
+	}
+	return ebiten.NewImage(w, h)
 }
 
 // Draw implements Scene. It draws only the UI of exploring (notices, the
@@ -630,14 +719,6 @@ func (e *Explore) drawTile(dst, img *ebiten.Image, x, y int, flipH, flipV bool) 
 	dst.DrawImage(img, op)
 }
 
-type drawable struct {
-	a        *entity.Actor
-	x, y     int // screen position
-	priority int
-	swimming bool
-	vehicle  *ebiten.Image // bicycle or scooter, if riding
-}
-
 // Tiles of the project's own sheet (assets/tiles/worlds.png).
 const (
 	sheetWorlds = "worlds"
@@ -650,32 +731,28 @@ const (
 
 var colorRipple = color.RGBA{0xd8, 0xf4, 0xff, 0xff}
 
-// placement returns where an actor is drawn on screen and whether it is
-// swimming. Only walkers on land hop; swimmers and riders glide, otherwise
-// the waist-deep sprite and its ripple would bob on every step.
-func (e *Explore) placement(a *entity.Actor, riding bool) (x, y int, swimming bool) {
-	swimming = e.w.Terrain(a.Pos) == world.Shallow
-	px, py := e.pixel(a)
-	if !swimming && !riding {
-		py += int64(a.Hop())
-	}
-	x, y = e.screen(a.Pos.Map, px, py)
-	return x, y, swimming
+type drawable struct {
+	a        *entity.Actor
+	x, y     float64 // relative to the camera, in game pixels
+	priority int
+	swimming bool
+	vehicle  *ebiten.Image // bicycle or scooter, if riding
 }
 
-func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
-	sw, sh := dst.Bounds().Dx(), dst.Bounds().Dy()
+// drawActors draws NPCs and the party onto the physical screen.
+func (e *Explore) drawActors(screen *ebiten.Image, m world.MapRef, s, offX, offY, alpha float64) {
+	vw, vh := float64(e.viewW), float64(e.viewH)
 	var ds []drawable
 	add := func(a *entity.Actor, priority int, vehicle *ebiten.Image) {
 		if a.Pos.Map != m {
 			return
 		}
 		d := drawable{a: a, priority: priority}
-		d.x, d.y, d.swimming = e.placement(a, vehicle != nil)
+		d.x, d.y, d.swimming = e.placement(a, vehicle != nil, alpha)
 		if vehicle != nil && !d.swimming {
 			d.vehicle = vehicle
 		}
-		if d.x < -tile || d.y < -tile || d.x > sw || d.y > sh {
+		if d.x < -tile || d.y < -tile || d.x > vw || d.y > vh {
 			return
 		}
 		ds = append(ds, d)
@@ -699,6 +776,21 @@ func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
 		}
 		return ds[i].priority < ds[j].priority
 	})
+	// sprite draws img with its top-left corner at game pixel (x, y)
+	// relative to the camera, snapped to physical pixels.
+	sprite := func(img *ebiten.Image, x, y float64, flip bool) {
+		if img == nil {
+			return
+		}
+		op := &ebiten.DrawImageOptions{}
+		if flip {
+			op.GeoM.Scale(-1, 1)
+			op.GeoM.Translate(float64(img.Bounds().Dx()), 0)
+		}
+		op.GeoM.Scale(s, s)
+		op.GeoM.Translate(offX+math.Round(x*s), offY+math.Round(y*s))
+		screen.DrawImage(img, op)
+	}
 	for _, d := range ds {
 		img := e.sheets.Tile(d.a.Sprite.Sheet, d.a.Sprite.Index)
 		flip := d.a.Facing == world.Left
@@ -707,13 +799,14 @@ func (e *Explore) drawActors(dst *ebiten.Image, m world.MapRef) {
 			// Only the upper body shows above the water, with a ripple.
 			b := img.Bounds()
 			top := img.SubImage(image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Min.Y+waterline)).(*ebiten.Image)
-			e.drawTile(dst, top, d.x, d.y+1, flip, false)
-			gfx.FillRect(dst, image.Rect(d.x+2, d.y+waterline+1, d.x+14, d.y+waterline+2), colorRipple)
+			sprite(top, d.x, d.y+1, flip)
+			px, py := offX+math.Round((d.x+2)*s), offY+math.Round((d.y+waterline+1)*s)
+			gfx.FillRect(screen, image.Rect(int(px), int(py), int(px+12*s), int(py+s)), colorRipple)
 		case d.vehicle != nil:
-			e.drawTile(dst, img, d.x, d.y-riderRaise, flip, false)
-			e.drawTile(dst, d.vehicle, d.x, d.y+vehicleDrop, flip, false)
+			sprite(img, d.x, d.y-riderRaise, flip)
+			sprite(d.vehicle, d.x, d.y+vehicleDrop, flip)
 		default:
-			e.drawTile(dst, img, d.x, d.y, flip, false)
+			sprite(img, d.x, d.y, flip)
 		}
 	}
 }

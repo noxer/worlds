@@ -43,10 +43,6 @@ type Game struct {
 	lastUpdate  time.Time
 }
 
-// worldMargin is the extra border of the world image, in game pixels: room
-// to shift it by the camera's movement between two ticks (riding: 2 px).
-const worldMargin = 3
-
 // New loads all content from fsys and sets up the starting scene.
 func New(fsys fs.FS) (*Game, error) {
 	c, err := content.Load(fsys)
@@ -102,29 +98,19 @@ func (g *Game) Update() error {
 	return nil
 }
 
-// Draw implements ebiten.Game. The world is drawn pixel-perfect at game
-// resolution, then scaled up and shifted by a fraction of a game pixel so
-// that scrolling follows real time between two ticks (the display's frames
-// rarely line up exactly with 60 updates per second). The UI is drawn
-// separately and not shifted.
+// Draw implements ebiten.Game. The exploration scene draws the world at
+// physical resolution, following real time between ticks (see
+// Explore.DrawWorld); the UI is drawn at game resolution and scaled up.
 func (g *Game) Draw(screen *ebiten.Image) {
 	t0 := time.Now()
-	m := worldMargin
-	g.worldImg = ensure(g.worldImg, g.w+2*m, g.h+2*m)
-	g.uiImg = ensure(g.uiImg, g.w, g.h)
-
-	g.explore.DrawWorld(g.worldImg, m)
 	alpha := float64(time.Since(g.lastUpdate)) / float64(time.Second/60)
-	sx, sy := g.explore.CameraShift(alpha)
-	s := float64(g.scale)
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Scale(s, s)
-	op.GeoM.Translate(float64(g.offX)+math.Round((sx-float64(m))*s), float64(g.offY)+math.Round((sy-float64(m))*s))
-	screen.DrawImage(g.worldImg, op)
+	g.explore.DrawWorld(screen, g.scale, g.offX, g.offY, alpha)
 
+	g.uiImg = ensure(g.uiImg, g.w, g.h)
 	g.uiImg.Clear()
 	g.stack.Draw(g.uiImg)
-	op = &ebiten.DrawImageOptions{}
+	s := float64(g.scale)
+	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Scale(s, s)
 	op.GeoM.Translate(float64(g.offX), float64(g.offY))
 	screen.DrawImage(g.uiImg, op)
