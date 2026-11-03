@@ -380,7 +380,9 @@ edge, keyed by its two settlements, computed on demand and cached.
   - no trees on ways.
 - **Rail (implemented):** a chain of single cells along the line, track
   tiles on the deco layer chosen by which neighbours are track (straights,
-  curves, junctions, buffer stops: one tile per combination of sides).
+  curves, buffer stops; where three sides meet, a junction: the straight
+  line with curves branching both ways; where lines cross, a diamond
+  crossing on a plate, the rails broken by flangeways).
   The tiles are transparent round the track, so a line over a path or road
   is a level crossing without extra art. Shallow water under the track
   becomes an embankment; no trees on it; village layouts keep houses,
@@ -522,8 +524,9 @@ Arterials form one grid per city; districts vary what is inside it.
    the layout): track tiles become ballast and the tiles beside them a
    railway fence (16 connection tiles of our own), wherever the line runs,
    even along a street, which then gives way to the railway. Roads that
-   cross the line at right angles keep their asphalt (level crossings) and
-   the fence stops at their edges; it runs on across the plaza up to the
+   cross the line at right angles keep their asphalt (level crossings), and
+   so do the sidewalks along them (a sidewalk runs the way its kerb says);
+   the fence stops at the block's inner edge; it runs on across the plaza up to the
    station's walls. The ballast is solid: in towns and villages the line
    can't be walked onto, only crossed where a road or path crosses it (out
    in the country it stays walkable).

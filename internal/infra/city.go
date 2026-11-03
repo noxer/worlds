@@ -435,8 +435,13 @@ func (c *CityPlan) railAxes(x, y int64) (h, v bool) {
 }
 
 // roadAxes reports which ways a road runs at tile (x, y): east-west (h),
-// north-south (v), both at junctions, neither off the roads.
+// north-south (v), both at junctions, neither off the roads. A sidewalk
+// runs along its road (its kerb side tells which way), so it crosses a
+// railway with the road instead of being fenced off.
 func (c *CityPlan) roadAxes(x, y int64) (h, v bool) {
+	if t := c.base(x, y); t.Kind == CWalk {
+		return t.Edge&(1|4) != 0, t.Edge&(2|8) != 0
+	}
 	i, j, u, w := c.grid(x, y)
 	if u < arterial || w < arterial {
 		return w < arterial, u < arterial

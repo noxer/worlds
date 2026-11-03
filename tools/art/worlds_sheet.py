@@ -120,6 +120,34 @@ def rail_tile(mask):
                     elif abs(r - rr) < 1.5:
                         put(t, x, y, INK)
         return t
+    if len(arms) == 3:
+        # A junction: the straight line, and curves from the third side
+        # to both ends of it (a turnout either way).
+        through = N | S if n_s else E | W
+        arm = mask & ~through
+        t = rail_tile(through)
+        ends = (N, S) if through == N | S else (E, W)
+        for end in ends:
+            t.alpha_composite(rail_tile(arm | end))
+        return t
+    if len(arms) == 4:
+        # A diamond crossing: sleepers both ways, the rails of each line
+        # broken where the other's cross them (dark flangeways).
+        t = rail_tile(N | S)
+        t.alpha_composite(rail_tile(E | W))
+        d = ImageDraw.Draw(t)
+        d.rectangle((2, 2, 13, 13), fill=INK)          # the crossing plate
+        d.rectangle((3, 3, 12, 12), fill=(70, 62, 60, 255))
+        for k in (4, 11):                               # east-west rails run through
+            d.line((0, k, 15, k), fill=STEEL_HI)
+        for x in (4, 11):                               # north-south rails, broken
+            for y in range(16):
+                near = any(abs(y - k) == 1 for k in (4, 11))
+                if near:
+                    put(t, x, y, INK)                   # the flangeways
+                elif y not in (4, 11):
+                    put(t, x, y, STEEL_HI)
+        return t
     # Straight pieces and arms from the centre.
     def piece(full, half):  # a vertical track: full height, or the top half
         p = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
