@@ -43,6 +43,10 @@
   {
    "firstgid": 1,
    "source": "../../tilesets/rpgurban.tsj"
+  },
+  {
+   "firstgid": 487,
+   "source": "../../tilesets/worlds.tsj"
   }
  ],
  "layers": [

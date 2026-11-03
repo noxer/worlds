@@ -19,9 +19,12 @@ type PrefabSpec struct {
 	// Material ("red", "orange") and Shop let districts favour some buildings.
 	Material string
 	Shop     bool
-	W, H     int64
-	Weight   int
-	DoorX    int64 // column of the door (houses)
+	// BayX, BayY: a station's track bay column and the row of its buffer
+	// stop (BayY 0 or less: no bay).
+	BayX, BayY int64
+	W, H       int64
+	Weight     int
+	DoorX      int64 // column of the door (houses)
 }
 
 // Cell kinds of a site.

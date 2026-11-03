@@ -173,6 +173,7 @@ func prefabSpecs(ps []*world.Prefab) ([]infra.PrefabSpec, error) {
 	for _, p := range ps {
 		s := infra.PrefabSpec{Name: string(p.Name), Kind: p.Props.String("kind"), Style: p.Props.String("style"),
 			Material: p.Props.String("material"), Shop: p.Props.Bool("shop"),
+			BayX: int64(p.Props.Int("bay_x", -1)), BayY: int64(p.Props.Int("bay_y", -1)),
 			W: p.W, H: p.H, Weight: p.Props.Int("weight", 1)}
 		doorRow := p.H - 2 // a house's front step is its bottom row
 		if s.Kind == "building" {
@@ -235,6 +236,7 @@ type region struct {
 	sites  []*infra.Site // villages overlapping the region
 	rail   []bool        // a rail line on the cell
 	fence  []bool        // the fence beside a railway in a town or village
+	bed    []bool        // a village's track bed (ballast) off the paths
 	city   []infra.CityTile
 	cities []*infra.CityPlan // towns and cities overlapping the region
 	pier   []uint8           // 1: a pier, 2: the land cell a pier starts from
@@ -460,6 +462,9 @@ func (e *Earth) railsAndPiers(b *world.ChunkBuilder, r *region) {
 			if r.fenceAt(x, y) && !r.railAt(x, y) {
 				b.Set(world.LayerDeco, lx, ly, e.fence[mask4(x, y, r.fenceAt)])
 			}
+			if r.bed[y*r.n+x] && r.railAt(x, y) {
+				b.Set(world.LayerGround, lx, ly, e.ballast) // no walking on the line in villages
+			}
 			if r.railAt(x, y) {
 				b.Set(world.LayerDeco, lx, ly, e.rail[mask4(x, y, r.railAt)])
 			}
@@ -542,7 +547,7 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 	r := &region{
 		x0: b.CX*world.ChunkSize - margin, y0: b.CY*world.ChunkSize - margin, n: n,
 		class: make([]uint8, n*n), fixed: make([]bool, n*n), raw: make([]bool, n*n), way: make([]uint8, n*n),
-		site: make([]infra.SiteCell, n*n), rail: make([]bool, n*n), pier: make([]uint8, n*n), fence: make([]bool, n*n),
+		site: make([]infra.SiteCell, n*n), rail: make([]bool, n*n), pier: make([]uint8, n*n), fence: make([]bool, n*n), bed: make([]bool, n*n),
 		city: make([]infra.CityTile, n*n),
 	}
 	for y := 0; y < n; y++ {
@@ -639,6 +644,8 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 					case infra.Fence:
 						r.class[i] = cLand
 						r.fence[i] = true
+					case infra.Track:
+						r.bed[i] = r.way[i] == 0 // where no path crosses
 					}
 				}
 			}

@@ -505,17 +505,23 @@ Arterials form one grid per city; districts vary what is inside it.
 5. **Buildings** are prefabs of kind `building` with a `style`, `material`
    and `shop` flag, picked by weight to fit (the district's material three
    times as likely, shops by its factor); none on a rail line.
-6. **Rail** keeps out of station plazas: lines end at a buffer stop on the
-   plaza's north edge, behind the station, coming from the arterial north
-   of it; the search treats the plaza as impassable and the last legs go
-   round it at right angles.
+6. **Rail** runs into the station: the station prefab has a track bay
+   (map properties `bay_x`, `bay_y`: its column and the buffer stop's row),
+   open from its roof down to the row above its front, walls either side.
+   Lines end at the buffer stop inside the bay, coming straight down from
+   the arterial north of the plaza; a waiting train stands in the station.
+   The search treats the plaza as impassable and the last legs go round it
+   at right angles.
    **Railways are fenced off** from the city (`CityPlan.At` lays them over
    the layout): track tiles become ballast and the tiles beside them a
    railway fence (16 connection tiles of our own), wherever the line runs,
    even along a street, which then gives way to the railway. Roads that
    cross the line at right angles keep their asphalt (level crossings) and
-   the fence stops at their edges; the station plaza stays open for
-   boarding. Buildings keep a tile from the line, and their front step
+   the fence stops at their edges; it runs on across the plaza up to the
+   station's walls. The ballast is solid: in towns and villages the line
+   can't be walked onto, only crossed where a road or path crosses it (out
+   in the country it stays walkable). Boarding is through the station door.
+   Buildings keep a tile from the line, and their front step
    another, so no door opens onto the fence; street lamps stand only on
    blocks' top corners, so a fence below can't shut a row of doors in.
 7. In chunks, city tiles replace the terrain, paths and roads (rail stays,
@@ -530,7 +536,8 @@ cached; hand-made settlements keep their own.
 3. The square: 7×7 cobbles at the centre, the `well` prefab in the middle,
    a lamp post on each corner.
    Rail lines through a village are fenced off the same way (open ground
-   beside the track becomes fence; paths, lanes and footpaths cross it).
+   beside the track becomes fence, the track ballast; paths, lanes and
+   footpaths cross it).
 4. Lanes: 2-wide dirt lanes from the square, 30–45% of the radius long, in
    directions no way leaves it, until at least two directions have a
    street (and sometimes more).

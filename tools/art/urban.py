@@ -40,7 +40,9 @@ with open(tsj, "w") as f:
     f.write(json.dumps(ts, indent=1) + "\n")
 
 # --- building prefabs ---------------------------------------------------
-URBAN = 1  # firstgid of rpgurban in the prefab maps
+URBAN = 1    # firstgid of rpgurban in the prefab maps
+WORLDS = 487 # firstgid of the project's own tiles (after rpgurban's 486)
+BALLAST = ("worlds", 80)
 WALLS = {  # rows of a facade: top, ledge, plain, bottom; each (left, middle, right)
     "red": dict(top=(17, 18, 19), ledge=(44, 45, 46), plain=(71, 72, 73), bottom=(98, 99, 100)),
     "orange": dict(top=(125, 126, 127), ledge=(152, 153, 154), plain=(179, 180, 181), bottom=(206, 207, 208)),
@@ -54,11 +56,11 @@ def row3(t, w):
     l, m, r = t
     return [l] + [m] * (w - 2) + [r]
 
-def write(name, w, h, ground, deco, door, style, weight, bump, material, shop=False):
+def write(name, w, h, ground, deco, door, style, weight, bump, material, shop=False, extra=()):
     def layer(i, lname, data, extra=None):
         d = {"id": i, "name": lname, "type": "tilelayer", "visible": True, "opacity": 1,
              "x": 0, "y": 0, "width": w, "height": h,
-             "data": [0 if v is None else v + URBAN for v in data]}
+             "data": [0 if v is None else (WORLDS + v[1] if isinstance(v, tuple) else v + URBAN) for v in data]}
         if extra:
             d["properties"] = extra
         return d
@@ -73,8 +75,10 @@ def write(name, w, h, ground, deco, door, style, weight, bump, material, shop=Fa
                         {"name": "style", "type": "string", "value": style},
                         {"name": "material", "type": "string", "value": material},
                         {"name": "shop", "type": "bool", "value": shop},
+                        *[{"name": k, "type": "int", "value": v} for k, v in extra],
                         {"name": "weight", "type": "int", "value": weight}],
-         "tilesets": [{"firstgid": URBAN, "source": "../../tilesets/rpgurban.tsj"}],
+         "tilesets": [{"firstgid": URBAN, "source": "../../tilesets/rpgurban.tsj"},
+                      {"firstgid": WORLDS, "source": "../../tilesets/worlds.tsj"}],
          "layers": [layer(1, "ground", ground), layer(2, "deco", deco),
                     layer(3, "overhead", [None] * (w * h), [{"name": "overhead", "type": "bool", "value": True}]),
                     {"id": 4, "name": "objects", "type": "objectgroup", "visible": True, "opacity": 1,
@@ -120,6 +124,26 @@ def building(name, style, wall, roof, w, hr, hf, door, kind="plain", weight=1):
         put(door, h - 1, 285)
         put(door + 1, h - 1, 285)
         bump = "station"
+        # The track bay: open from the top down to the row above the
+        # bottom, where the buffer stop is; walls either side.
+        bay = w - 3
+        W2 = WALLS[wall]
+        for y in range(h - 1):
+            ground[y * w + bay] = BALLAST
+            deco[y * w + bay] = None
+            if y < hr:  # roof edges either side of the bay
+                rows = ROOFS[roof]
+                part = rows[0] if y == 0 else rows[2] if y == hr - 1 else rows[1]
+                ground[y * w + bay - 1] = part[2]
+                ground[y * w + bay + 1] = part[0]
+            else:
+                part = W2["top"] if y == hr else W2["plain"]
+                ground[y * w + bay - 1] = part[2]
+                ground[y * w + bay + 1] = part[0]
+                deco[y * w + bay - 1] = deco[y * w + bay + 1] = None
+        write(name, w, h, ground, deco, door, style, weight, bump, wall, False,
+              (("bay_x", bay), ("bay_y", h - 2)))
+        return
     elif kind == "warehouse":
         put(door, h - 1, 283)
     else:

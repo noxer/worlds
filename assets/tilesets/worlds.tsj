@@ -730,6 +730,11 @@
      "name": "name",
      "type": "string",
      "value": "ballast"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
     }
    ]
   }

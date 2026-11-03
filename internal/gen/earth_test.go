@@ -346,6 +346,7 @@ func TestRailTiles(t *testing.T) {
 	if route == nil {
 		t.Fatal("no rail line found")
 	}
+	ballast, _ := w.Tilesets().Named("worlds", "ballast") // solid in towns
 	// Follow the line's first 400 tiles from its start.
 	start := route.Points[0]
 	isRail := func(p world.Pos) (int, bool) {
@@ -370,8 +371,8 @@ func TestRailTiles(t *testing.T) {
 				next = append(next, q)
 			}
 		}
-		if w.Solid(p) {
-			t.Fatalf("track at %v is solid", p)
+		if w.Solid(p) && w.Tile(p, world.LayerGround) != ballast {
+			t.Fatalf("track at %v is solid off the ballast", p)
 		}
 		if len(next) == 0 {
 			break
@@ -495,4 +496,59 @@ func checkCityDoors(t *testing.T, w *world.World, plan *infra.CityPlan) {
 	if doors < 40 {
 		t.Errorf("only %d doors near the centre", doors)
 	}
+}
+
+// TestTrackIntoStation: rail lines end inside the station building, in its
+// track bay, and in the city the track can't be walked onto.
+func TestTrackIntoStation(t *testing.T) {
+	c, err := content.Load(assets.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, in := c.World, c.Infra
+	n := 0
+	for _, s := range in.Near(0, 193770, 140000, infra.City) {
+		for _, e := range in.Edges(infra.Rail, s) {
+			r := in.Route(e)
+			end := r.Points[0]
+			if e.B.ID == s.ID {
+				end = r.Points[len(r.Points)-1]
+			}
+			front, ok := in.StationFront(s)
+			if !ok {
+				t.Fatalf("%v has no station", s.ID)
+			}
+			// The buffer stop is inside the building: above its front door
+			// row, within its width.
+			dx, dy, _ := w.Delta(world.Pos{Map: world.Main, X: front.X, Y: front.Y}, world.Pos{Map: world.Main, X: end.X, Y: end.Y})
+			if dy >= 0 || dy < -8 || geom.Abs(dx) > 8 {
+				t.Errorf("line %v-%v ends at %v, %d,%d from the station's door", e.A.ID, e.B.ID, end, dx, dy)
+			}
+			// The last 30 tiles of track (up from the buffer stop): no
+			// walking on them, except across roads.
+			p := world.Pos{Map: world.Main, X: end.X, Y: end.Y}
+			for k := 0; k < 30; k++ {
+				if !w.Solid(p) && w.Tile(p, world.LayerGround) == w.Tilesets().MustTile("worlds", 80) {
+					t.Errorf("walkable ballast at %v", p)
+				}
+				q, _ := w.Neighbor(p, world.Up)
+				if !isTrack(w, q) {
+					break // the line turns off the straight approach
+				}
+				p = q
+			}
+			n++
+		}
+		if n >= 3 {
+			break
+		}
+	}
+	if n == 0 {
+		t.Fatal("no rail line into a city")
+	}
+}
+
+func isTrack(w *world.World, p world.Pos) bool {
+	d := w.Tile(p, world.LayerDeco)
+	return !d.Empty() && w.Tilesets().Get(d.Set()).Name == "worlds" && d.Index() >= 16 && d.Index() < 32
 }

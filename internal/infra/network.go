@@ -240,8 +240,12 @@ func (in *Infra) endpoint(s, t Settlement, n Network) (end, lead Point) {
 		return end, lead
 	}
 	if r, ok := in.stationRect(n, s); ok {
-		// Behind the station: a buffer stop on the north edge of the
-		// plaza, reached from the arterial road north of it.
+		// Into the station: the buffer stop at the end of its track bay,
+		// coming straight down from the arterial road north of the plaza
+		// (without a bay: on the plaza's north edge, behind the station).
+		if x0, y0, pf, ok := in.station(s); ok && pf.BayY > 0 {
+			return in.norm(x0+pf.BayX, y0+pf.BayY), in.norm(x0+pf.BayX, r.Y-2)
+		}
 		return in.norm(s.X, r.Y), in.norm(s.X, r.Y-2)
 	}
 	best := int64(-1)

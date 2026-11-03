@@ -300,7 +300,7 @@ for k, name in enumerate(("train car h", "train car v", "train loco e", "train l
         ps.append(prop("solid", "bool", True))
     tiles.append({"id": 48 + k, "properties": ps})
 tiles += [{"id": 64 + m, "properties": [prop("name", "string", f"fence {m}"), prop("solid", "bool", True)]} for m in range(16)]
-tiles.append({"id": 80, "properties": [prop("name", "string", "ballast")]})
+tiles.append({"id": 80, "properties": [prop("name", "string", "ballast"), prop("solid", "bool", True)]})  # no walking on the line in towns
 ts = {"type": "tileset", "version": "1.10", "tiledversion": "1.11.0", "name": "worlds",
       "tilewidth": 16, "tileheight": 16, "tilecount": 96, "columns": 16,
       "image": "../tiles/worlds.png", "imagewidth": 256, "imageheight": 96,

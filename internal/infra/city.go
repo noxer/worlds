@@ -398,8 +398,8 @@ func (c *CityPlan) included(i, j int64) bool { return c.sb(i, j).style != sbOut 
 // on the station plaza, where trains are boarded.
 func (c *CityPlan) At(x, y int64) CityTile {
 	t := c.base(x, y)
-	if t.Kind == CNone || c.onPlaza(x, y) {
-		return t
+	if t.Kind == CNone || t.Kind == CBuilt {
+		return t // buildings (the station's track bay among them) stay as they are
 	}
 	if c.railAt(x, y) {
 		h, v := c.roadAxes(x, y)
@@ -410,8 +410,8 @@ func (c *CityPlan) At(x, y int64) CityTile {
 		return CityTile{Kind: CTrack}
 	}
 	for _, d := range [8][2]int64{{0, -1}, {1, 0}, {0, 1}, {-1, 0}, {1, -1}, {1, 1}, {-1, 1}, {-1, -1}} {
-		if !c.railAt(x+d[0], y+d[1]) || c.onPlaza(x+d[0], y+d[1]) {
-			continue
+		if !c.railAt(x+d[0], y+d[1]) || c.base(x+d[0], y+d[1]).Kind == CBuilt {
+			continue // the line inside the station needs no fence
 		}
 		h, v := c.roadAxes(x, y)
 		rh, rv := c.railAxes(x+d[0], y+d[1])
@@ -454,14 +454,6 @@ func (c *CityPlan) roadAxes(x, y int64) (h, v bool) {
 		inRow = inRow || (q >= sp.at && q < sp.at+sp.size)
 	}
 	return !inRow, !inCol // a minor street between rows runs east-west
-}
-
-// onPlaza reports whether tile (x, y) is inside the station's or the
-// square's superblock.
-func (c *CityPlan) onPlaza(x, y int64) bool {
-	i, j, u, v := c.grid(x, y)
-	st := c.sb(i, j).style
-	return (st == sbStation || st == sbSquare) && u >= arterial && v >= arterial
 }
 
 // base is the city's tile before railways are fenced off.
@@ -727,18 +719,27 @@ func (c *CityPlan) Buildings(x, y, w, h int64) []Building {
 // StationFront returns the tile in front of a city's station door, where
 // arriving passengers come out.
 func (in *Infra) StationFront(s Settlement) (Point, bool) {
-	if s.Fixed != "" || s.ID.Tier < City {
+	x0, y0, pf, ok := in.station(s)
+	if !ok {
 		return Point{}, false
+	}
+	return in.norm(x0+pf.DoorX, y0+pf.H), true
+}
+
+// station returns the top-left tile (not normalised) and the prefab of a
+// city's station.
+func (in *Infra) station(s Settlement) (x0, y0 int64, pf PrefabSpec, ok bool) {
+	if s.Fixed != "" || s.ID.Tier < City {
+		return 0, 0, PrefabSpec{}, false
 	}
 	a := cityPeriod(s.ID.Tier)
 	S := a - arterial
 	st, ok := in.prefabStyle("station", S, S)
 	if !ok {
-		return Point{}, false
+		return 0, 0, PrefabSpec{}, false
 	}
-	pf := in.prefabs[st]
-	x0, y0 := s.X-a/2+arterial+S/2-pf.W/2, s.Y-a/2+arterial+1 // the station's top-left
-	return in.norm(x0+pf.DoorX, y0+pf.H), true
+	pf = in.prefabs[st]
+	return s.X - a/2 + arterial + S/2 - pf.W/2, s.Y - a/2 + arterial + 1, pf, true
 }
 
 // pickStyle picks a building of the superblock's style that fits w x h,
