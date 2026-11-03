@@ -54,6 +54,7 @@ func (in *Infra) prefetchLoop() {
 		if !done {
 			in.blockWith(k[0], k[1], y)
 			in.SitesIn(k[0]*BlockSize, k[1]*BlockSize, BlockSize, BlockSize)
+			in.ferriesIn(k[0]*BlockSize, k[1]*BlockSize, BlockSize, y)
 		}
 	}
 }

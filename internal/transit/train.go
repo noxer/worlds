@@ -18,31 +18,46 @@ import (
 	"github.com/noxer/worlds/internal/world"
 )
 
-// Cars is the number of cars of a train, the locomotive included.
-const Cars = 4
+// Kind is a kind of vehicle.
+type Kind uint8
+
+const (
+	Train Kind = iota // on a rail line between two stations
+	Ferry             // on a sea lane between two piers
+)
+
+// spec is how a kind of vehicle runs.
+type spec struct {
+	cars                      int     // cars (a train's locomotive included; a ferry's bow and stern)
+	vMax, vSlow, aSlow, aFast float64 // tiles per tick and tiles per tick²
+}
+
+var specs = [...]spec{
+	// About 120 km/h; leaving gently up to half a tile per tick.
+	Train: {cars: 4, vMax: 2000.0 / sim.TicksPerMinute, vSlow: 0.5, aSlow: 0.002, aFast: 0.2},
+	// About 36 km/h; casting off slowly.
+	Ferry: {cars: 2, vMax: 600.0 / sim.TicksPerMinute, vSlow: 0.3, aSlow: 0.001, aFast: 0.02},
+}
 
 // Timing, in ticks (60 per game minute).
 const (
-	Dwell = 10 * sim.TicksPerMinute // waiting at a station before leaving
-
-	vMax   = 2000.0 / sim.TicksPerMinute // tiles per tick: about 120 km/h
-	vSlow  = 0.5                         // tiles per tick when leaving and arriving
-	aSlow  = 0.002                       // tiles per tick², up to vSlow
-	aFast  = 0.2                         // tiles per tick², from vSlow to vMax
-	cycleK = 0x747261696e                // "train"
+	Dwell  = 10 * sim.TicksPerMinute // waiting at a station or pier before leaving
+	cycleK = 0x747261696e            // "train"
 )
 
-// Line is a rail line with its train.
+// Line is a route with its vehicle shuttling between the two ends.
 type Line struct {
+	Kind   Kind
 	Edge   infra.Edge
-	ox, oy int64      // the track's first tile (A's buffer stop), normalised
-	pts    [][2]int64 // track corners in tiles relative to (ox, oy): axis-aligned legs
-	cum    []float64  // track distance to each corner
-	Length float64    // in tiles, from buffer stop to buffer stop
-	Travel int64      // ticks from leaving one station to arriving at the other
-	Cycle  int64      // ticks of a round trip
-	offset int64      // where the cycle starts
-	w, h   int64      // world size, for wrapping
+	Cars   int          // cars of its vehicle
+	ox, oy int64        // the route's first tile (A's end), normalised
+	pts    [][2]float64 // route corners in tiles relative to (ox, oy)
+	cum    []float64    // route distance to each corner
+	Length float64      // in tiles, from end to end
+	Travel int64        // ticks from leaving one end to arriving at the other
+	Cycle  int64        // ticks of a round trip
+	offset int64        // where the cycle starts
+	w, h   int64        // world size, for wrapping
 
 	prof profile
 }
@@ -54,29 +69,64 @@ func NewLine(in *infra.Infra, e infra.Edge, worldW, worldH int64, seed uint64) *
 	if way == nil || way.Net != infra.Rail || len(way.Pts) < 2 {
 		return nil
 	}
-	l := &Line{Edge: e, w: worldW, h: worldH}
+	var pts [][2]int64
 	for _, p := range way.Pts {
-		q := [2]int64{geom.FloorDiv(p[0], 16), geom.FloorDiv(p[1], 16)}
-		if n := len(l.pts); n > 0 && l.pts[n-1] == q {
+		q := [2]int64{way.OX + geom.FloorDiv(p[0], 16), way.OY + geom.FloorDiv(p[1], 16)}
+		if n := len(pts); n > 0 && pts[n-1] == q {
 			continue
 		}
-		l.pts = append(l.pts, q)
+		pts = append(pts, q)
 	}
-	l.ox, l.oy = geom.Mod(way.OX+l.pts[0][0], worldW), geom.Mod(way.OY+l.pts[0][1], worldH)
-	o := l.pts[0]
-	for k := range l.pts {
-		l.pts[k] = [2]int64{l.pts[k][0] - o[0], l.pts[k][1] - o[1]}
+	return newLine(Train, e, pts, worldW, worldH, seed)
+}
+
+// NewFerry makes the line of a sea lane, from pier tip to pier tip, or
+// returns nil if it has no ferry route (infra.FerryRoute, which it computes
+// if it isn't ready).
+func NewFerry(in *infra.Infra, e infra.Edge, worldW, worldH int64, seed uint64) *Line {
+	if e.Net != infra.SeaLane {
+		return nil
+	}
+	route, ok := in.FerryRouteReady(e)
+	if !ok {
+		route = in.FerryRoute(e)
+	}
+	if len(route) < 2 {
+		return nil
+	}
+	pts := make([][2]int64, 0, len(route))
+	for _, p := range route { // already unwrapped
+		q := [2]int64{p.X, p.Y}
+		if n := len(pts); n == 0 || pts[n-1] != q {
+			pts = append(pts, q)
+		}
+	}
+	return newLine(Ferry, e, pts, worldW, worldH, seed)
+}
+
+func newLine(k Kind, e infra.Edge, pts [][2]int64, worldW, worldH int64, seed uint64) *Line {
+	if len(pts) < 2 {
+		return nil
+	}
+	sp := specs[k]
+	l := &Line{Kind: k, Edge: e, Cars: sp.cars, w: worldW, h: worldH}
+	l.ox, l.oy = geom.Mod(pts[0][0], worldW), geom.Mod(pts[0][1], worldH)
+	for _, p := range pts {
+		l.pts = append(l.pts, [2]float64{float64(p[0] - pts[0][0]), float64(p[1] - pts[0][1])})
 	}
 	l.cum = make([]float64, len(l.pts))
-	for k := 1; k < len(l.pts); k++ {
-		a, b := l.pts[k-1], l.pts[k]
-		l.cum[k] = l.cum[k-1] + float64(geom.Abs(b[0]-a[0])+geom.Abs(b[1]-a[1]))
+	for i := 1; i < len(l.pts); i++ {
+		a, b := l.pts[i-1], l.pts[i]
+		l.cum[i] = l.cum[i-1] + math.Hypot(b[0]-a[0], b[1]-a[1])
 	}
 	l.Length = l.cum[len(l.cum)-1]
-	l.prof = newProfile(l.Length - (Cars - 1))
+	if l.Length <= float64(l.Cars) {
+		return nil
+	}
+	l.prof = newProfile(l.Length-float64(l.Cars-1), sp)
 	l.Travel = int64(math.Ceil(l.prof.total))
 	l.Cycle = 2 * (Dwell + l.Travel)
-	h := uint64(seed) ^ cycleK
+	h := uint64(seed) ^ cycleK ^ uint64(k)
 	for _, v := range []int64{e.A.ID.CX, e.A.ID.CY, e.B.ID.CX, e.B.ID.CY} {
 		h = (h ^ uint64(v)) * 0x9e3779b97f4a7c15
 	}
@@ -87,21 +137,22 @@ func NewLine(in *infra.Infra, e infra.Edge, worldW, worldH int64, seed uint64) *
 // profile is the speed curve of a run: gently up to vSlow, fast up to the
 // cruising speed, cruise, and down the same way.
 type profile struct {
+	sp                 spec
 	d                  float64 // distance to run
 	t1, d1, t2, d2, vc float64 // the two speeding-up phases and the cruising speed
 	cruise, total      float64
 }
 
-func newProfile(d float64) profile {
-	p := profile{d: d}
-	p.t1, p.d1 = vSlow/aSlow, vSlow*vSlow/(2*aSlow)
-	vc := vMax
-	// On a short line, the train doesn't reach full speed.
-	if 2*(p.d1+(vc*vc-vSlow*vSlow)/(2*aFast)) > d {
-		vc = math.Sqrt(max(vSlow*vSlow, aFast*(d-2*p.d1)+vSlow*vSlow))
+func newProfile(d float64, sp spec) profile {
+	p := profile{sp: sp, d: d}
+	p.t1, p.d1 = sp.vSlow/sp.aSlow, sp.vSlow*sp.vSlow/(2*sp.aSlow)
+	vc := sp.vMax
+	// On a short line, the vehicle doesn't reach full speed.
+	if 2*(p.d1+(vc*vc-sp.vSlow*sp.vSlow)/(2*sp.aFast)) > d {
+		vc = math.Sqrt(max(sp.vSlow*sp.vSlow, sp.aFast*(d-2*p.d1)+sp.vSlow*sp.vSlow))
 	}
 	p.vc = vc
-	p.t2, p.d2 = (vc-vSlow)/aFast, (vc*vc-vSlow*vSlow)/(2*aFast)
+	p.t2, p.d2 = (vc-sp.vSlow)/sp.aFast, (vc*vc-sp.vSlow*sp.vSlow)/(2*sp.aFast)
 	p.cruise = max(0, d-2*(p.d1+p.d2)) / vc
 	p.total = 2*(p.t1+p.t2) + p.cruise
 	return p
@@ -117,10 +168,10 @@ func (p profile) at(t float64) float64 {
 	case t > p.total/2:
 		return p.d - p.at(p.total-t) // arriving mirrors leaving
 	case t < p.t1:
-		return aSlow * t * t / 2
+		return p.sp.aSlow * t * t / 2
 	case t < p.t1+p.t2:
 		u := t - p.t1
-		return p.d1 + vSlow*u + aFast*u*u/2
+		return p.d1 + p.sp.vSlow*u + p.sp.aFast*u*u/2
 	}
 	return min(p.d1+p.d2+(t-p.t1-p.t2)*p.vc, p.d/2)
 }
@@ -159,20 +210,21 @@ func (l *Line) At(t float64) State {
 	c := geom.Mod(tick-l.offset, l.Cycle)
 	start := tick - c
 	tr := float64(l.Travel)
+	back := float64(l.Cars - 1) // the locomotive (or bow) is this far from the end
 	switch {
 	case c < Dwell:
-		return State{AtA: true, ToB: true, Front: Cars - 1, Since: start, Until: start + Dwell}
+		return State{AtA: true, ToB: true, Front: back, Since: start, Until: start + Dwell}
 	case c < Dwell+l.Travel:
 		run := float64(c-Dwell) + frac
-		return State{Moving: true, ToB: true, Front: Cars - 1 + l.prof.at(min(run, tr)),
+		return State{Moving: true, ToB: true, Front: back + l.prof.at(min(run, tr)),
 			Since: start + Dwell, Until: start + Dwell + l.Travel}
 	case c < 2*Dwell+l.Travel:
 		s := start + Dwell + l.Travel
-		return State{Front: l.Length - (Cars - 1), Since: s, Until: s + Dwell}
+		return State{Front: l.Length - back, Since: s, Until: s + Dwell}
 	}
 	run := float64(c-2*Dwell-l.Travel) + frac
 	s := start + 2*Dwell + l.Travel
-	return State{Moving: true, Front: l.Length - (Cars - 1) - l.prof.at(min(run, tr)), Since: s, Until: s + l.Travel}
+	return State{Moving: true, Front: l.Length - back - l.prof.at(min(run, tr)), Since: s, Until: s + l.Travel}
 }
 
 // NextStop returns when the train next stands at A's (atA) or B's
@@ -190,8 +242,9 @@ func (l *Line) NextStop(t int64, atA bool) (arrive, leave int64) {
 	return start + at, start + at + Dwell
 }
 
-// Pos returns the tile position (fractional, normalised) of track
-// distance s from A's buffer stop, and the direction of increasing s there.
+// Pos returns the tile position (fractional, normalised) of route
+// distance s from A's end, and the direction of increasing s there (the
+// main one, on a diagonal leg).
 func (l *Line) Pos(s float64) (x, y float64, d world.Dir) {
 	s = min(max(s, 0), l.Length)
 	k := sort.SearchFloat64s(l.cum, s)
@@ -202,21 +255,26 @@ func (l *Line) Pos(s float64) (x, y float64, d world.Dir) {
 		k = len(l.pts) - 1
 	}
 	a, b := l.pts[k-1], l.pts[k]
-	f := s - l.cum[k-1]
-	dx, dy := sign(b[0]-a[0]), sign(b[1]-a[1])
-	x = float64(l.ox+a[0]) + float64(dx)*f
-	y = float64(l.oy+a[1]) + float64(dy)*f
+	seg := l.cum[k] - l.cum[k-1]
+	f := 0.0
+	if seg > 0 {
+		f = (s - l.cum[k-1]) / seg
+	}
+	dx, dy := b[0]-a[0], b[1]-a[1]
+	x = float64(l.ox) + a[0] + dx*f
+	y = float64(l.oy) + a[1] + dy*f
 	switch {
-	case dx > 0:
+	case math.Abs(dx) >= math.Abs(dy) && dx > 0:
 		d = world.Right
-	case dx < 0:
+	case math.Abs(dx) >= math.Abs(dy):
 		d = world.Left
 	case dy > 0:
 		d = world.Down
 	default:
 		d = world.Up
 	}
-	return math.Mod(x+float64(l.w), float64(l.w)), math.Mod(y+float64(l.h), float64(l.h)), d
+	w, h := float64(l.w), float64(l.h)
+	return math.Mod(math.Mod(x, w)+w, w), math.Mod(math.Mod(y, h)+h, h), d
 }
 
 // Car is one car of a train.
@@ -226,11 +284,14 @@ type Car struct {
 	Loco   bool
 }
 
-// Cars returns where the cars of a train in state st are, the locomotive
-// first.
-func (l *Line) Cars(st State) []Car {
-	out := make([]Car, Cars)
-	for k := range Cars {
+// CarsAt returns where the cars of the vehicle in state st are, the
+// locomotive (or bow) first.
+func (l *Line) CarsAt(st State) []Car {
+	out := make([]Car, l.Cars)
+	if l.Kind == Ferry {
+		return l.ferryAt(st, out)
+	}
+	for k := range l.Cars {
 		s := st.Front - float64(k) // heading for B: the cars trail towards A
 		if !st.ToB {
 			s = st.Front + float64(k)
@@ -244,6 +305,46 @@ func (l *Line) Cars(st State) []Car {
 	return out
 }
 
+// ferryAt places a ferry: its bow where the route puts it, its stern
+// right behind, in line along the main direction of the route there (a
+// boat doesn't bend round corners like a train).
+func (l *Line) ferryAt(st State, out []Car) []Car {
+	s, back := st.Front, st.Front-1
+	if !st.ToB {
+		back = st.Front + 1
+	}
+	bx, by, _ := l.Pos(s)
+	sx, sy, _ := l.Pos(back)
+	dx, dy := wrapF(bx-sx, float64(l.w)), wrapF(by-sy, float64(l.h))
+	var d world.Dir
+	var ux, uy float64
+	switch {
+	case math.Abs(dx) >= math.Abs(dy) && dx >= 0:
+		d, ux = world.Right, 1
+	case math.Abs(dx) >= math.Abs(dy):
+		d, ux = world.Left, -1
+	case dy > 0:
+		d, uy = world.Down, 1
+	default:
+		d, uy = world.Up, -1
+	}
+	w, h := float64(l.w), float64(l.h)
+	out[0] = Car{X: bx, Y: by, Facing: d, Loco: true}
+	out[1] = Car{X: math.Mod(bx-ux+w, w), Y: math.Mod(by-uy+h, h), Facing: d}
+	return out
+}
+
+// wrapF returns d the shortest way round a world of size n.
+func wrapF(d, n float64) float64 {
+	switch {
+	case d > n/2:
+		return d - n
+	case d < -n/2:
+		return d + n
+	}
+	return d
+}
+
 func opposite(d world.Dir) world.Dir {
 	switch d {
 	case world.Up:
@@ -254,14 +355,4 @@ func opposite(d world.Dir) world.Dir {
 		return world.Right
 	}
 	return world.Left
-}
-
-func sign(v int64) int64 {
-	switch {
-	case v > 0:
-		return 1
-	case v < 0:
-		return -1
-	}
-	return 0
 }

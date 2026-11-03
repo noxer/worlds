@@ -705,8 +705,11 @@ func (e *Explore) DrawWorld(screen *ebiten.Image, scale, offX, offY int, alpha f
 	e.camX, e.camY = int64(ix)-m, int64(iy)-m
 	mp := e.party.Leader().Pos.Map
 	e.groundImg.Fill(gfx.ColorVoid)
-	if mp.Template == trainMap {
+	switch mp.Template {
+	case trainMap:
 		e.drawWindowView(e.groundImg, alpha)
+	case ferryMap:
+		e.drawSeaView(e.groundImg, alpha)
 	}
 	e.drawLayers(e.groundImg, mp, false)
 	e.overImg.Clear()

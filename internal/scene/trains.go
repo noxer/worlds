@@ -18,9 +18,15 @@ import (
 // into a waiting train, ridden inside the "train" detail map with the world
 // passing by its windows, and left at the next station.
 
+// Ferries work the same way on the sea lanes: drawn from their timetables
+// off the pier tips, boarded from the end of the pier, ridden on the
+// "ferry" deck with the sea all round.
+
 const (
 	trainMap      world.MapID = "train" // the carriage's detail map
+	ferryMap      world.MapID = "ferry" // the ferry's deck
 	trainReach                = 48      // lines this close to the party are drawn
+	ferryReach                = 3000    // harbours this close have their ferries drawn
 	viewSlowTiles             = 150     // near stations, the window shows the real place
 	viewSpeed                 = 0.6     // tiles per tick the scenery passes at speed
 )
@@ -46,12 +52,25 @@ func (e *Explore) trainTick(alpha float64) float64 {
 	return float64(e.clock.Ticks()) + min(max(alpha, 0), 1)
 }
 
-// line returns the line of a rail edge, made on first use.
+// vehicleMap is the detail map a line's vehicle is ridden in.
+func vehicleMap(l *transit.Line) world.MapID {
+	if l.Kind == transit.Ferry {
+		return ferryMap
+	}
+	return trainMap
+}
+
+// line returns the line of a rail edge or sea lane, made on first use.
 func (e *Explore) line(edge infra.Edge) *transit.Line {
 	if l, ok := e.lines[edge]; ok {
 		return l
 	}
-	l := transit.NewLine(e.infra, edge, e.w.W, e.w.H, e.w.Seed)
+	var l *transit.Line
+	if edge.Net == infra.SeaLane {
+		l = transit.NewFerry(e.infra, edge, e.w.W, e.w.H, e.w.Seed)
+	} else {
+		l = transit.NewLine(e.infra, edge, e.w.W, e.w.H, e.w.Seed)
+	}
 	if len(e.lines) > 256 {
 		clear(e.lines)
 	}
@@ -78,12 +97,28 @@ func (e *Explore) updateTrains() {
 				e.nearLines = append(e.nearLines, line)
 			}
 		}
+		// Ferries from the harbours around, once their routes are ready
+		// (computed in the background with the ways).
+		for _, s := range e.infra.Near(l.Pos.X, l.Pos.Y, ferryReach, infra.Town) {
+			if _, ok := e.infra.Harbour(s); !ok {
+				continue
+			}
+			for _, edge := range e.infra.Edges(infra.SeaLane, s) {
+				if _, ready := e.infra.FerryRouteReady(edge); !ready {
+					continue
+				}
+				if line := e.line(edge); line != nil && !seen[line] {
+					seen[line] = true
+					e.nearLines = append(e.nearLines, line)
+				}
+			}
+		}
 	}
 	clear(e.trainCells)
 	if l.Pos.Map.IsMain() {
 		for _, line := range e.nearLines {
 			st := line.At(float64(e.clock.Ticks()))
-			for _, c := range line.Cars(st) {
+			for _, c := range line.CarsAt(st) {
 				p := world.Pos{Map: world.Main, X: geom.Mod(int64(math.Round(c.X)), e.w.W), Y: geom.Mod(int64(math.Round(c.Y)), e.w.H)}
 				e.trainCells[p] = trainCar{Car: c, line: line, st: st}
 			}
@@ -108,9 +143,20 @@ func (e *Explore) stationAt(p world.Pos) (infra.Settlement, bool) {
 	return infra.Settlement{}, false
 }
 
+// harbourAt returns the settlement whose pier tip (the water off the end
+// of the pier, where the ferry moors) tile p is.
+func (e *Explore) harbourAt(p world.Pos) (infra.Settlement, bool) {
+	for _, s := range e.infra.Near(p.X, p.Y, ferryReach, infra.Town) {
+		if pier, ok := e.infra.Harbour(s); ok && pier.Tip.X == p.X && pier.Tip.Y == p.Y {
+			return s, true
+		}
+	}
+	return infra.Settlement{}, false
+}
+
 // platformBeside returns a free tile next to the train, on the platform.
 func (e *Explore) platformBeside(line *transit.Line, st transit.State) (world.Pos, bool) {
-	cars := line.Cars(st)
+	cars := line.CarsAt(st)
 	onTrain := map[world.Pos]bool{}
 	pos := make([]world.Pos, len(cars))
 	for k, c := range cars {
@@ -150,7 +196,7 @@ func (e *Explore) trainBump(p world.Pos) bool {
 			e.say(e.infra.Name(s) + " Station: departures. Press to read the timetable.")
 			return true
 		}
-	case ok && id == "train_exit":
+	case ok && (id == "train_exit" || id == "ferry_exit"):
 		e.leaveTrain(false)
 		return true
 	}
@@ -171,23 +217,30 @@ func (e *Explore) trainTalk(ctx *Context, p world.Pos) bool {
 	}
 	if id, ok := e.w.Bump(p); ok && id == "station" {
 		if s, ok := e.stationAt(p); ok {
-			e.timetable(ctx, s)
+			e.timetable(ctx, s, infra.Rail)
 			return true
 		}
 	}
-	if e.signs[p] == "train_seat" && e.ride != nil && !e.ride.arrived {
+	if p.Map.IsMain() {
+		if s, ok := e.harbourAt(p); ok {
+			e.timetable(ctx, s, infra.SeaLane)
+			return true
+		}
+	}
+	if sg := e.signs[p]; (sg == "train_seat" || sg == "ferry_bench") && e.ride != nil && !e.ride.arrived {
 		e.restOffer(ctx)
 		return true
 	}
 	return false
 }
 
-// timetable shows the trains from a station, to board or wait for.
-func (e *Explore) timetable(ctx *Context, s infra.Settlement) {
+// timetable shows the trains from a station (net Rail) or the ferries
+// from a harbour (SeaLane), to board or wait for.
+func (e *Explore) timetable(ctx *Context, s infra.Settlement, net infra.Network) {
 	now := e.clock.Ticks()
 	var choices []dialog.Choice
 	var lines []*transit.Line
-	for _, edge := range e.infra.Edges(infra.Rail, s) {
+	for _, edge := range e.infra.Edges(net, s) {
 		line := e.line(edge)
 		if line == nil {
 			continue
@@ -209,12 +262,19 @@ func (e *Explore) timetable(ctx *Context, s infra.Settlement) {
 		}
 	}
 	text := "Where would you like to go?"
+	speaker := e.infra.Name(s) + " Station"
+	if net == infra.SeaLane {
+		speaker = e.infra.Name(s) + " Harbour"
+	}
 	if len(lines) == 0 {
 		text = "No trains run from here."
+		if net == infra.SeaLane {
+			text = "No ferries sail from here."
+		}
 	}
 	choices = append(choices, dialog.Choice{Text: "Not now."})
 	d := &dialog.Dialog{ID: "timetable", Start: "main", Nodes: map[string]*dialog.Node{
-		"main": {Speaker: e.infra.Name(s) + " Station", Lines: []string{text}, Choices: choices},
+		"main": {Speaker: speaker, Lines: []string{text}, Choices: choices},
 	}}
 	r := dialog.NewRunner(d)
 	ctx.Push(NewDialogBox(r, func() {
@@ -248,7 +308,7 @@ func (e *Explore) board(line *transit.Line, toB bool) {
 	if !toB {
 		r.from, r.to = r.to, r.from
 	}
-	sp, ok := e.w.Spawn(trainMap, "aboard")
+	sp, ok := e.w.Spawn(vehicleMap(line), "aboard")
 	if !ok {
 		return
 	}
@@ -264,7 +324,7 @@ func (e *Explore) updateRide() {
 	if r == nil || e.fade != 0 {
 		return
 	}
-	if e.party.Leader().Pos.Map.Template != trainMap {
+	if e.party.Leader().Pos.Map.Template != vehicleMap(r.line) {
 		e.ride = nil // got off
 		return
 	}
@@ -304,7 +364,11 @@ func (e *Explore) leaveTrain(forced bool) {
 	case !st.Moving: // still at the platform where it boarded
 		at = r.from
 	default:
-		e.bump0("train_exit")
+		if r.line.Kind == transit.Ferry {
+			e.bump0("ferry_exit")
+		} else {
+			e.bump0("train_exit")
+		}
 		return
 	}
 	// Onto the platform beside the train (or, failing that, out in front
@@ -312,6 +376,12 @@ func (e *Explore) leaveTrain(forced bool) {
 	to, ok := e.platformBeside(r.line, st)
 	if forced || !ok {
 		front, ok := e.infra.StationFront(at)
+		if r.line.Kind == transit.Ferry {
+			var pier infra.Pier
+			if pier, ok = e.infra.Harbour(at); ok { // the end of the pier
+				front = pier.Cells[len(pier.Cells)-1]
+			}
+		}
 		if !ok {
 			return
 		}
@@ -320,7 +390,9 @@ func (e *Explore) leaveTrain(forced bool) {
 	e.ride = nil
 	e.warp = &world.Warp{To: to, Facing: world.Down, HasFacing: true}
 	e.fade = fadeTicks
-	if forced {
+	if forced && r.line.Kind == transit.Ferry {
+		e.pendingNotice = "All ashore, please."
+	} else if forced {
 		e.pendingNotice = "End of the line. Everyone off, please."
 	}
 }
@@ -355,10 +427,22 @@ func (e *Explore) restOffer(ctx *Context) {
 	}))
 }
 
-// trainSprite returns the tile of a car.
-func (e *Explore) trainSprite(c transit.Car) (img *ebiten.Image, flip bool) {
+// trainSprite returns the tile of a car (or half of a ferry).
+func (e *Explore) trainSprite(l *transit.Line, c transit.Car) (img *ebiten.Image, flip bool) {
 	name := "train car h"
+	part := "stern"
+	if c.Loco {
+		part = "bow"
+	}
 	switch {
+	case l.Kind == transit.Ferry && c.Facing == world.Right:
+		name = "ferry " + part + " e"
+	case l.Kind == transit.Ferry && c.Facing == world.Left:
+		name, flip = "ferry "+part+" e", true
+	case l.Kind == transit.Ferry && c.Facing == world.Down:
+		name = "ferry " + part + " s"
+	case l.Kind == transit.Ferry:
+		name = "ferry " + part + " n"
 	case c.Loco && c.Facing == world.Right:
 		name = "train loco e"
 	case c.Loco && c.Facing == world.Left:
@@ -391,12 +475,12 @@ func (e *Explore) trainDrawables(m world.MapRef, alpha float64) []drawable {
 	t := e.trainTick(alpha)
 	var out []drawable
 	for _, line := range e.nearLines {
-		for _, c := range line.Cars(line.At(t)) {
+		for _, c := range line.CarsAt(line.At(t)) {
 			x, y := e.screenAt(m, c.X*tile, c.Y*tile, cx, cy)
 			if x < -tile || y < -tile || x > float64(e.viewW) || y > float64(e.viewH) {
 				continue
 			}
-			img, flip := e.trainSprite(c)
+			img, flip := e.trainSprite(line, c)
 			out = append(out, drawable{img: img, flip: flip, x: x, y: y})
 		}
 	}
@@ -428,12 +512,12 @@ func (e *Explore) viewTrack(alpha float64) (s, heading float64, ok bool) {
 		}
 	}
 	if st.Moving && st.ToB == r.toB {
-		start := float64(transit.Cars - 1) // where the locomotive leaves from
+		start := float64(r.line.Cars - 1) // where the locomotive leaves from
 		if !st.ToB {
-			start = r.line.Length - float64(transit.Cars-1)
+			start = r.line.Length - float64(r.line.Cars-1)
 		}
 		run := math.Abs(s - start)
-		left := r.line.Length - float64(transit.Cars-1) - run
+		left := r.line.Length - float64(r.line.Cars-1) - run
 		if run > viewSlowTiles && left > viewSlowTiles {
 			since := t - float64(st.Since) - r.line.TimeTo(viewSlowTiles)
 			s = start + heading*(viewSlowTiles+viewSpeed*max(since, 0))
@@ -495,7 +579,7 @@ func (e *Explore) drawWindowView(dst *ebiten.Image, alpha float64) {
 				wp, ok := e.w.Normalize(world.Pos{Map: world.Main,
 					X: int64(math.Round(x)) + nx*viewSide, Y: int64(math.Round(y)) + ny*viewSide})
 				if ok {
-					e.drawWorldTile(e.viewImg, wp, k*tile-shift)
+					e.drawWorldTile(e.viewImg, wp, k*tile-shift, 0)
 				}
 			}
 			op := &ebiten.DrawImageOptions{}
@@ -503,6 +587,58 @@ func (e *Explore) drawWindowView(dst *ebiten.Image, alpha float64) {
 			dst.DrawImage(e.viewImg, op)
 		}
 	}
+}
+
+// drawSeaView draws the world round the ferry's deck, over the whole of
+// dst: the strip of world along the route, unrolled like the train's
+// window view. The ferry sails to the right through it; each row above the
+// deck's middle row is a tile further to the left of the route (port),
+// each row below one to the right.
+func (e *Explore) drawSeaView(dst *ebiten.Image, alpha float64) {
+	s, heading, ok := e.viewTrack(alpha)
+	if !ok {
+		return
+	}
+	line := e.ride.line
+	mw, mh, _ := e.w.Size(world.Detail(ferryMap))
+	u := heading * s
+	t0 := math.Floor(u)
+	shift := int((u - t0) * tile)
+	w, h := dst.Bounds().Dx(), dst.Bounds().Dy()
+	cx0, cy0 := geom.FloorDiv(e.camX, tile), geom.FloorDiv(e.camY, tile)
+	for cy := cy0; cy*tile-e.camY < int64(h); cy++ {
+		lat := mh/2 - cy
+		for cx := cx0; cx*tile-e.camX-int64(shift) < int64(w); cx++ {
+			sd := heading * (t0 + float64(cx-mw/2)) // back to route distance
+			sc := min(max(sd, 0), line.Length)
+			x, y, d := line.Pos(sc)
+			// Beyond the ends (at the piers), straight on.
+			ax, ay := dirVec(d)
+			x, y = x+ax*(sd-sc), y+ay*(sd-sc)
+			if heading < 0 {
+				d = opposite(d)
+			}
+			nx, ny := leftOf(d)
+			wp, ok := e.w.Normalize(world.Pos{Map: world.Main,
+				X: int64(math.Round(x)) + nx*lat, Y: int64(math.Round(y)) + ny*lat})
+			if ok {
+				e.drawWorldTile(dst, wp, int(cx*tile-e.camX)-shift, int(cy*tile-e.camY))
+			}
+		}
+	}
+}
+
+// dirVec returns the unit step of a direction.
+func dirVec(d world.Dir) (dx, dy float64) {
+	switch d {
+	case world.Right:
+		return 1, 0
+	case world.Left:
+		return -1, 0
+	case world.Down:
+		return 0, 1
+	}
+	return 0, -1
 }
 
 // leftOf returns the offset to the left of a direction of travel.
@@ -530,8 +666,9 @@ func opposite(d world.Dir) world.Dir {
 	return world.Left
 }
 
-// drawWorldTile draws all layers of main-map tile p at x (pixels) in dst.
-func (e *Explore) drawWorldTile(dst *ebiten.Image, p world.Pos, x int) {
+// drawWorldTile draws all layers of main-map tile p at (x, y) (pixels) in
+// dst.
+func (e *Explore) drawWorldTile(dst *ebiten.Image, p world.Pos, x, y int) {
 	sets := e.w.Tilesets()
 	ms := animationClock()
 	for l := 0; l < world.NumLayers; l++ {
@@ -539,6 +676,6 @@ func (e *Explore) drawWorldTile(dst *ebiten.Image, p world.Pos, x int) {
 		if t.Empty() {
 			continue
 		}
-		e.drawTile(dst, e.sheets.Tile(sets.Get(t.Set()).Name, t.Index()), x, 0, t.FlipH(), t.FlipV())
+		e.drawTile(dst, e.sheets.Tile(sets.Get(t.Set()).Name, t.Index()), x, y, t.FlipH(), t.FlipV())
 	}
 }

@@ -5,11 +5,11 @@
  "name": "worlds",
  "tilewidth": 16,
  "tileheight": 16,
- "tilecount": 96,
+ "tilecount": 112,
  "columns": 16,
  "image": "../tiles/worlds.png",
  "imagewidth": 256,
- "imageheight": 96,
+ "imageheight": 112,
  "margin": 0,
  "spacing": 0,
  "tiles": [
@@ -475,6 +475,241 @@
      "name": "name",
      "type": "string",
      "value": "train door"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 58,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry bow e"
+    }
+   ]
+  },
+  {
+   "id": 59,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry stern e"
+    }
+   ]
+  },
+  {
+   "id": 60,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry bow s"
+    }
+   ]
+  },
+  {
+   "id": 61,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry stern s"
+    }
+   ]
+  },
+  {
+   "id": 62,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry bow n"
+    }
+   ]
+  },
+  {
+   "id": 63,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry stern n"
+    }
+   ]
+  },
+  {
+   "id": 96,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry deck"
+    }
+   ]
+  },
+  {
+   "id": 97,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry sea"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 98,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry bench"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 99,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry gangway"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 100,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 1"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 101,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 2"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 102,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 4"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 103,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 8"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 104,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 9"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 105,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 3"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 106,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 12"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 107,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 6"
     },
     {
      "name": "solid",

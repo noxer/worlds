@@ -199,6 +199,7 @@ type Infra struct {
 	sites  map[ID]*Site
 	piers  map[ID]Pier
 	cities map[ID]*CityPlan
+	ferry  map[edgeKey][]Point
 
 	prefetchAt      [2]int64
 	prefetchStarted bool
@@ -249,6 +250,7 @@ func New(cfg Config) (*Infra, error) {
 		cells:   map[ID]cellResult{},
 		routes:  map[edgeKey]*Route{},
 		blocks:  map[[2]int64][]*Way{},
+		ferry:   map[edgeKey][]Point{},
 	}
 	in.sea, in.deep = cfg.Relief.Levels()
 	for _, f := range cfg.Fixed {

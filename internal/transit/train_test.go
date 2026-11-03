@@ -48,9 +48,9 @@ func TestTrainRuns(t *testing.T) {
 			t.Fatalf("tick %d: the train jumped %.1f tiles", tick, d)
 		}
 		if !st.Moving {
-			want := float64(transit.Cars - 1)
+			want := float64(l.Cars - 1)
 			if !st.AtA {
-				want = l.Length - (transit.Cars - 1)
+				want = l.Length - float64(l.Cars-1)
 			}
 			if st.Front != want {
 				t.Fatalf("tick %d: waiting at %.1f, not at the platform (%.1f)", tick, st.Front, want)
@@ -60,7 +60,7 @@ func TestTrainRuns(t *testing.T) {
 			}
 		}
 		if tick%97 == 0 {
-			cars := l.Cars(st)
+			cars := l.CarsAt(st)
 			for k, car := range cars {
 				p := world.Pos{Map: world.Main, X: int64(math.Round(car.X)), Y: int64(math.Round(car.Y))}
 				if tick%(97*20) == 0 && !rails[w.Tile(p, world.LayerDeco)] {

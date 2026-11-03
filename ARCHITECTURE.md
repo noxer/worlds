@@ -216,7 +216,8 @@ coastline autotiler of the generator will use these sets. `worlds_sheet.py`
 draws the project's own tiles and writes `worlds.tsj`: bicycle, scooter,
 lamp post, and the rail and pier sets, generated for all 16 combinations of
 connected sides (named `rail <mask>`, `pier <mask>`, N=1, E=2, S=4,
-W=8). `prefabs.py` writes the
+W=8), the train and ferry outsides and insides, the railway fence and
+ballast. `prefabs.py` writes the
 starting set of village prefabs (`assets/maps/prefabs`), which are ordinary
 Tiled maps from then on.
 
@@ -390,7 +391,11 @@ edge, keyed by its two settlements, computed on demand and cached.
 - **Harbours (implemented):** a coastal town or bigger with sea lanes gets
   a wooden pier where the shore is nearest its centre along one of the four
   axes: from the last land cell out over the water for up to 10 tiles (at
-  least 3), with open water beyond. Sea lanes start off its tip. Pier tiles
+  least 3), with open water beyond: water that opens out to sea (a search
+  over the water, always going on from the cell farthest out, gets 384
+  tiles away), so a pier never goes into a lake; shore after shore along
+  the axis is tried. Sea lanes start off its tip, right off the end of the
+  pier, where the ferry moors. Pier tiles
   replace the water on the ground layer (walkable), chosen by which sides
   continue the pier or the shore; the cells stay water for the shore art
   around them.
@@ -706,7 +711,38 @@ than a fixed tile.
   per tick instead, cutting back to the real place as the train slows into
   the station. Chunk streaming follows the view.
 - Not yet: the `forward` mapping of the scroll direction, tickets, several
-  trains per line, ferries, buses, taxis and aircraft.
+  trains per line, buses, taxis and aircraft.
+
+**Ferries (implemented: `transit`, `infra/ferry.go`, `scene/trains.go`).**
+- **Routes:** a sea lane between two harbours with piers is a ferry line.
+  The lane's coarse route (128-tile grid, allowed through town near its
+  ends) would cross land, so the ferry has its own route
+  (`infra.FerryRoute`): from pier tip to pier tip, 4 tiles straight out
+  from each pier first; grid points on land dropped; any leg touching land
+  (or a pier, or a hand-made patch) searched again over the water on a
+  4-tile grid (an 8-tile grid with a wider box to round an island); then
+  straightened where a straight leg stays on the water. Pool islands placed
+  by the world are unknown to infra; a ferry at cruising speed crosses one
+  in a frame. Routes are computed in the background with the ways
+  (`Prefetch`), and the scene only draws ferries whose route is ready.
+- **Timetable:** the same machinery as trains (`transit.Line` with a
+  `Kind`): 10 minutes at each pier, casting off slowly (0.3 tiles per tick
+  over the first 45 tiles) up to about 600 tiles a game minute (36 km/h).
+- **Exterior:** two tiles, bow and stern (`ferry bow e` …), the bow where
+  the route puts it and the stern right behind it in line (a boat doesn't
+  bend round corners); moored, it lies off the end of the pier, heading out.
+- **Boarding:** confirm at the end of the pier facing the water for the
+  harbour's timetable (board, or wait for the next ferry), or walk into the
+  moored ferry.
+- **Deck:** the `ferry` detail map (`tools/art/ferry_interior.py`): planks,
+  railing, benches (rest until the other harbour), a passenger and a
+  deckhand, two gangways (`ferry_exit`: up at sea; at a pier, down onto the
+  pier beside the ferry). The sea round the deck is the real world: the
+  whole screen behind the deck shows the strip along the route, unrolled
+  like the train's window view (the ferry sails to the right; each row
+  above the deck's middle is a tile further to port, each below to
+  starboard; past the route's ends, straight on). At a pier the real
+  harbour shows, at sea the passing water at a calm pace.
 
 **Simulation.**
 - Vehicles move in the world simulation, independent of the current scene.
@@ -965,7 +1001,11 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    timetables from the clock, trains on the map, station timetables,
    boarding, the carriage with its window view, arrival and getting off;
    tests for the timetable and motion along a real line and a whole
-   journey. Next: ferries on the sea lanes, buses, taxis, aircraft.
+   journey. **Ferries done:** piers that open to the sea, water-only ferry
+   routes, the ferry on the map and moored at the pier, harbour
+   timetables, the deck with the sea all round, benches and gangways;
+   tests for a ferry's run and a whole crossing. Next: buses, taxis,
+   aircraft.
 
 ## Asset delivery
 

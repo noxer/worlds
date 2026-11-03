@@ -16,14 +16,21 @@ transparent: the game shows the world passing behind it), "train seat",
 "train door".
 Row 4 (64-79): a railway fence by which sides it connects to ("fence <mask>",
 N=1, E=2, S=4, W=8): posts and two rails, transparent round it (deco layer).
+Row 3 also (58-63): the ferry outside, seen from above, two tiles long:
+"ferry bow e", "ferry stern e" (west: mirrored), "ferry bow s", "ferry stern
+s", "ferry bow n", "ferry stern n".
 Row 5 (80): "ballast", the gravel bed of tracks in towns.
+Row 6 (96-107): on the ferry's deck: "ferry deck", "ferry sea" (transparent:
+the game shows the sea passing round the deck), "ferry bench", "ferry
+gangway", and the railing round the deck on its outer sides ("ferry rail
+<mask>", N=1, E=2, S=4, W=8: masks 1, 2, 4, 8, 9, 3, 12, 6), 96-107.
 Deep water lives in water.png."""
 import json, math, sys
 from PIL import Image, ImageDraw
 battle, out, tsj = sys.argv[1], sys.argv[2], sys.argv[3]
 src = Image.open(battle).convert("RGBA")
 def tile(i): return src.crop((i%18*16, i//18*16, i%18*16+16, i//18*16+16))
-sheet = Image.new("RGBA", (16*16, 16*6), (0, 0, 0, 0))
+sheet = Image.new("RGBA", (16*16, 16*7), (0, 0, 0, 0))
 INK = (43, 29, 35, 255)
 def bike(ox, frame, accent, deck=False):
     d = ImageDraw.Draw(sheet)
@@ -281,6 +288,92 @@ def door():
     return t
 for k, img in enumerate((floor(), wall(), window(), seat(), door())):
     sheet.alpha_composite(img, (16 * (5 + k), 48))
+# --- the ferry ---------------------------------------------------------------
+HULL, HULL_SH = (236, 238, 242, 255), (196, 200, 210, 255)
+STRIPE = (58, 96, 140, 255)
+CABIN, CABIN_HI = (210, 214, 224, 255), (244, 246, 250, 255)
+FUNNEL = (196, 72, 56, 255)
+def ferry_e():
+    """The ferry heading east, 32x16: stern tile, bow tile."""
+    t = Image.new("RGBA", (32, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(t)
+    hull = [(1, 2), (24, 2), (31, 8), (24, 13), (1, 13), (0, 12), (0, 3)]
+    d.polygon(hull, fill=INK)
+    d.polygon([(2, 3), (24, 3), (29, 8), (24, 12), (2, 12), (1, 11), (1, 4)], fill=HULL)
+    d.line((2, 3, 24, 3), fill=STRIPE)
+    d.line((2, 12, 24, 12), fill=HULL_SH)
+    d.line((24, 3, 29, 8), fill=STRIPE)
+    d.rectangle((3, 5, 25, 10), fill=PLANK)     # the deck
+    for x in range(3, 26, 3):
+        d.line((x, 5, x, 10), fill=PLANK_DARK)
+    d.rectangle((5, 4, 16, 11), fill=INK)        # the cabin roof
+    d.rectangle((6, 5, 15, 10), fill=CABIN)
+    d.rectangle((6, 5, 15, 6), fill=CABIN_HI)
+    d.rectangle((9, 7, 11, 9), fill=INK)         # the funnel
+    d.rectangle((10, 8, 10, 8), fill=FUNNEL)
+    d.point((27, 8), fill=INK)                   # a bollard on the bow
+    return t
+fe = ferry_e()
+sheet.alpha_composite(fe.crop((16, 0, 32, 16)), (16 * 10, 48))  # 58 bow e
+sheet.alpha_composite(fe.crop((0, 0, 16, 16)), (16 * 11, 48))   # 59 stern e
+fs = fe.rotate(-90, expand=True)  # 16x32, heading south: stern on top
+sheet.alpha_composite(fs.crop((0, 16, 16, 32)), (16 * 12, 48))  # 60 bow s
+sheet.alpha_composite(fs.crop((0, 0, 16, 16)), (16 * 13, 48))   # 61 stern s
+fn = fe.rotate(90, expand=True)   # heading north: bow on top
+sheet.alpha_composite(fn.crop((0, 0, 16, 16)), (16 * 14, 48))   # 62 bow n
+sheet.alpha_composite(fn.crop((0, 16, 16, 32)), (16 * 15, 48))  # 63 stern n
+
+DECK, DECK_HI, DECK_DARK = (196, 150, 98, 255), (220, 176, 120, 255), (150, 106, 64, 255)
+RAIL, RAIL_HI = (236, 238, 242, 255), (255, 255, 255, 255)
+def deck():
+    t = Image.new("RGBA", (16, 16), DECK)
+    d = ImageDraw.Draw(t)
+    for y in range(0, 16, 4):
+        d.line((0, y + 3, 15, y + 3), fill=DECK_DARK)
+        d.line((0, y, 15, y), fill=DECK_HI)
+    for y, x in ((0, 5), (4, 12), (8, 2), (12, 9)):  # board ends
+        d.line((x, y, x, y + 2), fill=DECK_DARK)
+    return t
+def bench():
+    t = deck()
+    d = ImageDraw.Draw(t)
+    d.rectangle((1, 3, 14, 12), fill=INK)
+    d.rectangle((2, 4, 13, 11), fill=(132, 86, 52, 255))
+    for y in (5, 8):
+        d.line((2, y, 13, y), fill=(168, 114, 70, 255))
+    d.line((2, 11, 13, 11), fill=(96, 62, 40, 255))
+    return t
+def gangway():
+    t = deck()
+    d = ImageDraw.Draw(t)
+    d.rectangle((2, 0, 13, 15), fill=INK)
+    d.rectangle((3, 0, 12, 15), fill=(150, 152, 168, 255))
+    for y in range(1, 16, 3):
+        d.line((3, y, 12, y), fill=(112, 114, 130, 255))
+    d.rectangle((0, 13, 15, 15), fill=INK)          # the gate across it
+    d.rectangle((1, 14, 14, 14), fill=(232, 192, 64, 255))
+    return t
+def rail(mask):
+    """Railing at the deck's edge, on the sides in mask (N=1, E=2, S=4,
+    W=8: the outer sides)."""
+    t = deck()
+    d = ImageDraw.Draw(t)
+    def bar(x0, y0, x1, y1):
+        d.rectangle((x0, y0, x1, y1), fill=INK)
+        d.rectangle((x0 + 1, y0 + 1, x1 - 1, y1 - 1), fill=RAIL)
+    if mask & N: bar(0, 0, 15, 3)
+    if mask & S: bar(0, 12, 15, 15)
+    if mask & W: bar(0, 0, 3, 15)
+    if mask & E: bar(12, 0, 15, 15)
+    # posts where the rails meet and at the middle
+    for x, y, m in ((6, 0, N), (6, 12, S), (0, 6, W), (12, 6, E)):
+        if mask & m:
+            d.rectangle((x, y, x + 3, y + 3), fill=INK)
+            d.rectangle((x + 1, y + 1, x + 2, y + 2), fill=RAIL_HI)
+    return t
+RAIL_MASKS = (N, E, S, W, N | W, N | E, S | W, S | E)
+for k, img in enumerate([deck(), Image.new("RGBA", (16, 16), (0, 0, 0, 0)), bench(), gangway()] + [rail(m) for m in RAIL_MASKS]):
+    sheet.alpha_composite(img, (16 * k, 96))
 # --- railway fence and ballast ---------------------------------------------
 POST, BAR, BAR_HI = (86, 84, 98, 255), (128, 128, 144, 255), (176, 178, 194, 255)
 def fence(mask):
@@ -327,11 +420,18 @@ for k, name in enumerate(("train car h", "train car v", "train loco e", "train l
     if name in ("train wall", "train window", "train seat", "train door"):
         ps.append(prop("solid", "bool", True))
     tiles.append({"id": 48 + k, "properties": ps})
+for k, name in enumerate(("ferry bow e", "ferry stern e", "ferry bow s", "ferry stern s", "ferry bow n", "ferry stern n")):
+    tiles.append({"id": 58 + k, "properties": [prop("name", "string", name)]})
+for k, name in enumerate(["ferry deck", "ferry sea", "ferry bench", "ferry gangway"] + [f"ferry rail {m}" for m in RAIL_MASKS]):
+    ps = [prop("name", "string", name)]
+    if name != "ferry deck":
+        ps.append(prop("solid", "bool", True))
+    tiles.append({"id": 96 + k, "properties": ps})
 tiles += [{"id": 64 + m, "properties": [prop("name", "string", f"fence {m}"), prop("solid", "bool", True)]} for m in range(16)]
 tiles.append({"id": 80, "properties": [prop("name", "string", "ballast"), prop("solid", "bool", True)]})  # no walking on the line in towns
 ts = {"type": "tileset", "version": "1.10", "tiledversion": "1.11.0", "name": "worlds",
-      "tilewidth": 16, "tileheight": 16, "tilecount": 96, "columns": 16,
-      "image": "../tiles/worlds.png", "imagewidth": 256, "imageheight": 96,
+      "tilewidth": 16, "tileheight": 16, "tilecount": 112, "columns": 16,
+      "image": "../tiles/worlds.png", "imagewidth": 256, "imageheight": 112,
       "margin": 0, "spacing": 0, "tiles": tiles}
 with open(tsj, "w") as f:
     f.write(json.dumps(ts, indent=1) + "\n")

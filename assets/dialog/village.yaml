@@ -57,3 +57,33 @@ train_passenger_2:
       speaker: Passenger
       lines:
         - Wake me when we get there, would you?
+
+ferry_exit:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The gangway is up until we reach the harbour.
+
+ferry_bench:
+  start: main
+  nodes:
+    main:
+      lines:
+        - A bench on deck, salt on the breeze.
+
+ferry_passenger_1:
+  start: main
+  nodes:
+    main:
+      speaker: Passenger
+      lines:
+        - On a clear day you can see the other shore from halfway across.
+
+ferry_passenger_2:
+  start: main
+  nodes:
+    main:
+      speaker: Deckhand
+      lines:
+        - Mind the rail. We'll be alongside the pier in no time.

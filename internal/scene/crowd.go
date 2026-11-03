@@ -192,7 +192,8 @@ func itoa(i int) string {
 }
 
 // debugTravel jumps (through the usual fade) to the plaza of the nearest
-// generated village, then town, then city, then back home: a quick way to
+// generated village, then town, then city, then the end of the nearest
+// ferry pier, then back home: a quick way to
 // look at places that are hours apart on foot.
 func (e *Explore) debugTravel() {
 	if e.infra == nil {
@@ -222,6 +223,17 @@ func (e *Explore) debugTravel() {
 			}
 		}
 	}
+	facing := world.Down
+	if !found && e.travel == len(tiers) {
+		// Last, the nearest harbour with a ferry: the end of its pier,
+		// looking out to sea.
+		e.travel++
+		if _, pier, ok := e.ferryHarbourNear(from); ok {
+			end := pier.Cells[len(pier.Cells)-1]
+			dest, found = world.Pos{Map: world.Main, X: end.X, Y: end.Y}, true
+			facing, _ = e.w.DirBetween(dest, world.Pos{Map: world.Main, X: pier.Tip.X, Y: pier.Tip.Y})
+		}
+	}
 	if !found {
 		dest, e.travel = e.home, 0
 	}
@@ -229,6 +241,32 @@ func (e *Explore) debugTravel() {
 	for r := int64(0); r < 8 && (e.w.Solid(dest) || e.w.Terrain(dest) != world.Land); r++ {
 		dest, _ = e.w.Offset(dest, 1, 0)
 	}
-	e.warp = &world.Warp{To: dest, Facing: world.Down, HasFacing: true}
+	e.warp = &world.Warp{To: dest, Facing: facing, HasFacing: true}
 	e.fade = fadeTicks
+}
+
+// ferryHarbourNear returns the harbour with a ferry nearest p (as the crow
+// flies, within the longest sea lane's reach).
+func (e *Explore) ferryHarbourNear(p world.Pos) (infra.Settlement, infra.Pier, bool) {
+	best := int64(-1)
+	var bs infra.Settlement
+	var bp infra.Pier
+	for _, s := range e.infra.Near(p.X, p.Y, 400000, infra.Town) {
+		dx, dy, _ := e.w.Delta(p, world.Pos{Map: world.Main, X: s.X, Y: s.Y})
+		d := dx*dx + dy*dy
+		if best >= 0 && d >= best {
+			continue
+		}
+		pier, ok := e.infra.Harbour(s)
+		if !ok {
+			continue
+		}
+		for _, edge := range e.infra.Edges(infra.SeaLane, s) {
+			if len(e.infra.FerryRoute(edge)) >= 2 {
+				best, bs, bp = d, s, pier
+				break
+			}
+		}
+	}
+	return bs, bp, best >= 0
 }
