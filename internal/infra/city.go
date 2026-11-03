@@ -40,6 +40,8 @@ const (
 	CGrass                   // lawn, park
 	CBuilt                   // a building (its prefab is drawn there)
 	CParking                 // asphalt with a parking sign (industrial yards)
+	CTrack                   // a railway's ballast (the rail is drawn over it)
+	CFence                   // the fence beside a railway
 )
 
 // City decorations.
@@ -390,8 +392,80 @@ func spans(length, n, minSize, g int64) []span {
 // included reports whether superblock (i, j) is part of the city.
 func (c *CityPlan) included(i, j int64) bool { return c.sb(i, j).style != sbOut }
 
-// At returns what tile (x, y) is in the city.
+// At returns what tile (x, y) is in the city. Railways are fenced off from
+// the city: their tiles are ballast and the tiles next to them fence,
+// except where a road crosses them at right angles (a level crossing) and
+// on the station plaza, where trains are boarded.
 func (c *CityPlan) At(x, y int64) CityTile {
+	t := c.base(x, y)
+	if t.Kind == CNone || c.onPlaza(x, y) {
+		return t
+	}
+	if c.railAt(x, y) {
+		h, v := c.roadAxes(x, y)
+		rh, rv := c.railAxes(x, y)
+		if (rh && !rv && v && !h) || (rv && !rh && h && !v) || (h && v && rh != rv) {
+			return t // a road crossing the line
+		}
+		return CityTile{Kind: CTrack}
+	}
+	for _, d := range [8][2]int64{{0, -1}, {1, 0}, {0, 1}, {-1, 0}, {1, -1}, {1, 1}, {-1, 1}, {-1, -1}} {
+		if !c.railAt(x+d[0], y+d[1]) || c.onPlaza(x+d[0], y+d[1]) {
+			continue
+		}
+		h, v := c.roadAxes(x, y)
+		rh, rv := c.railAxes(x+d[0], y+d[1])
+		if (h && rv && !rh) || (v && rh && !rv) || (h && v) {
+			continue // the road crosses here
+		}
+		return CityTile{Kind: CFence}
+	}
+	return t
+}
+
+// railAt reports whether a rail line runs over tile (x, y).
+func (c *CityPlan) railAt(x, y int64) bool {
+	i, j, u, v := c.grid(x, y)
+	return c.sb(i, j).rails[[2]int64{u, v}]
+}
+
+// railAxes reports which ways the line runs at a rail tile.
+func (c *CityPlan) railAxes(x, y int64) (h, v bool) {
+	return c.railAt(x-1, y) || c.railAt(x+1, y), c.railAt(x, y-1) || c.railAt(x, y+1)
+}
+
+// roadAxes reports which ways a road runs at tile (x, y): east-west (h),
+// north-south (v), both at junctions, neither off the roads.
+func (c *CityPlan) roadAxes(x, y int64) (h, v bool) {
+	i, j, u, w := c.grid(x, y)
+	if u < arterial || w < arterial {
+		return w < arterial, u < arterial
+	}
+	sb := c.sb(i, j)
+	if sb.style == sbOut || sb.style == sbPark || sb.style == sbStation || sb.style == sbSquare {
+		return false, false
+	}
+	p, q := u-arterial, w-arterial
+	inCol, inRow := false, false
+	for _, sp := range sb.cols {
+		inCol = inCol || (p >= sp.at && p < sp.at+sp.size)
+	}
+	for _, sp := range sb.rows {
+		inRow = inRow || (q >= sp.at && q < sp.at+sp.size)
+	}
+	return !inRow, !inCol // a minor street between rows runs east-west
+}
+
+// onPlaza reports whether tile (x, y) is inside the station's or the
+// square's superblock.
+func (c *CityPlan) onPlaza(x, y int64) bool {
+	i, j, u, v := c.grid(x, y)
+	st := c.sb(i, j).style
+	return (st == sbStation || st == sbSquare) && u >= arterial && v >= arterial
+}
+
+// base is the city's tile before railways are fenced off.
+func (c *CityPlan) base(x, y int64) CityTile {
 	i, j, u, v := c.grid(x, y)
 	vert, hor := u < arterial, v < arterial
 	if vert || hor {
@@ -521,7 +595,10 @@ func (c *CityPlan) block(i, j int64, sb *superblock, col, row, bu, bv, bw, bh in
 	if edge != 0 {
 		t := CityTile{Kind: CWalk, Edge: edge}
 		switch {
-		case edge == 1|8 || edge == 1|2 || edge == 4|8 || edge == 4|2:
+		case edge == 1|8 || edge == 1|2:
+			// Lamps on the top corners only: at the bottom corners they
+			// could shut the row of doors in, should a railway fence take
+			// the street below.
 			if sb.p.lamps {
 				t.Deco = DLamp
 			}
@@ -590,9 +667,12 @@ func (c *CityPlan) plots(i, j int64, sb *superblock, col, row, iw, ih int64) []p
 	return ps
 }
 
+// railFree reports whether a building's rectangle of a superblock keeps
+// at least a tile away from rail lines (room for the fence), and its front
+// (the sidewalk below) too, so the door doesn't open onto the fence.
 func (c *CityPlan) railFree(sb *superblock, x, y, w, h int64) bool {
-	for v := y; v < y+h; v++ {
-		for u := x; u < x+w; u++ {
+	for v := y - 1; v <= y+h+1; v++ {
+		for u := x - 1; u <= x+w; u++ {
 			if sb.rails[[2]int64{u, v}] {
 				return false
 			}

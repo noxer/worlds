@@ -14,13 +14,16 @@ Row 3 (48-58): trains. Outside, seen from above: "train car h", "train car v",
 Inside a carriage: "train floor", "train wall", "train window" (glass left
 transparent: the game shows the world passing behind it), "train seat",
 "train door".
+Row 4 (64-79): a railway fence by which sides it connects to ("fence <mask>",
+N=1, E=2, S=4, W=8): posts and two rails, transparent round it (deco layer).
+Row 5 (80): "ballast", the gravel bed of tracks in towns.
 Deep water lives in water.png."""
 import json, math, sys
 from PIL import Image, ImageDraw
 battle, out, tsj = sys.argv[1], sys.argv[2], sys.argv[3]
 src = Image.open(battle).convert("RGBA")
 def tile(i): return src.crop((i%18*16, i//18*16, i%18*16+16, i//18*16+16))
-sheet = Image.new("RGBA", (16*16, 16*4), (0, 0, 0, 0))
+sheet = Image.new("RGBA", (16*16, 16*6), (0, 0, 0, 0))
 INK = (43, 29, 35, 255)
 def bike(ox, frame, accent, deck=False):
     d = ImageDraw.Draw(sheet)
@@ -250,6 +253,36 @@ def door():
     return t
 for k, img in enumerate((floor(), wall(), window(), seat(), door())):
     sheet.alpha_composite(img, (16 * (5 + k), 48))
+# --- railway fence and ballast ---------------------------------------------
+POST, BAR, BAR_HI = (86, 84, 98, 255), (128, 128, 144, 255), (176, 178, 194, 255)
+def fence(mask):
+    t = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(t)
+    def bar(x0, y0, x1, y1):
+        d.rectangle((x0, y0, x1, y1), fill=INK)
+        if x1 - x0 > y1 - y0:
+            d.line((x0, y0 + 1, x1, y0 + 1), fill=BAR_HI)
+        else:
+            d.line((x0 + 1, y0, x0 + 1, y1), fill=BAR_HI)
+    for y in (4, 9):  # two rails each way
+        if mask & E: bar(8, y, 15, y + 2)
+        if mask & W: bar(0, y, 7, y + 2)
+    for x in (5, 9):
+        if mask & N: bar(x, 0, x + 2, 7)
+        if mask & S: bar(x, 8, x + 2, 15)
+    d.rectangle((5, 3, 10, 13), fill=INK)   # the post
+    d.rectangle((6, 4, 9, 12), fill=POST)
+    d.rectangle((6, 4, 9, 5), fill=BAR)
+    return t
+for m in range(16):
+    sheet.alpha_composite(fence(m), (16 * m, 64))
+import random
+rnd = random.Random(7)
+ballast = Image.new("RGBA", (16, 16), (138, 128, 116, 255))
+for _ in range(70):
+    x, y = rnd.randrange(16), rnd.randrange(16)
+    ballast.putpixel((x, y), rnd.choice([(110, 102, 94, 255), (164, 154, 140, 255), (124, 114, 104, 255)]))
+sheet.alpha_composite(ballast, (0, 80))
 sheet.save(out)
 
 def prop(name, typ, value):
@@ -266,9 +299,11 @@ for k, name in enumerate(("train car h", "train car v", "train loco e", "train l
     if name in ("train wall", "train window", "train seat", "train door"):
         ps.append(prop("solid", "bool", True))
     tiles.append({"id": 48 + k, "properties": ps})
+tiles += [{"id": 64 + m, "properties": [prop("name", "string", f"fence {m}"), prop("solid", "bool", True)]} for m in range(16)]
+tiles.append({"id": 80, "properties": [prop("name", "string", "ballast")]})
 ts = {"type": "tileset", "version": "1.10", "tiledversion": "1.11.0", "name": "worlds",
-      "tilewidth": 16, "tileheight": 16, "tilecount": 64, "columns": 16,
-      "image": "../tiles/worlds.png", "imagewidth": 256, "imageheight": 64,
+      "tilewidth": 16, "tileheight": 16, "tilecount": 96, "columns": 16,
+      "image": "../tiles/worlds.png", "imagewidth": 256, "imageheight": 96,
       "margin": 0, "spacing": 0, "tiles": tiles}
 with open(tsj, "w") as f:
     f.write(json.dumps(ts, indent=1) + "\n")

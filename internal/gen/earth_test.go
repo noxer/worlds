@@ -429,20 +429,24 @@ func TestCityTiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	w, in := c.World, c.Infra
-	var plan *infra.CityPlan
+	var plans []*infra.CityPlan
 	for _, s := range in.Near(0, 193770, 140000, infra.City) {
 		for _, p := range in.CitiesIn(s.X, s.Y, 1, 1) {
-			if p.S.ID == s.ID {
-				plan = p
+			if p.S.ID == s.ID && len(plans) < 2 {
+				plans = append(plans, p)
 			}
 		}
-		if plan != nil {
-			break
-		}
 	}
-	if plan == nil {
-		t.Fatal("no city")
+	if len(plans) < 2 {
+		t.Fatal("not enough cities")
 	}
+	for _, plan := range plans {
+		checkCityDoors(t, w, plan)
+	}
+}
+
+func checkCityDoors(t *testing.T, w *world.World, plan *infra.CityPlan) {
+	t.Helper()
 	s := plan.S
 	const half = 80
 	walkable := func(p world.Pos) bool { return !w.Solid(p) && w.Terrain(p) == world.Land }

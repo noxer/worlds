@@ -34,6 +34,7 @@ const (
 	Street                  // a way (path or road) through the village
 	Lane                    // a village lane from the square (dirt, like paths)
 	Track                   // a rail line through the village
+	Fence                   // the fence beside it
 	Square                  // the village square (cobbles)
 	Foot                    // a footpath from a front step to a street (cobbles)
 	Built                   // covered by a prefab or a lamp
@@ -158,6 +159,21 @@ func (in *Infra) layout(s Settlement) *Site {
 			site.Cells[k] = Street
 		}
 	})
+	// Rail lines are fenced off where they pass through.
+	for j := int64(0); j < n; j++ {
+		for i := int64(0); i < n; i++ {
+			if *at(i, j) != Track {
+				continue
+			}
+			for dj := int64(-1); dj <= 1; dj++ {
+				for di := int64(-1); di <= 1; di++ {
+					if inside(i+di, j+dj) && *at(i+di, j+dj) == Open {
+						*at(i+di, j+dj) = Fence
+					}
+				}
+			}
+		}
+	}
 	r := &rng{s: hash(in.seed^salt, 0x73697465, int64(s.ID.Tier), s.ID.CX, s.ID.CY)} // "site"
 
 	// 3. The square at the centre: cobbles, the well, a lamp on each corner.

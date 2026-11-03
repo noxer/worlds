@@ -7,7 +7,7 @@ doors (bump: train_exit); seats are signs with dialog "train_seat"; the
 import json, sys
 out = sys.argv[1]
 W, H = 14, 6
-WORLDS, DUNGEON = 1, 65
+WORLDS, DUNGEON = 1, 97
 FLOOR, WALL, WINDOW, SEAT, DOOR = 53, 54, 55, 56, 57
 ground = [FLOOR] * (W * H)
 def put(x, y, t): ground[y * W + x] = t

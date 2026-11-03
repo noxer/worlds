@@ -509,6 +509,15 @@ Arterials form one grid per city; districts vary what is inside it.
    plaza's north edge, behind the station, coming from the arterial north
    of it; the search treats the plaza as impassable and the last legs go
    round it at right angles.
+   **Railways are fenced off** from the city (`CityPlan.At` lays them over
+   the layout): track tiles become ballast and the tiles beside them a
+   railway fence (16 connection tiles of our own), wherever the line runs,
+   even along a street, which then gives way to the railway. Roads that
+   cross the line at right angles keep their asphalt (level crossings) and
+   the fence stops at their edges; the station plaza stays open for
+   boarding. Buildings keep a tile from the line, and their front step
+   another, so no door opens onto the fence; street lamps stand only on
+   blocks' top corners, so a fence below can't shut a row of doors in.
 7. In chunks, city tiles replace the terrain, paths and roads (rail stays,
    over the asphalt); wild trees give way to the city's own.
 
@@ -520,6 +529,8 @@ cached; hand-made settlements keep their own.
 2. Streets: the ways crossing it (paths and roads end at the centre).
 3. The square: 7×7 cobbles at the centre, the `well` prefab in the middle,
    a lamp post on each corner.
+   Rail lines through a village are fenced off the same way (open ground
+   beside the track becomes fence; paths, lanes and footpaths cross it).
 4. Lanes: 2-wide dirt lanes from the square, 30–45% of the radius long, in
    directions no way leaves it, until at least two directions have a
    street (and sometimes more).

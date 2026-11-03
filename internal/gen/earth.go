@@ -35,6 +35,8 @@ type Earth struct {
 	lamp      [2]world.Tile         // lamp post and lantern (the tile above)
 	rail      [16]world.Tile        // track by connected sides (N=1, E=2, S=4, W=8)
 	pier      [16]world.Tile        // pier by connected sides
+	fence     [16]world.Tile        // railway fence by connected sides
+	ballast   world.Tile            // a railway's bed in towns
 	urban     map[int]world.Tile    // RPG Urban tiles cities use, by index
 }
 
@@ -112,6 +114,9 @@ func NewEarth(info world.GenInfo) (world.Generator, error) {
 		if e.pier[m], err = info.Tilesets.Named("worlds", fmt.Sprintf("pier %d", m)); err != nil {
 			return nil, fmt.Errorf("earth: %w", err)
 		}
+		if e.fence[m], err = info.Tilesets.Named("worlds", fmt.Sprintf("fence %d", m)); err != nil {
+			return nil, fmt.Errorf("earth: %w", err)
+		}
 	}
 	e.urban = map[int]world.Tile{}
 	tiles := []int{urbanRoad, urbanPaved, urbanParking, urbanTree, urbanTreeTop, urbanBench, urbanLampPost, urbanLamp}
@@ -127,6 +132,9 @@ func NewEarth(info world.GenInfo) (world.Generator, error) {
 		if e.urban[i], err = info.Tilesets.Tile("rpgurban", i); err != nil {
 			return nil, fmt.Errorf("earth: %w", err)
 		}
+	}
+	if e.ballast, err = info.Tilesets.Named("worlds", "ballast"); err != nil {
+		return nil, fmt.Errorf("earth: %w", err)
 	}
 	specs, err := prefabSpecs(info.Prefabs)
 	if err != nil {
@@ -226,6 +234,7 @@ type region struct {
 	site   []infra.SiteCell
 	sites  []*infra.Site // villages overlapping the region
 	rail   []bool        // a rail line on the cell
+	fence  []bool        // the fence beside a railway in a town or village
 	city   []infra.CityTile
 	cities []*infra.CityPlan // towns and cities overlapping the region
 	pier   []uint8           // 1: a pier, 2: the land cell a pier starts from
@@ -234,6 +243,10 @@ type region struct {
 func (r *region) cityAt(x, y int) infra.CityTile {
 	x, y = min(max(x, 0), r.n-1), min(max(y, 0), r.n-1)
 	return r.city[y*r.n+x]
+}
+
+func (r *region) fenceAt(x, y int) bool {
+	return x >= 0 && y >= 0 && x < r.n && y < r.n && r.fence[y*r.n+x]
 }
 
 func (r *region) railAt(x, y int) bool {
@@ -301,7 +314,7 @@ func (e *Earth) Generate(seed uint64, b *world.ChunkBuilder) {
 			// Trees grow on land, off the ways and village buildings, and
 			// sparsely in villages; a tall one needs free land above it too.
 			free := func(dy int) bool {
-				if r.at(x, y+dy) != cLand || r.wayAt(x, y+dy) || r.railAt(x, y+dy) || r.pierAt(x, y+dy) == 1 {
+				if r.at(x, y+dy) != cLand || r.wayAt(x, y+dy) || r.railAt(x, y+dy) || r.fenceAt(x, y+dy) || r.pierAt(x, y+dy) == 1 {
 					return false
 				}
 				if r.cityAt(x, y+dy).Kind != infra.CNone {
@@ -388,6 +401,8 @@ func (e *Earth) cityTiles(b *world.ChunkBuilder, r *region) {
 				g = u(w)
 			case infra.CPaved, infra.CBuilt:
 				g = u(urbanPaved)
+			case infra.CTrack, infra.CFence:
+				g = e.ballast
 			case infra.CParking:
 				g = u(urbanParking)
 			}
@@ -435,12 +450,16 @@ func (e *Earth) cityTiles(b *world.ChunkBuilder, r *region) {
 	}
 }
 
-// railsAndPiers draws track (deco layer, over whatever ground) and piers
-// (ground layer, over the water).
+// railsAndPiers draws track (deco layer, over whatever ground), the fences
+// beside it in towns and villages, and piers (ground layer, over the
+// water).
 func (e *Earth) railsAndPiers(b *world.ChunkBuilder, r *region) {
 	for ly := 0; ly < world.ChunkSize; ly++ {
 		for lx := 0; lx < world.ChunkSize; lx++ {
 			x, y := margin+lx, margin+ly
+			if r.fenceAt(x, y) && !r.railAt(x, y) {
+				b.Set(world.LayerDeco, lx, ly, e.fence[mask4(x, y, r.fenceAt)])
+			}
 			if r.railAt(x, y) {
 				b.Set(world.LayerDeco, lx, ly, e.rail[mask4(x, y, r.railAt)])
 			}
@@ -523,7 +542,7 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 	r := &region{
 		x0: b.CX*world.ChunkSize - margin, y0: b.CY*world.ChunkSize - margin, n: n,
 		class: make([]uint8, n*n), fixed: make([]bool, n*n), raw: make([]bool, n*n), way: make([]uint8, n*n),
-		site: make([]infra.SiteCell, n*n), rail: make([]bool, n*n), pier: make([]uint8, n*n),
+		site: make([]infra.SiteCell, n*n), rail: make([]bool, n*n), pier: make([]uint8, n*n), fence: make([]bool, n*n),
 		city: make([]infra.CityTile, n*n),
 	}
 	for y := 0; y < n; y++ {
@@ -617,6 +636,9 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 						r.class[i] = cLand
 					case infra.Built, infra.Yard:
 						r.class[i] = cLand
+					case infra.Fence:
+						r.class[i] = cLand
+						r.fence[i] = true
 					}
 				}
 			}
@@ -638,6 +660,7 @@ func (e *Earth) classify(seed uint64, b *world.ChunkBuilder) *region {
 						r.city[i] = t
 						r.class[i] = cLand
 						r.way[i] = 0
+						r.fence[i] = t.Kind == infra.CFence
 					}
 				}
 			}
