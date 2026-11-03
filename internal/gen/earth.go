@@ -114,7 +114,7 @@ func NewEarth(info world.GenInfo) (world.Generator, error) {
 		}
 	}
 	e.urban = map[int]world.Tile{}
-	for _, i := range append(append([]int{urbanRoad, urbanLineH, urbanLineV, urbanPaved, urbanTree, urbanBench, urbanLampPost, urbanLamp},
+	for _, i := range append(append([]int{urbanRoad, urbanLineH, urbanLineV, urbanPaved, urbanParking, urbanTree, urbanBench, urbanLampPost, urbanLamp},
 		urbanCrossH[:]...), urbanCrossV[:]...) {
 		if e.urban[i], err = info.Tilesets.Tile("rpgurban", i); err != nil {
 			return nil, fmt.Errorf("earth: %w", err)
@@ -161,6 +161,7 @@ func prefabSpecs(ps []*world.Prefab) ([]infra.PrefabSpec, error) {
 	var out []infra.PrefabSpec
 	for _, p := range ps {
 		s := infra.PrefabSpec{Name: string(p.Name), Kind: p.Props.String("kind"), Style: p.Props.String("style"),
+			Material: p.Props.String("material"), Shop: p.Props.Bool("shop"),
 			W: p.W, H: p.H, Weight: p.Props.Int("weight", 1)}
 		doorRow := p.H - 2 // a house's front step is its bottom row
 		if s.Kind == "building" {
@@ -186,9 +187,9 @@ func prefabSpecs(ps []*world.Prefab) ([]infra.PrefabSpec, error) {
 			}
 			if s.Kind == "building" {
 				switch s.Style {
-				case "downtown", "residential", "suburb", "station":
+				case "downtown", "residential", "suburb", "industrial", "station":
 				default:
-					return nil, fmt.Errorf("prefab %s: style must be downtown, residential, suburb or station, not %q", p.Name, s.Style)
+					return nil, fmt.Errorf("prefab %s: style must be downtown, residential, suburb, industrial or station, not %q", p.Name, s.Style)
 				}
 			}
 		case "garden", "well":
@@ -344,6 +345,7 @@ var (
 
 const (
 	urbanRoad, urbanLineH, urbanLineV, urbanPaved   = 406, 433, 462, 36
+	urbanParking                                    = 442
 	urbanTree, urbanBench, urbanLampPost, urbanLamp = 260, 270, 192, 165
 )
 
@@ -380,6 +382,8 @@ func (e *Earth) cityTiles(b *world.ChunkBuilder, r *region) {
 				g = u(w)
 			case infra.CPaved, infra.CBuilt:
 				g = u(urbanPaved)
+			case infra.CParking:
+				g = u(urbanParking)
 			}
 			if !g.Empty() {
 				b.Set(world.LayerGround, lx, ly, g)

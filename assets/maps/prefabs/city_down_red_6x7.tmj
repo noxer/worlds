@@ -24,6 +24,16 @@
    "value": "downtown"
   },
   {
+   "name": "material",
+   "type": "string",
+   "value": "red"
+  },
+  {
+   "name": "shop",
+   "type": "bool",
+   "value": false
+  },
+  {
    "name": "weight",
    "type": "int",
    "value": 2

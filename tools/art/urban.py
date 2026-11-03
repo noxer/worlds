@@ -4,7 +4,8 @@ building prefabs:
 Buildings are a flat roof (seen from above) on a brick facade; the bottom
 row of the facade has the door, which opens onto the sidewalk below.
 Prefab map properties: kind "building", style (downtown | residential |
-suburb | station), weight. The door object is in the bottom row."""
+suburb | industrial | station), material (red | orange), weight. The door
+object is in the bottom row."""
 import json, os, sys
 
 tsj, out = sys.argv[1], sys.argv[2]
@@ -51,7 +52,7 @@ def row3(t, w):
     l, m, r = t
     return [l] + [m] * (w - 2) + [r]
 
-def write(name, w, h, ground, deco, door, style, weight, bump):
+def write(name, w, h, ground, deco, door, style, weight, bump, material, shop=False):
     def layer(i, lname, data, extra=None):
         d = {"id": i, "name": lname, "type": "tilelayer", "visible": True, "opacity": 1,
              "x": 0, "y": 0, "width": w, "height": h,
@@ -68,6 +69,8 @@ def write(name, w, h, ground, deco, door, style, weight, bump):
          "width": w, "height": h, "tilewidth": 16, "tileheight": 16, "nextlayerid": 5, "nextobjectid": 2,
          "properties": [{"name": "kind", "type": "string", "value": "building"},
                         {"name": "style", "type": "string", "value": style},
+                        {"name": "material", "type": "string", "value": material},
+                        {"name": "shop", "type": "bool", "value": shop},
                         {"name": "weight", "type": "int", "value": weight}],
          "tilesets": [{"firstgid": URBAN, "source": "../../tilesets/rpgurban.tsj"}],
          "layers": [layer(1, "ground", ground), layer(2, "deco", deco),
@@ -101,6 +104,11 @@ def building(name, style, wall, roof, w, hr, hf, door, kind="plain", weight=1):
                 put(x, y, 328 if x == 0 else 330 if x == w - 1 else 329)
             elif kind == "station" and bottom:
                 put(x, y, 386 if x == 0 else 388 if x == w - 1 else 387)
+            elif kind == "warehouse":
+                if bottom and x in (2, w - 3):
+                    put(x, y, 339)  # loading bays
+                elif not bottom and y == hr and x % 3 == 1:
+                    put(x, y, 390)  # a few wide windows high up
             elif (x + y) % 2 == 1 or (kind == "tall" and x % 2 == 1):
                 put(x, y, 364 if not bottom else 363)
     if kind == "shop":
@@ -110,9 +118,11 @@ def building(name, style, wall, roof, w, hr, hf, door, kind="plain", weight=1):
         put(door, h - 1, 285)
         put(door + 1, h - 1, 285)
         bump = "station_closed"
+    elif kind == "warehouse":
+        put(door, h - 1, 283)
     else:
         put(door, h - 1, 283 if style == "suburb" else 284 if w >= 6 else 282)
-    write(name, w, h, ground, deco, door, style, weight, bump)
+    write(name, w, h, ground, deco, door, style, weight, bump, wall, kind == "shop")
 
 n = 0
 for wall, roof in (("red", "tan"), ("orange", "grey")):
@@ -124,4 +134,6 @@ for wall, roof in (("red", "tan"), ("orange", "grey")):
     building(f"city_shop_{wall}_5", "residential", wall, roof, 5, 2, 3, 2, "shop", 1)
     for w in (4, 5):
         building(f"city_sub_{wall}_{w}", "suburb", wall, roof, w, 2, 2, w // 2, "plain", 1)
+    for w in (8, 10):
+        building(f"city_ind_{wall}_{w}", "industrial", wall, "grey", w, 2, 3, w // 2, "warehouse", 2 if wall == "orange" else 1)
 building("city_station", "station", "orange", "grey", 12, 3, 4, 5, "station", 1)

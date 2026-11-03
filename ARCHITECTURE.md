@@ -451,31 +451,45 @@ blocks overlapping the chunk, with the autotiler for junctions and kerbs.
 metropolises are laid out on a grid of superblocks every A tiles (36, 40,
 44 by tier) around their centre, evaluated tile by tile, so a chunk only
 looks at the superblocks it overlaps (each worked out once and cached).
-This is the first version of the plan above: one grid per city instead of
-districts with their own grids.
+Arterials form one grid per city; districts vary what is inside it.
 1. **Arterials:** 3 lanes between superblocks, with a centre line and
    crosswalks next to the junctions, where at least one neighbouring
    superblock belongs to the city.
 2. **Superblocks** belong to the city if their centre is within the radius
-   and their centre and corners are dry and away from hand-made patches.
-   Style by density (100% at the centre, 0% at the radius): downtown (over
-   55%, cities and metropolises), residential (over 25%), suburb; one in
-   nine is a park (lawn, trees, crossing paths, benches). The centre one is
-   the plaza: with the station on its north side for cities, a square for
-   towns; rows of trees, benches and lamps.
-3. **Blocks:** a minor street (2 wide) down the middle and across, rows of
-   blocks 10, 9 or 8 tall (downtown, residential, suburb). Each block has a
+   in that direction (78–100% of it, varying smoothly over 16 sectors, so
+   the outline is irregular) and their centre and corners are dry and away
+   from hand-made patches. The centre one is the plaza: with the station on
+   its north side for cities, a square for towns; rows of trees, benches
+   and lamps.
+3. **Districts:** superblocks belong to the nearest seed of a jittered grid
+   of 3×3 superblocks; the seed's density (100% at the centre, 0% at the
+   radius) and a roll give the district's character:
+   - *core* (cities, dense): downtown towers, paved yards, lamps, one
+     material favoured;
+   - *old quarter*: small blocks (8 tall) in 3 columns, terraces without
+     gaps, four times the shops, red brick, paved yards;
+   - *residential grid*: blocks 9 tall in 2 columns, gardens, sidewalk
+     trees;
+   - *garden suburb*: suburban houses with wide gaps, trees in the yards,
+     1 or 2 columns;
+   - *industrial* (cities): warehouses with loading bays, paved yards with a
+     parking strip at the back;
+   - *green belt*: one in three superblocks a park (elsewhere one in 9, in
+     the core one in 14).
+   Within the character, density still picks downtown, residential or
+   suburb, and block heights vary by a row.
+4. **Blocks:** minor streets (2 wide) cut a superblock into 1–3 columns
+   (at least 12 tiles wide) and as many rows as fit. Each block has a
    kerbed sidewalk round it (the RPG Urban 3×3 set by kerb sides) and a row
-   of buildings along its bottom, centred, facing the sidewalk below;
-   behind them a paved (downtown) or green yard. Lamps at downtown block
-   corners, trees on residential sidewalks.
-4. **Buildings** are prefabs of kind `building` with a `style`, picked by
-   weight to fit; none on a rail line.
-5. **Rail** keeps out of station plazas: lines end at a buffer stop on the
+   of buildings along its bottom, centred, facing the sidewalk below.
+5. **Buildings** are prefabs of kind `building` with a `style`, `material`
+   and `shop` flag, picked by weight to fit (the district's material three
+   times as likely, shops by its factor); none on a rail line.
+6. **Rail** keeps out of station plazas: lines end at a buffer stop on the
    plaza's north edge, behind the station, coming from the arterial north
    of it; the search treats the plaza as impassable and the last legs go
    round it at right angles.
-6. In chunks, city tiles replace the terrain, paths and roads (rail stays,
+7. In chunks, city tiles replace the terrain, paths and roads (rail stays,
    over the asphalt); wild trees give way to the city's own.
 
 **Villages (implemented, `infra/site.go`).** A generated village's layout
@@ -863,8 +877,9 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       streets, blocks with sidewalks, buildings from RPG Urban prefabs in
       four styles, parks, the station plaza where rail lines end; tests for
       the layout (buildings match their tiles, doors open onto sidewalks)
-      and the doors of a real city reachable from its plaza. Still open:
-      districts with their own grids, city transit (with step 6).
+      and the doors of a real city reachable from its plaza. Then districts
+      (core, old quarter, grid, garden suburb, industrial, green belt) and
+      a noisy outline. Still open: city transit (with step 6).
 6. Public transport on the networks: routes, stops and timetables; dynamic
    warps; interiors as instances; window view; taxis.
 

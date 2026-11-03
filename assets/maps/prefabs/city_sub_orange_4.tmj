@@ -24,6 +24,16 @@
    "value": "suburb"
   },
   {
+   "name": "material",
+   "type": "string",
+   "value": "orange"
+  },
+  {
+   "name": "shop",
+   "type": "bool",
+   "value": false
+  },
+  {
    "name": "weight",
    "type": "int",
    "value": 1

@@ -24,6 +24,16 @@
    "value": "residential"
   },
   {
+   "name": "material",
+   "type": "string",
+   "value": "orange"
+  },
+  {
+   "name": "shop",
+   "type": "bool",
+   "value": true
+  },
+  {
    "name": "weight",
    "type": "int",
    "value": 1

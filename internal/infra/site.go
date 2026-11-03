@@ -13,12 +13,15 @@ import (
 // PrefabSpec describes a prefab for layouts. Houses have a door; the cell
 // below it, in the prefab's bottom row, is the front step.
 type PrefabSpec struct {
-	Name   string
-	Kind   string // "house", "garden", "well" (villages) or "building" (cities)
-	Style  string // buildings: "downtown", "residential", "suburb" or "station"
-	W, H   int64
-	Weight int
-	DoorX  int64 // column of the door (houses)
+	Name  string
+	Kind  string // "house", "garden", "well" (villages) or "building" (cities)
+	Style string // buildings: "downtown", "residential", "suburb", "industrial" or "station"
+	// Material ("red", "orange") and Shop let districts favour some buildings.
+	Material string
+	Shop     bool
+	W, H     int64
+	Weight   int
+	DoorX    int64 // column of the door (houses)
 }
 
 // Cell kinds of a site.

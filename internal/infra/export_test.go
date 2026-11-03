@@ -14,3 +14,6 @@ func (in *Infra) BlockReady(x, y int64) bool {
 	return ok
 }
 func (in *Infra) WayOf(e Edge) *Way { return in.way(e, nil) }
+
+func (c *CityPlan) District(i, j int64) uint8        { return c.district(i, j) }
+func (c *CityPlan) RadiusTowards(dx, dy int64) int64 { return c.radiusTowards(dx, dy) }

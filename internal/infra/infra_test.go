@@ -476,3 +476,45 @@ func TestCityLayout(t *testing.T) {
 		t.Errorf("%d stations, %d buildings near the centre", stations, n)
 	}
 }
+
+// TestDistricts: a big city has districts of several characters, and its
+// outline isn't a circle.
+func TestDistricts(t *testing.T) {
+	c, err := content.Load(assets.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plan *infra.CityPlan
+	for _, s := range c.Infra.Near(0, 193770, 140000, infra.City) {
+		if ps := c.Infra.CitiesIn(s.X, s.Y, 1, 1); len(ps) > 0 && s.ID.Tier >= infra.City {
+			for _, p := range ps {
+				if p.S.ID == s.ID {
+					plan = p
+				}
+			}
+			break
+		}
+	}
+	if plan == nil {
+		t.Fatal("no city")
+	}
+	kinds := map[uint8]int{}
+	for j := int64(-12); j <= 12; j++ {
+		for i := int64(-12); i <= 12; i++ {
+			kinds[plan.District(i, j)]++
+		}
+	}
+	if len(kinds) < 4 {
+		t.Errorf("only %d district characters: %v", len(kinds), kinds)
+	}
+	lo, hi := plan.S.Radius, int64(0)
+	for k := int64(0); k < 64; k++ {
+		// Directions round the circle, as integer offsets.
+		dx, dy := []int64{1000, 707, 0, -707, -1000, -707, 0, 707}[k%8]+k, []int64{0, 707, 1000, 707, 0, -707, -1000, -707}[k%8]
+		r := plan.RadiusTowards(dx, dy)
+		lo, hi = min(lo, r), max(hi, r)
+	}
+	if hi-lo < plan.S.Radius/20 || hi > plan.S.Radius || lo < plan.S.Radius*3/4 {
+		t.Errorf("radius varies from %d to %d (radius %d)", lo, hi, plan.S.Radius)
+	}
+}
