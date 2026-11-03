@@ -650,6 +650,23 @@ func (c *CityPlan) Buildings(x, y, w, h int64) []Building {
 	return out
 }
 
+// StationFront returns the tile in front of a city's station door, where
+// arriving passengers come out.
+func (in *Infra) StationFront(s Settlement) (Point, bool) {
+	if s.Fixed != "" || s.ID.Tier < City {
+		return Point{}, false
+	}
+	a := cityPeriod(s.ID.Tier)
+	S := a - arterial
+	st, ok := in.prefabStyle("station", S, S)
+	if !ok {
+		return Point{}, false
+	}
+	pf := in.prefabs[st]
+	x0, y0 := s.X-a/2+arterial+S/2-pf.W/2, s.Y-a/2+arterial+1 // the station's top-left
+	return in.norm(x0+pf.DoorX, y0+pf.H), true
+}
+
 // pickStyle picks a building of the superblock's style that fits w x h,
 // by weight, favouring its material and (by its factor) shops.
 func (in *Infra) pickStyle(r *rng, sp sbParams, w, h int64) (int, bool) {

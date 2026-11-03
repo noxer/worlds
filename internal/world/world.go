@@ -102,6 +102,14 @@ type World struct {
 // Tilesets returns the tileset registry.
 func (w *World) Tilesets() *Tilesets { return w.tilesets }
 
+// TemplateProps returns the map properties of a detail-map template.
+func (w *World) TemplateProps(id MapID) Props {
+	if t := w.templates[id]; t != nil {
+		return t.src.props
+	}
+	return nil
+}
+
 // Templates returns the ids of all detail-map templates, sorted.
 func (w *World) Templates() []MapID {
 	ids := make([]MapID, 0, len(w.templates))

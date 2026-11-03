@@ -5,11 +5,11 @@
  "name": "worlds",
  "tilewidth": 16,
  "tileheight": 16,
- "tilecount": 48,
+ "tilecount": 64,
  "columns": 16,
  "image": "../tiles/worlds.png",
  "imagewidth": 256,
- "imageheight": 48,
+ "imageheight": 64,
  "margin": 0,
  "spacing": 0,
  "tiles": [
@@ -360,6 +360,126 @@
      "name": "name",
      "type": "string",
      "value": "pier 15"
+    }
+   ]
+  },
+  {
+   "id": 48,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train car h"
+    }
+   ]
+  },
+  {
+   "id": 49,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train car v"
+    }
+   ]
+  },
+  {
+   "id": 50,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train loco e"
+    }
+   ]
+  },
+  {
+   "id": 51,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train loco s"
+    }
+   ]
+  },
+  {
+   "id": 52,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train loco n"
+    }
+   ]
+  },
+  {
+   "id": 53,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train floor"
+    }
+   ]
+  },
+  {
+   "id": 54,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train wall"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 55,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train window"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 56,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train seat"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 57,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train door"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
     }
    ]
   }

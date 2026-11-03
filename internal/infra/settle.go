@@ -111,6 +111,8 @@ type Fixed struct {
 	// Ends are the gates where routes start (objects of type "road_end");
 	// without any, routes start at the centre.
 	Ends []Gate
+	// Title is its name for people (patch property "title").
+	Title string
 }
 
 // Gate is where routes enter a hand-made settlement: a tile on the border
@@ -137,7 +139,8 @@ func FixedFrom(patches []world.PatchInfo) ([]Fixed, error) {
 		if err != nil {
 			return nil, fmt.Errorf("patch %s: %w", p.Name, err)
 		}
-		f := Fixed{Name: string(p.Name), Tier: t, X: p.X + p.W/2, Y: p.Y + p.H/2, Radius: max(p.W, p.H) / 2}
+		f := Fixed{Name: string(p.Name), Tier: t, X: p.X + p.W/2, Y: p.Y + p.H/2, Radius: max(p.W, p.H) / 2,
+			Title: p.Props.String("title")}
 		for _, o := range p.Objects {
 			if o.Type != "road_end" {
 				continue
@@ -184,6 +187,7 @@ type Infra struct {
 	fixed     []Settlement
 	fixedAt   map[ID]Settlement
 	ends      map[ID][]Gate // gates of hand-made settlements
+	titles    map[ID]string // names of hand-made settlements
 	avoid     []Rect
 	prefabs   []PrefabSpec
 
@@ -235,6 +239,7 @@ func New(cfg Config) (*Infra, error) {
 		seed: cfg.Seed, w: cfg.W, h: cfg.H, relief: cfg.Relief,
 		fixedAt: map[ID]Settlement{},
 		ends:    map[ID][]Gate{},
+		titles:  map[ID]string{},
 		avoid:   cfg.Avoid,
 		prefabs: cfg.Prefabs,
 		sites:   map[ID]*Site{},
@@ -256,6 +261,9 @@ func New(cfg Config) (*Infra, error) {
 		s.Coastal = in.coastal(x, y, f.Radius)
 		in.fixedAt[id] = s
 		in.fixed = append(in.fixed, s)
+		if f.Title != "" {
+			in.titles[id] = f.Title
+		}
 		for _, g := range f.Ends {
 			g.X, g.Y = geom.Mod(g.X, cfg.W), geom.Mod(g.Y, cfg.H)
 			in.ends[id] = append(in.ends[id], g)

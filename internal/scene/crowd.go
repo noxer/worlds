@@ -216,6 +216,9 @@ func (e *Explore) debugTravel() {
 				if tiers[k] == infra.Village {
 					dest.Y = s.Y + 4 // just below the well
 				}
+				if f, ok := e.infra.StationFront(s); ok && tiers[k] == infra.City {
+					dest = world.Pos{Map: world.Main, X: f.X, Y: f.Y} // at the station's door
+				}
 			}
 		}
 	}

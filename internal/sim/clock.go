@@ -25,6 +25,13 @@ func NewClock(day int64, hour, minute int) Clock {
 // Tick advances the clock by one game tick.
 func (c *Clock) Tick() { c.ticks++ }
 
+// AdvanceTicks moves the clock forward by a number of ticks.
+func (c *Clock) AdvanceTicks(ticks int64) {
+	if ticks > 0 {
+		c.ticks += ticks
+	}
+}
+
 // Advance moves the clock forward by a number of game minutes.
 func (c *Clock) Advance(minutes int) { c.ticks += int64(minutes) * TicksPerMinute }
 

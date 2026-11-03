@@ -368,7 +368,7 @@
       {
        "name": "bump",
        "type": "string",
-       "value": "station_closed"
+       "value": "station"
       },
       {
        "name": "solid",

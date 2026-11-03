@@ -104,6 +104,10 @@ func (d *DialogBox) choiceRects() []image.Rectangle {
 // Update implements Scene.
 func (d *DialogBox) Update(ctx *Context) {
 	in := ctx.Input
+	if d.r.Done() {
+		d.after(ctx)
+		return
+	}
 	d.layout(ctx)
 	if d.shown < d.pageLen() {
 		d.shown += charsPerTick

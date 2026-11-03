@@ -9,13 +9,18 @@ buffer stops; transparent around the track, so they go on the deco layer
 over any ground (a rail over a path is a level crossing).
 Row 2 (32-47): a wooden pier, by which sides continue the pier (named
 "pier <mask>"), outlined on the open sides; it covers the water.
+Row 3 (48-58): trains. Outside, seen from above: "train car h", "train car v",
+"train loco e", "train loco s", "train loco n" (west: "loco e" mirrored).
+Inside a carriage: "train floor", "train wall", "train window" (glass left
+transparent: the game shows the world passing behind it), "train seat",
+"train door".
 Deep water lives in water.png."""
 import json, math, sys
 from PIL import Image, ImageDraw
 battle, out, tsj = sys.argv[1], sys.argv[2], sys.argv[3]
 src = Image.open(battle).convert("RGBA")
 def tile(i): return src.crop((i%18*16, i//18*16, i%18*16+16, i//18*16+16))
-sheet = Image.new("RGBA", (16*16, 16*3), (0, 0, 0, 0))
+sheet = Image.new("RGBA", (16*16, 16*4), (0, 0, 0, 0))
 INK = (43, 29, 35, 255)
 def bike(ox, frame, accent, deck=False):
     d = ImageDraw.Draw(sheet)
@@ -175,6 +180,76 @@ def pier_tile(mask):
 for m in range(16):
     sheet.alpha_composite(rail_tile(m), (16 * m, 16))
     sheet.alpha_composite(pier_tile(m), (16 * m, 32))
+# --- trains ---------------------------------------------------------------
+ROOF, ROOF_HI, ROOF_DARK = (196, 72, 56, 255), (230, 110, 84, 255), (150, 50, 44, 255)
+LOCO, LOCO_HI = (58, 96, 140, 255), (92, 136, 186, 255)
+GLASS_T = (150, 210, 236, 255)
+
+def car_h(loco=False):
+    t = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(t)
+    body, hi = (LOCO, LOCO_HI) if loco else (ROOF, ROOF_HI)
+    right = 14 if loco else 15
+    d.rectangle((0, 2, right, 13), fill=INK)
+    d.rectangle((1, 3, right - 1, 12), fill=body)
+    d.rectangle((1, 3, right - 1, 4), fill=hi)
+    if loco:  # rounded nose and cab windows at the front (east)
+        d.rectangle((right, 4, 15, 11), fill=INK)
+        d.rectangle((right - 3, 5, right - 1, 10), fill=GLASS_T)
+        d.rectangle((3, 6, 8, 9), fill=(40, 40, 52, 255))  # engine grille
+    else:
+        for x in (3, 7, 11):  # roof vents
+            d.rectangle((x, 7, x + 1, 8), fill=ROOF_DARK)
+        d.rectangle((0, 6, 0, 9), fill=(0, 0, 0, 0))  # coupling gaps
+        d.rectangle((15, 6, 15, 9), fill=(0, 0, 0, 0))
+    return t
+
+ch, lh = car_h(), car_h(True)
+sheet.alpha_composite(ch, (0, 48))
+sheet.alpha_composite(ch.rotate(90), (16, 48))                 # vertical car
+sheet.alpha_composite(lh, (32, 48))                            # loco facing east
+sheet.alpha_composite(lh.rotate(-90), (48, 48))                # facing south
+sheet.alpha_composite(lh.rotate(90), (64, 48))                 # facing north
+
+FLOOR, FLOOR_HI = (164, 132, 100, 255), (184, 152, 116, 255)
+WALL, WALL_HI = (112, 82, 76, 255), (140, 104, 94, 255)
+SEAT, SEAT_HI = (64, 92, 150, 255), (96, 128, 186, 255)
+def tile_at(x):
+    return (x * 16, 48)
+def floor():
+    t = Image.new("RGBA", (16, 16), FLOOR)
+    for y in range(0, 16, 4):
+        ImageDraw.Draw(t).line((0, y, 15, y), fill=FLOOR_HI)
+    return t
+def wall():
+    t = Image.new("RGBA", (16, 16), WALL)
+    d = ImageDraw.Draw(t)
+    d.rectangle((0, 0, 15, 2), fill=WALL_HI)
+    d.rectangle((0, 14, 15, 15), fill=INK)
+    return t
+def window():
+    t = wall()
+    d = ImageDraw.Draw(t)
+    d.rectangle((1, 3, 14, 12), fill=INK)
+    d.rectangle((2, 4, 13, 11), fill=(0, 0, 0, 0))  # the glass: the world shows here
+    return t
+def seat():
+    t = floor()
+    d = ImageDraw.Draw(t)
+    d.rectangle((2, 2, 13, 13), fill=INK)
+    d.rectangle((3, 3, 12, 12), fill=SEAT)
+    d.rectangle((3, 3, 12, 5), fill=SEAT_HI)
+    return t
+def door():
+    t = Image.new("RGBA", (16, 16), (150, 152, 168, 255))
+    d = ImageDraw.Draw(t)
+    d.rectangle((0, 0, 15, 15), outline=INK)
+    d.line((7, 1, 7, 14), fill=INK)
+    d.rectangle((3, 3, 5, 9), fill=GLASS_T)
+    d.rectangle((9, 3, 11, 9), fill=GLASS_T)
+    return t
+for k, img in enumerate((floor(), wall(), window(), seat(), door())):
+    sheet.alpha_composite(img, (16 * (5 + k), 48))
 sheet.save(out)
 
 def prop(name, typ, value):
@@ -185,9 +260,15 @@ tiles = [
 ]
 tiles += [{"id": 16 + m, "properties": [prop("name", "string", f"rail {m}")]} for m in range(16)]
 tiles += [{"id": 32 + m, "properties": [prop("name", "string", f"pier {m}")]} for m in range(16)]
+for k, name in enumerate(("train car h", "train car v", "train loco e", "train loco s", "train loco n",
+                          "train floor", "train wall", "train window", "train seat", "train door")):
+    ps = [prop("name", "string", name)]
+    if name in ("train wall", "train window", "train seat", "train door"):
+        ps.append(prop("solid", "bool", True))
+    tiles.append({"id": 48 + k, "properties": ps})
 ts = {"type": "tileset", "version": "1.10", "tiledversion": "1.11.0", "name": "worlds",
-      "tilewidth": 16, "tileheight": 16, "tilecount": 48, "columns": 16,
-      "image": "../tiles/worlds.png", "imagewidth": 256, "imageheight": 48,
+      "tilewidth": 16, "tileheight": 16, "tilecount": 64, "columns": 16,
+      "image": "../tiles/worlds.png", "imagewidth": 256, "imageheight": 64,
       "margin": 0, "spacing": 0, "tiles": tiles}
 with open(tsj, "w") as f:
     f.write(json.dumps(ts, indent=1) + "\n")

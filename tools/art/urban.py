@@ -117,7 +117,7 @@ def building(name, style, wall, roof, w, hr, hf, door, kind="plain", weight=1):
     elif kind == "station":
         put(door, h - 1, 285)
         put(door + 1, h - 1, 285)
-        bump = "station_closed"
+        bump = "station"
     elif kind == "warehouse":
         put(door, h - 1, 283)
     else:

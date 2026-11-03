@@ -24,6 +24,7 @@ var halfWidth = [NumNetworks]int64{Path: 18, Road: 26}
 
 // Way is a smoothed route.
 type Way struct {
+	Edge   Edge // the connection it is the route of
 	Net    Network
 	OX, OY int64      // origin: the route's first point, in tiles (normalised)
 	Pts    [][2]int64 // polyline relative to the origin, in 1/16 tile
@@ -159,6 +160,7 @@ func (in *Infra) way(e Edge, yl *yielder) *Way {
 	}
 	if r := in.routeWith(e, yl); r != nil {
 		w = in.newWay(e.Net, r)
+		w.Edge = e
 	}
 	in.mu.Lock()
 	if len(in.ways) >= routeCacheLimit {
@@ -168,6 +170,9 @@ func (in *Infra) way(e Edge, yl *yielder) *Way {
 	in.mu.Unlock()
 	return w
 }
+
+// WayOf returns the smoothed route of an edge, nil if it has none.
+func (in *Infra) WayOf(e Edge) *Way { return in.way(e, nil) }
 
 // blockCacheLimit bounds the block cache (about 50 km² of ways).
 const blockCacheLimit = 4096

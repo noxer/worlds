@@ -18,6 +18,7 @@ import (
 	"github.com/noxer/worlds/internal/input"
 	"github.com/noxer/worlds/internal/nav"
 	"github.com/noxer/worlds/internal/sim"
+	"github.com/noxer/worlds/internal/transit"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -74,10 +75,19 @@ type Explore struct {
 	clock    sim.Clock
 	home     world.Pos    // where the game started (for debug travel)
 	travel   int          // the next debug travel destination
-	infra    *infra.Infra // for the crowd; nil: nobody about
+	infra    *infra.Infra // for the crowd and trains; nil: neither
 	crowd    crowd
-	fade     int // >0 fading out, <0 fading in
-	warp     *world.Warp
+
+	// Trains (see trains.go).
+	lines         map[infra.Edge]*transit.Line
+	nearLines     []*transit.Line
+	trainCells    map[world.Pos]trainCar
+	trainTiles    map[string]int
+	ride          *ride
+	viewImg       *ebiten.Image
+	pendingNotice string // shown when the fade is over
+	fade          int    // >0 fading out, <0 fading in
+	warp          *world.Warp
 
 	// Camera: top-left pixel of the view in the coordinates of the leader's
 	// map. On the main map it is not wrapped; everything drawn is placed
@@ -113,8 +123,12 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		clock:   cfg.Clock,
 		infra:   cfg.Infra,
 		crowd:   newCrowd(),
-		signs:   map[world.Pos]string{},
-		bumps:   map[world.Pos]string{},
+
+		lines:      map[infra.Edge]*transit.Line{},
+		trainCells: map[world.Pos]trainCar{},
+		trainTiles: map[string]int{},
+		signs:      map[world.Pos]string{},
+		bumps:      map[world.Pos]string{},
 	}
 	for _, o := range e.w.Objects() {
 		switch o.Type {
@@ -176,7 +190,12 @@ func (e *Explore) npcAt(p world.Pos) *NPC {
 	return nil
 }
 
-func (e *Explore) blocked(p world.Pos) bool { return e.npcAt(p) != nil }
+func (e *Explore) blocked(p world.Pos) bool {
+	if _, ok := e.trainAt(p); ok {
+		return true
+	}
+	return e.npcAt(p) != nil
+}
 
 // mode is how the party currently travels.
 func (e *Explore) mode() nav.Mode {
@@ -260,6 +279,7 @@ func (e *Explore) Update(ctx *Context) {
 	arrived := e.party.Update()
 	e.updateNPCs()
 	e.updateCrowd()
+	e.updateTrains()
 	leader := e.party.Leader()
 	if arrived {
 		if wp := e.w.WarpAt(leader.Pos); wp != nil {
@@ -291,6 +311,9 @@ type notice struct {
 
 // bump shows the bump message of the object at p, if it has one.
 func (e *Explore) bump(p world.Pos) {
+	if e.trainBump(p) {
+		return
+	}
 	id, ok := e.bumps[p]
 	if !ok {
 		if id, ok = e.w.Bump(p); !ok || e.dialogs[id] == nil {
@@ -324,6 +347,10 @@ func (e *Explore) updateFade() {
 		return
 	}
 	e.fade++
+	if e.fade == 0 && e.pendingNotice != "" {
+		e.say(e.pendingNotice)
+		e.pendingNotice = ""
+	}
 }
 
 // control handles input and path following while the leader stands still.
@@ -524,6 +551,9 @@ func (e *Explore) followPath(ctx *Context) {
 
 // talk starts the conversation with whoever or whatever is at p.
 func (e *Explore) talk(ctx *Context, p world.Pos) {
+	if e.trainTalk(ctx, p) {
+		return
+	}
 	id := ""
 	if n := e.npcAt(p); n != nil {
 		id = n.Dialog
@@ -675,6 +705,9 @@ func (e *Explore) DrawWorld(screen *ebiten.Image, scale, offX, offY int, alpha f
 	e.camX, e.camY = int64(ix)-m, int64(iy)-m
 	mp := e.party.Leader().Pos.Map
 	e.groundImg.Fill(gfx.ColorVoid)
+	if mp.Template == trainMap {
+		e.drawWindowView(e.groundImg, alpha)
+	}
 	e.drawLayers(e.groundImg, mp, false)
 	e.overImg.Clear()
 	e.drawLayers(e.overImg, mp, true)
@@ -788,7 +821,9 @@ const (
 var colorRipple = color.RGBA{0xd8, 0xf4, 0xff, 0xff}
 
 type drawable struct {
-	a        *entity.Actor
+	a        *entity.Actor // nil for a train car: img and flip instead
+	img      *ebiten.Image
+	flip     bool
 	x, y     float64 // relative to the camera, in game pixels
 	priority int
 	swimming bool
@@ -828,6 +863,7 @@ func (e *Explore) drawActors(screen *ebiten.Image, m world.MapRef, s, offX, offY
 		}
 		add(a, len(e.party.Members)-i, vehicle) // leader on top when stacked after a warp
 	}
+	ds = append(ds, e.trainDrawables(m, alpha)...)
 	sort.SliceStable(ds, func(i, j int) bool {
 		if ds[i].y != ds[j].y {
 			return ds[i].y < ds[j].y
@@ -850,6 +886,10 @@ func (e *Explore) drawActors(screen *ebiten.Image, m world.MapRef, s, offX, offY
 		screen.DrawImage(img, op)
 	}
 	for _, d := range ds {
+		if d.a == nil {
+			sprite(d.img, d.x, d.y, d.flip)
+			continue
+		}
 		index, flip := d.a.Frame()
 		img := e.sheets.Tile(d.a.Sprite.Sheet, index)
 		switch {

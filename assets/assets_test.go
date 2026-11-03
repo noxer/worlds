@@ -56,6 +56,9 @@ func TestReachability(t *testing.T) {
 
 	var goals []world.Pos
 	for _, id := range w.Templates() {
+		if w.TemplateProps(id).String("vehicle") != "" {
+			continue // vehicle interiors are reached by boarding
+		}
 		goals = append(goals, firstWalkable(t, w, world.Pos{Map: world.Detail(id)}, 64))
 	}
 	for _, name := range []world.MapID{"town", "meadow", "isle"} { // the isle: by swimming

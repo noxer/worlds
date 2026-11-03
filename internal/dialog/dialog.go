@@ -27,10 +27,13 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// Choice is a player answer.
+// Choice is a player answer. Do names an action the game carries out when
+// it is chosen (dialogs built by the game, such as a station's timetable,
+// use it; the game decides what the names mean).
 type Choice struct {
 	Text string `yaml:"text"`
 	Next string `yaml:"next"`
+	Do   string `yaml:"do"`
 }
 
 // Node is one step of a conversation.
@@ -123,7 +126,11 @@ type Runner struct {
 	d    *Dialog
 	node *Node
 	line int
+	do   []string // actions of the choices made
 }
+
+// Actions returns the actions of the choices made so far, in order.
+func (r *Runner) Actions() []string { return r.do }
 
 // NewRunner starts a dialog at its start node.
 func NewRunner(d *Dialog) *Runner { return &Runner{d: d, node: d.Nodes[d.Start]} }
@@ -164,6 +171,9 @@ func (r *Runner) Choose(i int) {
 	cs := r.Choices()
 	if i < 0 || i >= len(cs) {
 		return
+	}
+	if cs[i].Do != "" {
+		r.do = append(r.do, cs[i].Do)
 	}
 	r.goTo(cs[i].Next)
 }

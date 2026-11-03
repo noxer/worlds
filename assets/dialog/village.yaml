@@ -21,9 +21,39 @@ shop_closed:
       lines:
         - "CLOSED  -  Back soon."
 
-station_closed:
+station:
   start: main
   nodes:
     main:
       lines:
-        - The station is closed. No trains are running yet.
+        - The station. Ask inside for the timetable.
+
+train_exit:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The doors stay closed until the next station.
+
+train_seat:
+  start: main
+  nodes:
+    main:
+      lines:
+        - A comfortable seat by the window.
+
+train_passenger_1:
+  start: main
+  nodes:
+    main:
+      speaker: Passenger
+      lines:
+        - I take this train every week. The view never gets old.
+
+train_passenger_2:
+  start: main
+  nodes:
+    main:
+      speaker: Passenger
+      lines:
+        - Wake me when we get there, would you?

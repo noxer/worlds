@@ -645,6 +645,39 @@ than a fixed tile.
 - Interior and exterior sizes are not consistent on purpose: the backdrop is
   a view, not geometry.
 
+**Trains (implemented: `transit`, `scene/trains.go`).**
+- **Lines:** every rail edge between two cities is a line with one train of
+  4 cars shuttling between the buffer stops behind the two stations. Where
+  it is comes from the clock alone (like NPC schedules): it waits 10 game
+  minutes at a platform, leaves gently (up to half a tile per tick over the
+  first 60 tiles), speeds up to about 2,000 tiles a game minute (120 km/h),
+  and arrives the same way; each line's cycle starts at an offset from the
+  seed. A 100,000-tile line takes under an hour of game time.
+- **Exterior:** the lines near the party are drawn on the main map, the
+  locomotive (heading where the train goes next) and its cars at exact
+  positions between ticks; their tiles block the way. Walking into, or
+  confirming at, a waiting train boards it.
+- **Stations:** the station door (bump `station`) names the city (cities
+  get names from the seed, `infra.Name`; hand-made places take the patch
+  property `title`). Confirm opens the timetable, built by the game: for
+  each line "boarding now", or the time of the next train with the offer to
+  wait for it (the clock moves on). Dialog choices can carry an action
+  (`do`) for this.
+- **Interior:** the `train` detail map (map property `vehicle`, written by
+  `tools/art/train_interior.py`): seats, two passengers, sliding doors
+  (`train_exit`). The doors open at the destination ("Now arriving at
+  …"), or before departure back at the start; when the train sets off
+  back, everyone is put off. Confirming at a seat offers to rest until the
+  next station. Leaving puts the party at the station's front door.
+- **Window view:** window tiles have transparent glass; behind them, the
+  main map is drawn around the train's place, the windows side by side
+  like a panorama. Near stations (150 tiles) that is the real place; at
+  speed, the real place would be a blur, so the track passes at 0.6 tiles
+  per tick instead, cutting back to the real place as the train slows into
+  the station. Chunk streaming follows the view.
+- Not yet: the `forward` mapping of the scroll direction, tickets, several
+  trains per line, ferries, buses, taxis and aircraft.
+
 **Simulation.**
 - Vehicles move in the world simulation, independent of the current scene.
 - Time passes while the party walks around inside.
@@ -898,7 +931,11 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       (core, old quarter, grid, garden suburb, industrial, green belt) and
       a noisy outline. Still open: city transit (with step 6).
 6. Public transport on the networks: routes, stops and timetables; dynamic
-   warps; interiors as instances; window view; taxis.
+   warps; interiors as instances; window view; taxis. **Trains done:**
+   timetables from the clock, trains on the map, station timetables,
+   boarding, the carriage with its window view, arrival and getting off;
+   tests for the timetable and motion along a real line and a whole
+   journey. Next: ferries on the sea lanes, buses, taxis, aircraft.
 
 ## Asset delivery
 
