@@ -470,9 +470,11 @@ metropolises are laid out on a grid of superblocks every A tiles (36, 40,
 44 by tier) around their centre, evaluated tile by tile, so a chunk only
 looks at the superblocks it overlaps (each worked out once and cached).
 Arterials form one grid per city; districts vary what is inside it.
-1. **Arterials:** 3 lanes between superblocks, with a centre line and
-   crosswalks next to the junctions, where at least one neighbouring
-   superblock belongs to the city.
+1. **Arterials:** 3 lanes between superblocks: edge lines on the outer
+   lanes, a dashed centre line (RPG Urban 406/433/460 east–west,
+   461/462/463 north–south), crosswalks next to the junctions, where at
+   least one neighbouring superblock belongs to the city. Junctions, minor
+   streets and yards are plain asphalt (441).
 2. **Superblocks** belong to the city if their centre is within the radius
    in that direction (78–100% of it, varying smoothly over 16 sectors, so
    the outline is irregular) and their centre and corners are dry and away

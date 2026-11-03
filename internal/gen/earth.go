@@ -114,8 +114,11 @@ func NewEarth(info world.GenInfo) (world.Generator, error) {
 		}
 	}
 	e.urban = map[int]world.Tile{}
-	for _, i := range append(append([]int{urbanRoad, urbanLineH, urbanLineV, urbanPaved, urbanParking, urbanTree, urbanTreeTop, urbanBench, urbanLampPost, urbanLamp},
-		urbanCrossH[:]...), urbanCrossV[:]...) {
+	tiles := []int{urbanRoad, urbanPaved, urbanParking, urbanTree, urbanTreeTop, urbanBench, urbanLampPost, urbanLamp}
+	for _, set := range [][3]int{urbanCrossH, urbanCrossV, urbanArtH, urbanArtV} {
+		tiles = append(tiles, set[:]...)
+	}
+	for _, i := range tiles {
 		if e.urban[i], err = info.Tilesets.Tile("rpgurban", i); err != nil {
 			return nil, fmt.Errorf("earth: %w", err)
 		}
@@ -339,12 +342,15 @@ func (e *Earth) Generate(seed uint64, b *world.ChunkBuilder) {
 var (
 	urbanCrossH = [3]int{405, 432, 459}
 	urbanCrossV = [3]int{434, 435, 436}
+	// arterial lanes: edge line, centre line, edge line
+	urbanArtH = [3]int{406, 433, 460}
+	urbanArtV = [3]int{461, 462, 463}
 	// sidewalk by kerb sides (N=1, E=2, S=4, W=8)
 	urbanWalk = map[uint8]int{0: 36, 1: 9, 2: 37, 4: 63, 8: 35, 1 | 8: 8, 1 | 2: 10, 4 | 8: 62, 4 | 2: 64}
 )
 
 const (
-	urbanRoad, urbanLineH, urbanLineV, urbanPaved                 = 406, 433, 462, 36
+	urbanRoad, urbanPaved                                         = 441, 36 // plain asphalt
 	urbanParking                                                  = 442
 	urbanTree, urbanTreeTop, urbanBench, urbanLampPost, urbanLamp = 260, 233, 270, 192, 165
 )
@@ -366,10 +372,10 @@ func (e *Earth) cityTiles(b *world.ChunkBuilder, r *region) {
 			switch t.Kind {
 			case infra.CRoad:
 				g = u(urbanRoad)
-			case infra.CLineH:
-				g = u(urbanLineH)
-			case infra.CLineV:
-				g = u(urbanLineV)
+			case infra.CArtH:
+				g = u(urbanArtH[t.Lane%3])
+			case infra.CArtV:
+				g = u(urbanArtV[t.Lane%3])
 			case infra.CCrossH:
 				g = u(urbanCrossH[t.Lane%3])
 			case infra.CCrossV:

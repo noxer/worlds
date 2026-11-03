@@ -30,9 +30,9 @@ type CityKind uint8
 
 const (
 	CNone    CityKind = iota // not part of the city
-	CRoad                    // asphalt
-	CLineH                   // asphalt with the centre line of an east-west road
-	CLineV                   // ... of a north-south road
+	CRoad                    // plain asphalt: junctions, minor streets, yards
+	CArtH                    // a lane of an east-west arterial (Lane: 0 north edge, 1 centre line, 2 south edge)
+	CArtV                    // a lane of a north-south arterial (Lane: 0 west edge, 1 centre line, 2 east edge)
 	CCrossH                  // crosswalk across an east-west road (Lane: which of its 3 rows)
 	CCrossV                  // crosswalk across a north-south road (Lane: which of its 3 columns)
 	CWalk                    // sidewalk round a block (Edge: the sides that meet the road)
@@ -405,20 +405,14 @@ func (c *CityPlan) At(x, y int64) CityTile {
 				if v == arterial || v == c.A-1 { // next to a junction
 					return CityTile{Kind: CCrossV, Lane: uint8(u)}
 				}
-				if u == 1 {
-					return CityTile{Kind: CLineV}
-				}
-				return CityTile{Kind: CRoad}
+				return CityTile{Kind: CArtV, Lane: uint8(u)}
 			}
 		default:
 			if c.included(i, j) || c.included(i, j-1) {
 				if u == arterial || u == c.A-1 {
 					return CityTile{Kind: CCrossH, Lane: uint8(v)}
 				}
-				if v == 1 {
-					return CityTile{Kind: CLineH}
-				}
-				return CityTile{Kind: CRoad}
+				return CityTile{Kind: CArtH, Lane: uint8(v)}
 			}
 		}
 		return CityTile{}
