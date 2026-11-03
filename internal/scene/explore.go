@@ -14,6 +14,7 @@ import (
 	"github.com/noxer/worlds/internal/entity"
 	"github.com/noxer/worlds/internal/geom"
 	"github.com/noxer/worlds/internal/gfx"
+	"github.com/noxer/worlds/internal/infra"
 	"github.com/noxer/worlds/internal/input"
 	"github.com/noxer/worlds/internal/nav"
 	"github.com/noxer/worlds/internal/sim"
@@ -38,6 +39,7 @@ type NPC struct {
 
 	schedule sim.Schedule // daily routine; empty: stays put
 	active   bool         // in the party's reach (always true without schedule)
+	ambient  bool         // part of the crowd (see crowd.go)
 	path     []nav.Move
 	wait     int
 }
@@ -70,6 +72,10 @@ type Explore struct {
 	turnWait int
 	riding   bool // the party rides bicycles and scooters
 	clock    sim.Clock
+	home     world.Pos    // where the game started (for debug travel)
+	travel   int          // the next debug travel destination
+	infra    *infra.Infra // for the crowd; nil: nobody about
+	crowd    crowd
 	fade     int // >0 fading out, <0 fading in
 	warp     *world.Warp
 
@@ -92,7 +98,8 @@ type ExploreConfig struct {
 	Dialogs dialog.Library
 	Party   *entity.Party
 	Start   world.Spawn
-	Clock   sim.Clock // game time at the start
+	Clock   sim.Clock    // game time at the start
+	Infra   *infra.Infra // settlements, for the crowd (nil: nobody about)
 }
 
 // NewExplore creates the exploration scene and spawns NPCs from all maps.
@@ -104,6 +111,8 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		dialogs: cfg.Dialogs,
 		party:   cfg.Party,
 		clock:   cfg.Clock,
+		infra:   cfg.Infra,
+		crowd:   newCrowd(),
 		signs:   map[world.Pos]string{},
 		bumps:   map[world.Pos]string{},
 	}
@@ -154,6 +163,7 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		facing = cfg.Start.Facing
 	}
 	e.party.PlaceAll(cfg.Start.Pos, facing)
+	e.home = cfg.Start.Pos
 	return e, nil
 }
 
@@ -229,6 +239,9 @@ func (e *Explore) Update(ctx *Context) {
 		e.debug = !e.debug
 		debugOverlay = e.debug
 	}
+	if e.debug && in.Pressed(input.DebugTravel) && e.fade == 0 {
+		e.debugTravel()
+	}
 	if e.debug && in.Pressed(input.DebugTime) {
 		e.clock.Advance(60)
 	}
@@ -246,6 +259,7 @@ func (e *Explore) Update(ctx *Context) {
 
 	arrived := e.party.Update()
 	e.updateNPCs()
+	e.updateCrowd()
 	leader := e.party.Leader()
 	if arrived {
 		if wp := e.w.WarpAt(leader.Pos); wp != nil {
@@ -836,8 +850,8 @@ func (e *Explore) drawActors(screen *ebiten.Image, m world.MapRef, s, offX, offY
 		screen.DrawImage(img, op)
 	}
 	for _, d := range ds {
-		img := e.sheets.Tile(d.a.Sprite.Sheet, d.a.Sprite.Index)
-		flip := d.a.Facing == world.Left
+		index, flip := d.a.Frame()
+		img := e.sheets.Tile(d.a.Sprite.Sheet, index)
 		switch {
 		case d.swimming && img != nil:
 			// Only the upper body shows above the water, with a ripple.

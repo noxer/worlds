@@ -13,6 +13,12 @@ const StepTicks = 16
 type Sprite struct {
 	Sheet string
 	Index int
+	// Walk, if set, has animation frames by facing (indexed by world.Dir):
+	// the standing frame, then the walking frames, one per step in turn.
+	Walk *[4][]int
+	// FacesLeft says the side frames face left (mirrored when facing
+	// right); otherwise sprites face right (mirrored when facing left).
+	FacesLeft bool
 }
 
 // Actor is anything that occupies a tile and can walk: party members, NPCs,
@@ -31,6 +37,7 @@ type Actor struct {
 	stepTicks int
 
 	queue []queuedStep // steps to start later (followers lag behind)
+	steps int          // steps taken, for walk animations
 }
 
 type queuedStep struct {
@@ -85,6 +92,7 @@ func (a *Actor) BeginStep(d world.Dir, to world.Pos, ticks int) {
 	}
 	a.Facing = d
 	a.Pos = to
+	a.steps++
 	a.stepDir = d
 	a.stepping = true
 	a.tick = 0
@@ -157,9 +165,30 @@ func (a *Actor) OffsetAt(alpha float64) (dx, dy float64) {
 	return -float64(ddx) * remaining, -float64(ddy) * remaining
 }
 
-// Hop returns a small vertical bounce used as walk animation, since the
-// Kenney characters have a single frame.
+// Frame returns the sprite's tile index to draw now and whether to mirror
+// it.
+func (a *Actor) Frame() (index int, flip bool) {
+	s := a.Sprite
+	if s.Walk == nil {
+		return s.Index, a.Facing == world.Left
+	}
+	frames := s.Walk[a.Facing]
+	index = frames[0]
+	if a.stepping && len(frames) > 1 {
+		index = frames[1+a.steps%(len(frames)-1)]
+	}
+	if s.FacesLeft {
+		return index, a.Facing == world.Right
+	}
+	return index, a.Facing == world.Left
+}
+
+// Hop returns a small vertical bounce used as walk animation for sprites
+// with a single frame (most Kenney characters); animated ones don't hop.
 func (a *Actor) Hop() int {
+	if a.Sprite.Walk != nil {
+		return 0
+	}
 	if a.stepping && a.tick >= a.stepTicks/4 && a.tick < a.stepTicks*3/4 {
 		return -1
 	}

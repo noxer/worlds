@@ -1,0 +1,81 @@
+# What passers-by say (the crowd in towns, cities and villages).
+
+crowd_city_1:
+  start: main
+  nodes:
+    main:
+      lines:
+        - Lovely day for a walk, isn't it?
+crowd_city_2:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The trains? Not running yet, they say. Any day now.
+crowd_city_3:
+  start: main
+  nodes:
+    main:
+      lines:
+        - Sorry, I'm in a hurry. Late for work again!
+crowd_city_4:
+  start: main
+  nodes:
+    main:
+      lines:
+        - Have you tried the bakery in the old quarter? Best rolls in town.
+crowd_city_5:
+  start: main
+  nodes:
+    main:
+      lines:
+        - Mind the traffic. Well... there isn't any yet.
+crowd_city_6:
+  start: main
+  nodes:
+    main:
+      lines:
+        - I've lived here all my life and I still get lost.
+crowd_city_7:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The warehouses out east never sleep.
+crowd_city_8:
+  start: main
+  nodes:
+    main:
+      lines:
+        - Hm? Oh, I thought you were someone else.
+
+crowd_village_1:
+  start: main
+  nodes:
+    main:
+      lines:
+        - Good day to you, travellers.
+crowd_village_2:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The well water's the best for miles around.
+crowd_village_3:
+  start: main
+  nodes:
+    main:
+      lines:
+        - Not many strangers come through here.
+crowd_village_4:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The city? Far too noisy for me.
+crowd_village_5:
+  start: main
+  nodes:
+    main:
+      lines:
+        - Watch your step, the lanes get muddy after rain.

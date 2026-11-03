@@ -28,6 +28,7 @@ On Linux, desktop builds need the X11/GL headers, for example:
 | Cancel | Esc, X | B | |
 | Debug overlay | F3 | | |
 | Skip an hour (with the overlay) | N | | |
+| Jump to the nearest village, town, city, home (with the overlay) | T | | |
 
 ## Editing the world
 
