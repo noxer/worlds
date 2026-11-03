@@ -24,6 +24,8 @@ for base in (81, 108, 135, 89, 116, 143):  # flat roofs, tan and grey
 for i in (259, 260, 286, 287, 270, 271, 251, 278, 279, 305, 189, 190, 191, 192):
     add(i, "solid", "bool", True)        # trees, benches, hydrant, bins, mailbox, posts
 add(192, "above", "int", 165)            # street lamp: post and double lantern
+for bottom, top in ((259, 232), (260, 233), (340, 313), (341, 314)):
+    add(bottom, "above", "int", top)     # tall trees: the crown goes in the tile above
 add(191, "above", "int", 164)            # street lamp: post and single lantern
 add(165, "light", "float", 3.5)
 add(165, "light_color", "color", "#fffff0d0")

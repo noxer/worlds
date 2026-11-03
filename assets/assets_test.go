@@ -129,6 +129,9 @@ func TestMultiTileObjects(t *testing.T) {
 	for _, ch := range [][2]int64{{0, 0}, {12345, 6789}, {32767, 16383}} {
 		check(world.Pos{Map: world.Main, X: ch[0] * world.ChunkSize, Y: ch[1] * world.ChunkSize}, 2*world.ChunkSize, 2*world.ChunkSize)
 	}
+	// Generated cities (street trees, lamps), villages and their surroundings.
+	check(world.Pos{Map: world.Main, X: 40027 - 150, Y: 90965 - 150}, 300, 300) // a city's centre
+	check(world.Pos{Map: world.Main, X: 2802 - 80, Y: 193995 - 80}, 160, 160)   // a village
 }
 
 // TestAnimationFramesMatch checks that every frame of an animated tile has

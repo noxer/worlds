@@ -115,3 +115,31 @@ func TestTrainJourney(t *testing.T) {
 		t.Error("no train to be seen at the station")
 	}
 }
+
+// TestWindowViewScrollsOneWay: on the way there and back, the scenery
+// moves the same way past the windows (the carriage always goes right).
+func TestWindowViewScrollsOneWay(t *testing.T) {
+	h, in := newCrowdHarness(t)
+	city, _, _ := stationDoor(t, in)
+	line := h.e.line(in.Edges(infra.Rail, city)[0])
+	for _, toB := range []bool{true, false} {
+		h.e.ride = &ride{line: line, toB: toB}
+		// The start of the run in that direction.
+		arrive, leave := line.NextStop(0, toB)
+		_ = arrive
+		h.e.clock.AdvanceTicks(leave - h.e.clock.Ticks())
+		prev := -1e18
+		for k := 0; k < 3000; k++ {
+			s, heading, ok := h.e.viewTrack(0)
+			if !ok {
+				t.Fatal("no view")
+			}
+			if u := heading * s; u < prev-1e-9 {
+				t.Fatalf("toB=%v, tick %d: the view went back (%.3f after %.3f)", toB, k, u, prev)
+			} else {
+				prev = u
+			}
+			h.e.clock.Tick()
+		}
+	}
+}

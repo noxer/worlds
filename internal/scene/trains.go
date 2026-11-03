@@ -379,40 +379,66 @@ func (e *Explore) trainDrawables(m world.MapRef, alpha float64) []drawable {
 	return out
 }
 
-// viewPos is where the window looks out: the train's real place near
-// stations; at speed, the track passing at a calm pace instead (the real
-// place would be a blur), cutting back to the real place on arrival.
-func (e *Explore) viewPos(alpha float64) (x, y float64, ok bool) {
+// viewTrack is where along the track the window looks out (track distance
+// from A's buffer stop) and which way the train heads (+1 for B, -1 for A):
+// the train's real place near stations; at speed, the real place would be
+// a blur, so the track passes at a calm pace instead, cutting back to the
+// real place as the train slows into the station.
+func (e *Explore) viewTrack(alpha float64) (s, heading float64, ok bool) {
 	r := e.ride
 	if r == nil {
 		return 0, 0, false
 	}
 	t := e.trainTick(alpha)
 	st := r.line.At(t)
-	s := st.Front
-	if st.Moving {
+	s, heading = st.Front, 1 // the ride's direction, not the timetable's next one
+	if !r.toB {
+		heading = -1
+	}
+	if !st.Moving && st.AtA != r.toB {
+		// Standing at the destination: where it stopped, not where the
+		// locomotive will be for the way back.
+		s = r.line.Length
+		if !r.toB {
+			s = 0
+		}
+	}
+	if st.Moving && st.ToB == r.toB {
 		start := float64(transit.Cars - 1) // where the locomotive leaves from
-		dir := 1.0
 		if !st.ToB {
-			start, dir = r.line.Length-float64(transit.Cars-1), -1
+			start = r.line.Length - float64(transit.Cars-1)
 		}
 		run := math.Abs(s - start)
 		left := r.line.Length - float64(transit.Cars-1) - run
 		if run > viewSlowTiles && left > viewSlowTiles {
 			since := t - float64(st.Since) - r.line.TimeTo(viewSlowTiles)
-			s = start + dir*(viewSlowTiles+viewSpeed*max(since, 0))
+			s = start + heading*(viewSlowTiles+viewSpeed*max(since, 0))
 			s = min(max(s, 0), r.line.Length)
 		}
 	}
-	x, y, _ = r.line.Pos(s)
+	return s, heading, true
+}
+
+// viewPos is the world position the window looks out at (for streaming).
+func (e *Explore) viewPos(alpha float64) (x, y float64, ok bool) {
+	s, _, ok := e.viewTrack(alpha)
+	if !ok {
+		return 0, 0, false
+	}
+	x, y, _ = e.ride.line.Pos(s)
 	return x, y, true
 }
 
-// drawWindowView draws the world outside into the carriage's windows:
-// under the window tiles of dst (the ground layer at the camera), whose
-// glass is transparent.
+// viewSide is how many tiles beside the track the windows look.
+const viewSide = 2
+
+// drawWindowView draws the world outside into the carriage's windows,
+// under the window tiles of dst (whose glass is transparent). The view is
+// the land beside the track, unrolled: whichever way the track runs in the
+// world, the carriage moves to the right through it (the scenery slides
+// left), ahead to the right, on the train's left-hand side.
 func (e *Explore) drawWindowView(dst *ebiten.Image, alpha float64) {
-	vx, vy, ok := e.viewPos(alpha)
+	s, heading, ok := e.viewTrack(alpha)
 	if !ok {
 		return
 	}
@@ -420,27 +446,75 @@ func (e *Explore) drawWindowView(dst *ebiten.Image, alpha float64) {
 	if err != nil {
 		return
 	}
+	line := e.ride.line
 	mw, mh, _ := e.w.Size(world.Detail(trainMap))
 	e.viewImg = ensureImage(e.viewImg, tile, tile)
-	saveX, saveY := e.camX, e.camY
+	u := heading * s // grows as the train goes, either way
 	for cy := int64(0); cy < mh; cy++ {
 		for cx := int64(0); cx < mw; cx++ {
 			p := world.Pos{Map: world.Detail(trainMap), X: cx, Y: cy}
 			if e.w.Tile(p, world.LayerGround) != win {
 				continue
 			}
-			// The window shows the world a few tiles north of the track,
-			// spread out like the windows along the carriage.
-			wx := vx*tile + float64(cx-mw/2)*tile
-			wy := vy*tile - 3*tile
+			// The windows side by side show the strip from left to right.
+			v := u + float64(cx-mw/2)
+			t0 := math.Floor(v)
+			shift := int((v - t0) * tile)
 			e.viewImg.Clear()
-			e.camX, e.camY = int64(math.Floor(wx)), int64(math.Floor(wy))
-			e.drawLayers(e.viewImg, world.Main, false)
-			e.drawLayers(e.viewImg, world.Main, true)
+			for k := 0; k < 2; k++ {
+				sd := heading * (t0 + float64(k)) // back to track distance
+				x, y, d := line.Pos(sd)
+				if heading < 0 {
+					d = opposite(d)
+				}
+				nx, ny := leftOf(d)
+				wp, ok := e.w.Normalize(world.Pos{Map: world.Main,
+					X: int64(math.Round(x)) + nx*viewSide, Y: int64(math.Round(y)) + ny*viewSide})
+				if ok {
+					e.drawWorldTile(e.viewImg, wp, k*tile-shift)
+				}
+			}
 			op := &ebiten.DrawImageOptions{}
-			op.GeoM.Translate(float64(cx*tile-saveX), float64(cy*tile-saveY))
+			op.GeoM.Translate(float64(cx*tile-e.camX), float64(cy*tile-e.camY))
 			dst.DrawImage(e.viewImg, op)
 		}
 	}
-	e.camX, e.camY = saveX, saveY
+}
+
+// leftOf returns the offset to the left of a direction of travel.
+func leftOf(d world.Dir) (dx, dy int64) {
+	switch d {
+	case world.Right:
+		return 0, -1
+	case world.Left:
+		return 0, 1
+	case world.Down:
+		return 1, 0
+	}
+	return -1, 0
+}
+
+func opposite(d world.Dir) world.Dir {
+	switch d {
+	case world.Up:
+		return world.Down
+	case world.Down:
+		return world.Up
+	case world.Left:
+		return world.Right
+	}
+	return world.Left
+}
+
+// drawWorldTile draws all layers of main-map tile p at x (pixels) in dst.
+func (e *Explore) drawWorldTile(dst *ebiten.Image, p world.Pos, x int) {
+	sets := e.w.Tilesets()
+	ms := animationClock()
+	for l := 0; l < world.NumLayers; l++ {
+		t := sets.Frame(e.w.Tile(p, l), ms, p.X, p.Y)
+		if t.Empty() {
+			continue
+		}
+		e.drawTile(dst, e.sheets.Tile(sets.Get(t.Set()).Name, t.Index()), x, 0, t.FlipH(), t.FlipV())
+	}
 }

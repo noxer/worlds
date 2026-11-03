@@ -114,7 +114,7 @@ func NewEarth(info world.GenInfo) (world.Generator, error) {
 		}
 	}
 	e.urban = map[int]world.Tile{}
-	for _, i := range append(append([]int{urbanRoad, urbanLineH, urbanLineV, urbanPaved, urbanParking, urbanTree, urbanBench, urbanLampPost, urbanLamp},
+	for _, i := range append(append([]int{urbanRoad, urbanLineH, urbanLineV, urbanPaved, urbanParking, urbanTree, urbanTreeTop, urbanBench, urbanLampPost, urbanLamp},
 		urbanCrossH[:]...), urbanCrossV[:]...) {
 		if e.urban[i], err = info.Tilesets.Tile("rpgurban", i); err != nil {
 			return nil, fmt.Errorf("earth: %w", err)
@@ -344,9 +344,9 @@ var (
 )
 
 const (
-	urbanRoad, urbanLineH, urbanLineV, urbanPaved   = 406, 433, 462, 36
-	urbanParking                                    = 442
-	urbanTree, urbanBench, urbanLampPost, urbanLamp = 260, 270, 192, 165
+	urbanRoad, urbanLineH, urbanLineV, urbanPaved                 = 406, 433, 462, 36
+	urbanParking                                                  = 442
+	urbanTree, urbanTreeTop, urbanBench, urbanLampPost, urbanLamp = 260, 233, 270, 192, 165
 )
 
 // cityTiles draws streets, sidewalks, plazas and street furniture, then
@@ -397,11 +397,17 @@ func (e *Earth) cityTiles(b *world.ChunkBuilder, r *region) {
 	for ly := 0; ly <= world.ChunkSize; ly++ {
 		for lx := 0; lx < world.ChunkSize; lx++ {
 			t := r.cityAt(margin+lx, margin+ly)
+			if r.railAt(margin+lx, margin+ly) {
+				continue // no trees, lamps or benches on the track
+			}
 			inChunk := ly < world.ChunkSize
 			switch t.Deco {
 			case infra.DTree:
 				if inChunk {
 					b.Set(world.LayerDeco, lx, ly, u(urbanTree))
+				}
+				if ly > 0 {
+					b.Set(world.LayerOverhead, lx, ly-1, u(urbanTreeTop)) // the crown
 				}
 			case infra.DBench:
 				if inChunk {
@@ -431,7 +437,6 @@ func (e *Earth) railsAndPiers(b *world.ChunkBuilder, r *region) {
 			x, y := margin+lx, margin+ly
 			if r.railAt(x, y) {
 				b.Set(world.LayerDeco, lx, ly, e.rail[mask4(x, y, r.railAt)])
-				b.Set(world.LayerOverhead, lx, ly, 0)
 			}
 			if r.pierAt(x, y) == 1 {
 				m := mask4(x, y, func(x, y int) bool { return r.pierAt(x, y) != 0 })
