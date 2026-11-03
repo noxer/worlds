@@ -1244,6 +1244,16 @@
    ]
   },
   {
+   "id": 333,
+   "properties": [
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
    "id": 340,
    "properties": [
     {

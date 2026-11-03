@@ -27,6 +27,7 @@ add(192, "above", "int", 165)            # street lamp: post and double lantern
 for bottom, top in ((259, 232), (260, 233), (340, 313), (341, 314)):
     add(bottom, "above", "int", top)     # tall trees: the crown goes in the tile above
 add(191, "above", "int", 164)            # street lamp: post and single lantern
+add(333, "solid", "bool", True)          # a board (the station's timetable)
 add(165, "light", "float", 3.5)
 add(165, "light_color", "color", "#fffff0d0")
 add(164, "light", "float", 3.0)
@@ -162,4 +163,113 @@ for wall, roof in (("red", "tan"), ("orange", "grey")):
         building(f"city_sub_{wall}_{w}", "suburb", wall, roof, w, 2, 2, w // 2, "plain", 1)
     for w in (8, 10):
         building(f"city_ind_{wall}_{w}", "industrial", wall, "grey", w, 2, 3, w // 2, "warehouse", 2 if wall == "orange" else 1)
-building("city_station", "station", "orange", "grey", 12, 3, 4, 5, "station", 1)
+
+def station():
+    """The station: a platform hall (three tracks with buffer stops,
+    kerbed platforms with lamps and benches, fenced round) behind the
+    station building, a concourse across the ends of the tracks with the
+    timetable boards, and an open passage through the building to the
+    plaza. Map properties: bays (the track columns), bay_y (the buffer
+    stops' row), entrance_x (the passage's middle column)."""
+    W, H = 15, 12
+    tracks = (3, 7, 11)
+    buffers = 6             # the tracks' last row
+    concourse = 7
+    top = concourse + 1     # the building's first row (roof)
+    ground = [None] * (W * H)
+    deco = [None] * (W * H)
+    over = [None] * (W * H)
+    def put(layer, x, y, t):
+        layer[y * W + x] = t
+    fences = set()
+    for y in range(concourse + 1):
+        fences.add((0, y))
+        fences.add((W - 1, y))
+    for x in range(1, W - 1):
+        if x not in tracks:
+            fences.add((x, 0))      # the platforms' far ends
+    def fence_mask(x, y):
+        m = 0
+        for bit, (dx, dy) in enumerate(((0, -1), (1, 0), (0, 1), (-1, 0))):
+            if (x + dx, y + dy) in fences:
+                m |= 1 << bit
+        if y == 0 and (x - 1 in tracks or x + 1 in tracks):
+            m |= 1  # the town's fence beside the line goes on north
+        return m
+    for y in range(concourse + 1):
+        for x in range(W):
+            if x in tracks and y <= buffers:
+                put(ground, x, y, ("worlds", 80))          # ballast
+                # Rails, with buffer stops at both ends; a line coming in
+                # replaces the far one with its own track.
+                mask = (1 if y > 0 else 0) | (4 if y < buffers else 0)
+                put(deco, x, y, ("worlds", 16 + mask))
+            elif y == concourse:
+                put(ground, x, y, 36)                      # the concourse
+            else:
+                left = x - 1 in tracks
+                right = x + 1 in tracks
+                put(ground, x, y, 37 if right and not left else 35 if left and not right else 36)
+            if (x, y) in fences:
+                put(deco, x, y, ("worlds", 64 + fence_mask(x, y)))
+    # Lamps (two tiles) and benches on the platforms.
+    for x in (5, 9):
+        for y in (2, 5):
+            put(deco, x, y, 192)
+            put(over, x, y - 1, 165)
+    for x, y in ((1, 3), (13, 3), (1, 5), (13, 5)):
+        put(deco, x, y, 270)
+    # The timetable boards on the concourse.
+    boards = (1, W - 2)
+    for x in boards:
+        put(deco, x, concourse, 333)
+    # The building, with an open passage in the middle.
+    ex = W // 2
+    passage = (ex - 1, ex, ex + 1)
+    rl, rm, rr = ROOFS["grey"][0]
+    walls = WALLS["orange"]
+    for x in range(W):
+        put(ground, x, top, rl if x == 0 else rr if x == W - 1 else rm)
+        for k, part in ((1, "top"), (2, "plain"), (3, "bottom")):
+            l, m, r = walls[part]
+            put(ground, x, top + k, l if x == 0 else r if x == W - 1 else m)
+            if x % 2 == 1 and x not in passage and k < 3:
+                put(deco, x, top + k, 364)
+            if k == 3 and x not in passage and x % 3 == 1:
+                put(deco, x, top + k, 386 if x < ex else 388)
+    for x in passage:  # walk through: paved floor, the roof overhead
+        put(over, x, top, ground[top * W + x])
+        put(over, x, top + 1, ground[(top + 1) * W + x])
+        for y in range(top, H):
+            put(ground, x, y, 36)
+            put(deco, x, y, None)
+    # Walls either side of the passage.
+    for y in range(top + 2, H):
+        put(deco, ex - 2, y, deco[y * W + ex - 2])
+    objs = [{"id": k + 1, "name": f"timetable_{k}", "type": "sign", "x": x * 16, "y": concourse * 16,
+             "width": 16, "height": 16, "rotation": 0, "visible": True,
+             "properties": [{"name": "bump", "type": "string", "value": "station"}]} for k, x in enumerate(boards)]
+    def layer(i, lname, data, extra=None):
+        d = {"id": i, "name": lname, "type": "tilelayer", "visible": True, "opacity": 1,
+             "x": 0, "y": 0, "width": W, "height": H,
+             "data": [0 if v is None else (WORLDS + v[1] if isinstance(v, tuple) else v + URBAN) for v in data]}
+        if extra:
+            d["properties"] = extra
+        return d
+    props = [("kind", "string", "building"), ("style", "string", "station"), ("material", "string", "orange"),
+             ("shop", "bool", False), ("weight", "int", 1), ("bays", "string", ",".join(map(str, tracks))),
+             ("bay_y", "int", buffers), ("entrance_x", "int", ex)]
+    m = {"type": "map", "version": "1.10", "tiledversion": "1.11.0", "orientation": "orthogonal",
+         "renderorder": "right-down", "infinite": False, "compressionlevel": -1,
+         "width": W, "height": H, "tilewidth": 16, "tileheight": 16, "nextlayerid": 5, "nextobjectid": len(objs) + 1,
+         "properties": [{"name": k, "type": t, "value": v} for k, t, v in props],
+         "tilesets": [{"firstgid": URBAN, "source": "../../tilesets/rpgurban.tsj"},
+                      {"firstgid": WORLDS, "source": "../../tilesets/worlds.tsj"}],
+         "layers": [layer(1, "ground", ground), layer(2, "deco", deco),
+                    layer(3, "overhead", over, [{"name": "overhead", "type": "bool", "value": True}]),
+                    {"id": 4, "name": "objects", "type": "objectgroup", "visible": True, "opacity": 1,
+                     "x": 0, "y": 0, "draworder": "topdown", "objects": objs}]}
+    with open(os.path.join(out, "city_station.tmj"), "w") as f:
+        f.write(json.dumps(m, indent=1) + "\n")
+
+station()

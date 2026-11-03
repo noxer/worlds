@@ -2,6 +2,8 @@ package gen
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"sync/atomic"
 
 	"github.com/noxer/worlds/internal/geom"
@@ -191,6 +193,26 @@ func prefabSpecs(ps []*world.Prefab) ([]infra.PrefabSpec, error) {
 					return nil, fmt.Errorf("prefab %s: the door must be in row %d", p.Name, doorRow)
 				}
 			}
+		}
+		for _, f := range strings.Split(p.Props.String("bays"), ",") {
+			if f = strings.TrimSpace(f); f != "" {
+				v, err := strconv.ParseInt(f, 10, 64)
+				if err != nil || v < 0 || v >= p.W {
+					return nil, fmt.Errorf("prefab %s: bad track column %q in bays", p.Name, f)
+				}
+				s.Bays = append(s.Bays, v)
+			}
+		}
+		if s.BayX >= 0 && len(s.Bays) == 0 {
+			s.Bays = []int64{s.BayX}
+		}
+		if s.Style == "station" && doors == 0 {
+			// A station is walked through: its entrance is a passage.
+			s.DoorX = int64(p.Props.Int("entrance_x", -1))
+			if s.DoorX < 0 || s.DoorX >= p.W {
+				return nil, fmt.Errorf("prefab %s: a station needs a door or an entrance_x", p.Name)
+			}
+			doors = 1
 		}
 		switch s.Kind {
 		case "house", "building":

@@ -726,6 +726,22 @@ func (in *Infra) StationFront(s Settlement) (Point, bool) {
 	return in.norm(x0+pf.DoorX, y0+pf.H), true
 }
 
+// StationRect returns the area of a city's station building and platforms.
+func (in *Infra) StationRect(s Settlement) (Rect, bool) {
+	x0, y0, pf, ok := in.station(s)
+	if !ok {
+		return Rect{}, false
+	}
+	p := in.norm(x0, y0)
+	return Rect{X: p.X, Y: p.Y, W: pf.W, H: pf.H}, true
+}
+
+// InStation reports whether tile (x, y) is part of a city's station.
+func (in *Infra) InStation(s Settlement, x, y int64) bool {
+	r, ok := in.StationRect(s)
+	return ok && in.inRect(r, x, y)
+}
+
 // station returns the top-left tile (not normalised) and the prefab of a
 // city's station.
 func (in *Infra) station(s Settlement) (x0, y0 int64, pf PrefabSpec, ok bool) {

@@ -20,8 +20,10 @@ type PrefabSpec struct {
 	Material string
 	Shop     bool
 	// BayX, BayY: a station's track bay column and the row of its buffer
-	// stop (BayY 0 or less: no bay).
+	// stop (BayY 0 or less: no bay). Bays are all its track columns (one
+	// line per track).
 	BayX, BayY int64
+	Bays       []int64
 	W, H       int64
 	Weight     int
 	DoorX      int64 // column of the door (houses)

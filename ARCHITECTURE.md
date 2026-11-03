@@ -505,13 +505,19 @@ Arterials form one grid per city; districts vary what is inside it.
 5. **Buildings** are prefabs of kind `building` with a `style`, `material`
    and `shop` flag, picked by weight to fit (the district's material three
    times as likely, shops by its factor); none on a rail line.
-6. **Rail** runs into the station: the station prefab has a track bay
-   (map properties `bay_x`, `bay_y`: its column and the buffer stop's row),
-   open from its roof down to the row above its front, walls either side.
-   Lines end at the buffer stop inside the bay, coming straight down from
-   the arterial north of the plaza; a waiting train stands in the station.
-   The search treats the plaza as impassable and the last legs go round it
-   at right angles.
+6. **The station** (prefab `city_station`, by `tools/art/urban.py`): a
+   platform hall behind the station building, fenced round: three tracks
+   on ballast (map property `bays`: their columns; `bay_y`: the buffer
+   stops' row), with rails and buffer stops drawn in, and kerbed platforms
+   between them with lamps and benches; a concourse across the ends of the
+   tracks with a timetable board (bump `station`) at each end; and an open
+   passage through the building (`entrance_x`) to the plaza. Each line
+   has its own track, by its place among the station's lines; it comes
+   straight down from the arterial north of the plaza and ends at the
+   buffer stop, so a waiting train stands at the platform. The search
+   treats the plaza as impassable and the last legs go round it at right
+   angles. Passengers walk onto the platform and into the train, or board
+   from the timetable; they get off onto the platform beside it.
    **Railways are fenced off** from the city (`CityPlan.At` lays them over
    the layout): track tiles become ballast and the tiles beside them a
    railway fence (16 connection tiles of our own), wherever the line runs,
@@ -520,7 +526,7 @@ Arterials form one grid per city; districts vary what is inside it.
    the fence stops at their edges; it runs on across the plaza up to the
    station's walls. The ballast is solid: in towns and villages the line
    can't be walked onto, only crossed where a road or path crosses it (out
-   in the country it stays walkable). Boarding is through the station door.
+   in the country it stays walkable).
    Buildings keep a tile from the line, and their front step
    another, so no door opens onto the fence; street lamps stand only on
    blocks' top corners, so a fence below can't shut a row of doors in.

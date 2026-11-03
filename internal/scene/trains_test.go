@@ -9,21 +9,21 @@ import (
 	"github.com/noxer/worlds/internal/world"
 )
 
-// stationDoor returns a city with rail lines, its station door and the tile
-// in front of it.
+// stationDoor returns a city with rail lines, a timetable board of its
+// station and the tile beside it (east) to stand on.
 func stationDoor(t *testing.T, in *infra.Infra) (infra.Settlement, world.Pos, world.Pos) {
 	t.Helper()
 	for _, s := range in.Near(0, 193770, 140000, infra.City) {
 		if len(in.Edges(infra.Rail, s)) == 0 {
 			continue
 		}
-		front, ok := in.StationFront(s)
+		r, ok := in.StationRect(s)
 		if !ok {
 			continue
 		}
-		f := world.Pos{Map: world.Main, X: front.X, Y: front.Y}
-		door := world.Pos{Map: world.Main, X: front.X, Y: front.Y - 1}
-		return s, door, f
+		// The first timetable board: column 1 of the concourse (row 7).
+		board := world.Pos{Map: world.Main, X: r.X + 1, Y: r.Y + 7}
+		return s, board, world.Pos{Map: world.Main, X: r.X + 2, Y: r.Y + 7}
 	}
 	t.Fatal("no station")
 	return infra.Settlement{}, world.Pos{}, world.Pos{}
@@ -54,7 +54,7 @@ func (h *harness) choose(prefix string) {
 func TestTrainJourney(t *testing.T) {
 	h, in := newCrowdHarness(t)
 	city, _, front := stationDoor(t, in)
-	h.e.party.PlaceAll(front, world.Up)
+	h.e.party.PlaceAll(front, world.Left)
 	h.tick(input.Frame{})
 
 	// The timetable at the station door: wait for the next train.
@@ -102,9 +102,8 @@ func TestTrainJourney(t *testing.T) {
 	// Off at the destination's station door.
 	h.e.leaveTrain(false)
 	h.runUntil("getting off", 200, func() bool { return h.e.fade == 0 && h.leader().Pos.Map.IsMain() })
-	want, _ := in.StationFront(r.to)
-	if p := h.leader().Pos; p.X != want.X || p.Y != want.Y {
-		t.Errorf("got off at %v, the station is at %v", p, want)
+	if p := h.leader().Pos; !in.InStation(r.to, p.X, p.Y) || h.w.Solid(p) {
+		t.Errorf("got off at %v, not on %s's platforms", p, in.Name(r.to))
 	}
 	if h.e.ride != nil {
 		t.Error("still riding")

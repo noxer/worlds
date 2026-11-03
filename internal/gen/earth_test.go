@@ -477,6 +477,18 @@ func checkCityDoors(t *testing.T, w *world.World, plan *infra.CityPlan) {
 		pf := w.Prefabs()[b.Prefab]
 		for _, o := range pf.Objects {
 			door, _ := w.Normalize(world.Pos{Map: world.Main, X: b.X + o.Pos.X, Y: b.Y + o.Pos.Y})
+			if o.Type != "door" {
+				// A sign (the station's timetable): reachable from a side.
+				ok := false
+				for _, d := range world.Dirs {
+					q, _ := w.Neighbor(door, d)
+					ok = ok || reach[q]
+				}
+				if !ok {
+					t.Errorf("%s: %s at %v can't be reached from the plaza", pf.Name, o.Name, door)
+				}
+				continue
+			}
 			if dx, dy, _ := w.Delta(start, door); geom.Abs(dx) > half || geom.Abs(dy) > half {
 				continue
 			}

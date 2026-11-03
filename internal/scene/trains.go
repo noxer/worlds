@@ -98,16 +98,34 @@ func (e *Explore) trainAt(p world.Pos) (trainCar, bool) {
 	return c, ok
 }
 
-// stationAt returns the city whose station door is at p.
+// stationAt returns the city whose station tile p (a timetable board) is.
 func (e *Explore) stationAt(p world.Pos) (infra.Settlement, bool) {
 	for _, s := range e.infra.Near(p.X, p.Y, 200, infra.City) {
-		if front, ok := e.infra.StationFront(s); ok {
-			if dx, dy, _ := e.w.Delta(p, world.Pos{Map: world.Main, X: front.X, Y: front.Y}); geom.Abs(dx) <= 1 && dy == 1 {
-				return s, true
-			}
+		if e.infra.InStation(s, p.X, p.Y) {
+			return s, true
 		}
 	}
 	return infra.Settlement{}, false
+}
+
+// platformBeside returns a free tile next to the train, on the platform.
+func (e *Explore) platformBeside(line *transit.Line, st transit.State) (world.Pos, bool) {
+	cars := line.Cars(st)
+	onTrain := map[world.Pos]bool{}
+	pos := make([]world.Pos, len(cars))
+	for k, c := range cars {
+		pos[k] = world.Pos{Map: world.Main, X: geom.Mod(int64(math.Round(c.X)), e.w.W), Y: geom.Mod(int64(math.Round(c.Y)), e.w.H)}
+		onTrain[pos[k]] = true
+	}
+	for _, p := range pos {
+		for _, d := range []world.Dir{world.Left, world.Right, world.Down, world.Up} {
+			q, ok := e.w.Neighbor(p, d)
+			if ok && !onTrain[q] && !e.w.Solid(q) && e.w.Terrain(q) == world.Land {
+				return q, true
+			}
+		}
+	}
+	return world.Pos{}, false
 }
 
 // trainBump handles walking into a train, a station door or the train's
@@ -129,7 +147,7 @@ func (e *Explore) trainBump(p world.Pos) bool {
 	switch {
 	case ok && id == "station":
 		if s, ok := e.stationAt(p); ok {
-			e.say(e.infra.Name(s) + " Station. Ask at the door for the timetable.")
+			e.say(e.infra.Name(s) + " Station: departures. Press to read the timetable.")
 			return true
 		}
 	case ok && id == "train_exit":
@@ -289,12 +307,18 @@ func (e *Explore) leaveTrain(forced bool) {
 		e.bump0("train_exit")
 		return
 	}
-	front, ok := e.infra.StationFront(at)
-	if !ok {
-		return
+	// Onto the platform beside the train (or, failing that, out in front
+	// of the station).
+	to, ok := e.platformBeside(r.line, st)
+	if forced || !ok {
+		front, ok := e.infra.StationFront(at)
+		if !ok {
+			return
+		}
+		to = world.Pos{Map: world.Main, X: front.X, Y: front.Y}
 	}
 	e.ride = nil
-	e.warp = &world.Warp{To: world.Pos{Map: world.Main, X: front.X, Y: front.Y}, Facing: world.Down, HasFacing: true}
+	e.warp = &world.Warp{To: to, Facing: world.Down, HasFacing: true}
 	e.fade = fadeTicks
 	if forced {
 		e.pendingNotice = "End of the line. Everyone off, please."

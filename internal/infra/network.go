@@ -243,8 +243,17 @@ func (in *Infra) endpoint(s, t Settlement, n Network) (end, lead Point) {
 		// Into the station: the buffer stop at the end of its track bay,
 		// coming straight down from the arterial road north of the plaza
 		// (without a bay: on the plaza's north edge, behind the station).
-		if x0, y0, pf, ok := in.station(s); ok && pf.BayY > 0 {
-			return in.norm(x0+pf.BayX, y0+pf.BayY), in.norm(x0+pf.BayX, r.Y-2)
+		if x0, y0, pf, ok := in.station(s); ok && pf.BayY > 0 && len(pf.Bays) > 0 {
+			// Each line has its track: by its place among the station's
+			// lines.
+			k := 0
+			for i, e := range in.rng(Rail, s) {
+				if e.A.ID == t.ID || e.B.ID == t.ID {
+					k = i
+				}
+			}
+			bay := pf.Bays[k%len(pf.Bays)]
+			return in.norm(x0+bay, y0+pf.BayY), in.norm(x0+bay, r.Y-2)
 		}
 		return in.norm(s.X, r.Y), in.norm(s.X, r.Y-2)
 	}
