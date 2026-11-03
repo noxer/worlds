@@ -43,7 +43,7 @@ var keys = [NumActions][]ebiten.Key{
 	Cancel:      {ebiten.KeyEscape, ebiten.KeyBackspace, ebiten.KeyX},
 	Menu:        {ebiten.KeyTab, ebiten.KeyM},
 	Ride:        {ebiten.KeyR},
-	Debug:       {ebiten.KeyF3, ebiten.KeyBackquote},
+	Debug:       {ebiten.KeyF3, ebiten.KeyI, ebiten.KeyBackquote}, // I: browsers take F3, and ` is a dead key on some layouts
 	DebugTime:   {ebiten.KeyN},
 	DebugTravel: {ebiten.KeyT},
 }

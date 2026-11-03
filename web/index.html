@@ -13,6 +13,8 @@
   <div id="status">Loading…</div>
   <script src="wasm_exec.js"></script>
   <script>
+    // Keep the browser from acting on keys the game uses (F3: find next).
+    window.addEventListener("keydown", (e) => { if (e.key === "F3") e.preventDefault(); }, true);
     const go = new Go();
     WebAssembly.instantiateStreaming(fetch("worlds.wasm"), go.importObject)
       .then((r) => { document.getElementById("status").remove(); go.run(r.instance); })

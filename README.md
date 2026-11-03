@@ -26,7 +26,7 @@ On Linux, desktop builds need the X11/GL headers, for example:
 | Talk / confirm | Space, Enter, E, Z | A | click an NPC or sign |
 | Ride bike / get off | R | Y | click your leader |
 | Cancel | Esc, X | B | |
-| Debug overlay | F3 | | |
+| Debug overlay | F3 or I | | |
 | Skip an hour (with the overlay) | N | | |
 | Jump to the nearest village, town, city (station door), home (with the overlay) | T | | |
 
