@@ -22,6 +22,10 @@ func NewClock(day int64, hour, minute int) Clock {
 	return Clock{ticks: (day*MinutesPerDay + int64(hour*60+minute)) * TicksPerMinute}
 }
 
+// ClockAt returns a clock at a number of ticks since day 0, 00:00 (as
+// Ticks returns it), for loading a saved game.
+func ClockAt(ticks int64) Clock { return Clock{ticks: max(ticks, 0)} }
+
 // Tick advances the clock by one game tick.
 func (c *Clock) Tick() { c.ticks++ }
 

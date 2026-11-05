@@ -29,6 +29,9 @@ type Context struct {
 // Push puts s on top of the stack.
 func (c *Context) Push(s Scene) { c.stack.scenes = append(c.stack.scenes, s) }
 
+// Quit asks the game to end (the desktop build closes its window).
+func (c *Context) Quit() { c.stack.quit = true }
+
 // Pop removes the top scene.
 func (c *Context) Pop() {
 	if n := len(c.stack.scenes); n > 0 {
@@ -40,7 +43,11 @@ func (c *Context) Pop() {
 type Stack struct {
 	scenes []Scene
 	ctx    Context
+	quit   bool
 }
+
+// Quitting reports whether a scene asked the game to end.
+func (s *Stack) Quitting() bool { return s.quit }
 
 // NewStack creates a stack with a root scene.
 func NewStack(in *input.State, root Scene) *Stack {

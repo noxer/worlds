@@ -17,6 +17,7 @@ import (
 	"github.com/noxer/worlds/internal/infra"
 	"github.com/noxer/worlds/internal/input"
 	"github.com/noxer/worlds/internal/nav"
+	"github.com/noxer/worlds/internal/save"
 	"github.com/noxer/worlds/internal/sim"
 	"github.com/noxer/worlds/internal/transit"
 	"github.com/noxer/worlds/internal/world"
@@ -89,7 +90,9 @@ type Explore struct {
 	ride          *ride
 	viewImg       *ebiten.Image
 	pendingNotice string // shown when the fade is over
-	fade          int    // >0 fading out, <0 fading in
+	restoreRiding bool   // ride on after the fade (a loaded game)
+	saves         save.Store
+	fade          int // >0 fading out, <0 fading in
 	warp          *world.Warp
 
 	// Camera: top-left pixel of the view in the coordinates of the leader's
@@ -113,6 +116,7 @@ type ExploreConfig struct {
 	Start   world.Spawn
 	Clock   sim.Clock    // game time at the start
 	Infra   *infra.Infra // settlements, for the crowd (nil: nobody about)
+	Saves   save.Store   // where the menu saves and loads (nil: no saving)
 }
 
 // NewExplore creates the exploration scene and spawns NPCs from all maps.
@@ -125,6 +129,7 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		party:   cfg.Party,
 		clock:   cfg.Clock,
 		infra:   cfg.Infra,
+		saves:   cfg.Saves,
 		crowd:   newCrowd(),
 
 		lines:      map[infra.Edge]*transit.Line{},
@@ -276,6 +281,11 @@ func (e *Explore) Update(ctx *Context) {
 		e.updateCamera(ctx)
 		return
 	}
+	if in.Pressed(input.Menu) || in.Pressed(input.Cancel) {
+		e.cancelPath()
+		ctx.Push(NewMenu(e, e.saves))
+		return
+	}
 
 	// Taps are accepted while walking; the new goal is picked up as soon as
 	// the leader reaches the next tile.
@@ -345,8 +355,9 @@ func (e *Explore) updateFade() {
 				facing = e.warp.Facing
 			}
 			e.party.PlaceAll(e.warp.To, facing)
-			e.refreshReach() // while the screen is black
-			e.riding = false // everyone gets off at a door
+			e.refreshReach()           // while the screen is black
+			e.riding = e.restoreRiding // everyone gets off at a door (unless loading)
+			e.restoreRiding = false
 			e.warp = nil
 			e.path = nil // the next leg is planned from the new position
 			e.fade = -fadeTicks

@@ -14,6 +14,7 @@ import (
 	"github.com/noxer/worlds/internal/entity"
 	"github.com/noxer/worlds/internal/gfx"
 	"github.com/noxer/worlds/internal/input"
+	"github.com/noxer/worlds/internal/save"
 	"github.com/noxer/worlds/internal/scene"
 	"github.com/noxer/worlds/internal/sim"
 	"github.com/noxer/worlds/internal/world"
@@ -66,9 +67,14 @@ func New(fsys fs.FS) (*Game, error) {
 		}
 	}
 
+	saves, err := save.DefaultStore()
+	if err != nil {
+		log.Printf("saving is off: %v", err)
+		saves = nil
+	}
 	explore, err := scene.NewExplore(scene.ExploreConfig{
 		World: c.World, Sheets: sheets, Dialogs: c.Dialogs, Party: party, Start: c.Start,
-		Clock: sim.NewClock(1, 8, 0), Infra: c.Infra,
+		Clock: sim.NewClock(1, 8, 0), Infra: c.Infra, Saves: saves,
 	})
 	if err != nil {
 		return nil, err
@@ -91,6 +97,9 @@ func (g *Game) Update() error {
 	t1 := time.Now()
 	g.input.Update()
 	g.stack.Update()
+	if g.stack.Quitting() {
+		return ebiten.Termination
+	}
 	t2 := time.Now()
 	g.lastUpdate = t2
 	if scene.Perf.RecordTick(t1.Sub(t0), t2.Sub(t1)) && scene.DebugOverlay() {

@@ -918,6 +918,27 @@ works across chunk borders and the wrap seam. After a warp everyone stands on
 the arrival tile and the queue unfolds again. Followers don't block the leader.
 When riding, the whole party rides.
 
+## Saving (implemented: `save`, `scene/savegame.go`, `scene/menu.go`)
+
+The world comes from the seed, and nothing in it can be changed yet, so a
+save is small: the clock, the party (members by name, leader first; where
+the leader stands, facing, riding) and the places visited. NPCs, trains,
+the crowd and the light follow from the clock. A save names the world's
+seed; one from another world is refused. Saves are versioned JSON
+(`save.Version`); a save of another version is refused rather than
+guessed at.
+- **Where:** `save.DefaultStore`: `save1.json` to `save3.json` in the
+  user's config directory (`~/.config/worlds` on Linux), written to a
+  temporary file and renamed; in the browser, `localStorage` keys
+  `worlds.save1` to `worlds.save3` (per site). Without storage the menu's
+  Save and Load are greyed out.
+- **When:** any time on foot or riding, not on a journey (in a vehicle or
+  in the middle of a fade). Loading sets the clock at once and fades the
+  party over to where it was saved.
+- **The menu** lists each slot with the game time and the place (the
+  nearest settlement's name, "near …" beyond 600 tiles, or the detail
+  map's name); Load starts on the newest save.
+
 ## Scenes
 
 A stack: only the top scene updates, but all scenes draw. Exploration (real
@@ -1088,6 +1109,15 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    departures boards, the cabin with the view and the clouds; a test of a
    whole flight. Step 6 is complete for now; still open: tickets and
    fares, several vehicles per line, city transit (trams, metro).
+7. Saving and menus:
+   1. **done:** the pause menu (Menu or Cancel: Resume, Save, Load, Quit
+      on desktop) and saved games in three slots (package `save`): files
+      in the user's config directory on desktop, `localStorage` in the
+      browser; tests for the format, both file and memory stores, a save
+      and load through the menu, and no saving on a journey;
+   2. the world map: an overview of the whole world from the terrain
+      preview, with zoom, settlements, the places visited and the party;
+   3. the party screen: the members, and who leads.
 
 ## Asset delivery
 
