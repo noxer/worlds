@@ -202,6 +202,7 @@ type Infra struct {
 	ferry    map[edgeKey][]Point
 	buses    map[edgeKey]*BusRoute
 	airports map[ID]Airport
+	access   map[ID]*Way // airports' access roads
 
 	obstacle func(x, y int64) bool // patches painted at sea, for ferries
 
@@ -257,6 +258,7 @@ func New(cfg Config) (*Infra, error) {
 		ferry:    map[edgeKey][]Point{},
 		buses:    map[edgeKey]*BusRoute{},
 		airports: map[ID]Airport{},
+		access:   map[ID]*Way{},
 	}
 	in.sea, in.deep = cfg.Relief.Levels()
 	for _, f := range cfg.Fixed {

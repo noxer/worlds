@@ -110,7 +110,7 @@ func (e *Explore) updateTrains() {
 		e.nearLines = e.nearLines[:0]
 		seen := map[*transit.Line]bool{}
 		for _, w := range e.infra.WaysIn(l.Pos.X-trainReach, l.Pos.Y-trainReach, 2*trainReach, 2*trainReach) {
-			if w.Net != infra.Rail && w.Net != infra.Road {
+			if (w.Net != infra.Rail && w.Net != infra.Road) || w.Access {
 				continue
 			}
 			if line := e.line(w.Edge); line != nil && !seen[line] {

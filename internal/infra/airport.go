@@ -245,6 +245,46 @@ func (in *Infra) FlightRoute(e Edge) []Point {
 	return out
 }
 
+// The access road: from the way in through the fence, straight out south
+// for a few tiles, then routed like a road to the city's centre (inside the
+// city, its streets take over, as for every road), round the airport.
+
+const accessLead = 10 // tiles straight out from the entrance
+
+// Entrance returns the middle of the way in through the south fence.
+func (a Airport) Entrance() Point {
+	return Point{a.X + (entranceX0+entranceX1-1)/2, a.Y + AirportH - 1}
+}
+
+// accessWay returns the access road of an airport, nil if it has none.
+func (in *Infra) accessWay(a Airport, yl *yielder) *Way {
+	in.mu.Lock()
+	w, ok := in.access[a.S.ID]
+	in.mu.Unlock()
+	if ok {
+		return w
+	}
+	e := Edge{Net: Road, A: a.S, B: a.S}
+	ent := a.Entrance()
+	lead := in.norm(ent.X, ent.Y+accessLead)
+	centre := Point{a.S.X, a.S.Y}
+	g := networks[Road].grid
+	if cells, _, ok := in.search(e, lead, centre, g, yl); ok {
+		// Points along the lead keep it straight through the smoothing.
+		pts := []Point{in.norm(ent.X, ent.Y), in.norm(ent.X, ent.Y+accessLead/3), in.norm(ent.X, ent.Y+2*accessLead/3)}
+		for _, c := range cells {
+			pts = append(pts, in.norm(lead.X+c[0]*g, lead.Y+c[1]*g))
+		}
+		pts[len(pts)-1] = centre // the grid point nearest the centre gives way to it
+		w = in.newWay(Road, &Route{Points: pts})
+		w.Edge, w.Access = e, true
+	}
+	in.mu.Lock()
+	in.access[a.S.ID] = w
+	in.mu.Unlock()
+	return w
+}
+
 // AirportsIn returns the airports overlapping the rectangle of tiles (x, y,
 // w, h).
 func (in *Infra) AirportsIn(x, y, w, h int64) []Airport {

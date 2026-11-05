@@ -799,7 +799,10 @@ than a fixed tile.
   south side, a runway along the north side (edges with lights, a dashed
   centre line), an apron with a gate per flight (up to six), the terminal
   (a downtown prefab, locked) and a departures board (bump `airport`).
-  Paths, roads and railways ending at the metropolis route round it.
+  Paths, roads and railways ending at the metropolis route round it. An
+  access road leaves the way in straight south for 10 tiles, then is
+  routed like any road to the city's centre (round the airport; inside
+  the city its streets take over), drawn with the roads of its blocks.
 - **Flights:** every flight edge is a line with one airliner: from its gate
   at A (facing west) along the apron to the runway's west end, the take-off
   run eastwards, across to B along the axes (one corner, then in to B's

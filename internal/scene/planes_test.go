@@ -15,6 +15,21 @@ func TestFlight(t *testing.T) {
 	if !ok {
 		t.Fatal("no airport")
 	}
+	// A road leads out of the way in, towards the city.
+	ent := a.Entrance()
+	road := false
+	for _, w := range in.WaysIn(ent.X, ent.Y+5, 1, 1) {
+		road = road || w.Access
+	}
+	if !road {
+		t.Error("no access road at the airport's way in")
+	}
+	for k := int64(0); k <= 6; k++ {
+		p := world.Pos{Map: world.Main, X: ent.X, Y: ent.Y + k}
+		if h.w.Solid(p) || h.w.Terrain(p) != world.Land {
+			t.Errorf("the way in is blocked at %v", p)
+		}
+	}
 	b := a.Board()
 	board := world.Pos{Map: world.Main, X: b.X, Y: b.Y}
 	if id, ok := h.w.Bump(board); !ok || id != "airport" || !h.w.Solid(board) {

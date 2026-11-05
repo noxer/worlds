@@ -26,6 +26,7 @@ var halfWidth = [NumNetworks]int64{Path: 18, Road: 26}
 type Way struct {
 	Edge   Edge // the connection it is the route of
 	Net    Network
+	Access bool       // an airport's access road (Edge is the city to itself)
 	OX, OY int64      // origin: the route's first point, in tiles (normalised)
 	Pts    [][2]int64 // polyline relative to the origin, in 1/16 tile
 	min    [2]int64   // bounding box of Pts, in 1/16 tile
@@ -137,6 +138,13 @@ func (in *Infra) blockWith(bx, by int64, yl *yielder) []*Way {
 			if way := in.way(e, yl); way != nil && in.touches(way, x, y, BlockSize, BlockSize) {
 				ws = append(ws, way)
 			}
+		}
+	}
+	// Airports' access roads.
+	r := tierRadius[Metropolis][1] + 400
+	for _, a := range in.AirportsIn(x-r, y-r, BlockSize+2*r, BlockSize+2*r) {
+		if way := in.accessWay(a, yl); way != nil && in.touches(way, x, y, BlockSize, BlockSize) {
+			ws = append(ws, way)
 		}
 	}
 	in.mu.Lock()
