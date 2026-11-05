@@ -126,6 +126,10 @@ func (w *World) patchCell(x, y int64) (p *patch, px, py int64) {
 	return nil, 0, 0
 }
 
+// Painted reports whether a hand-made patch (fixed or placed from the
+// pool) paints main-map cell (x, y). Safe for concurrent use.
+func (w *World) Painted(x, y int64) bool { return w.painted(x, y) }
+
 // painted reports whether a patch paints main-map cell (x, y).
 func (w *World) painted(x, y int64) bool {
 	p, _, _ := w.patchCell(x, y)

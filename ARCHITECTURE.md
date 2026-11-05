@@ -721,9 +721,14 @@ than a fixed tile.
   from each pier first; grid points on land dropped; any leg touching land
   (or a pier, or a hand-made patch) searched again over the water on a
   4-tile grid (an 8-tile grid with a wider box to round an island); then
-  straightened where a straight leg stays on the water. Pool islands placed
-  by the world are unknown to infra; a ferry at cruising speed crosses one
-  in a frame. Routes are computed in the background with the ways
+  straightened where a straight leg stays on the water; then made
+  axis-aligned like rail (each diagonal leg a corner either way round over
+  the water, or split, or searched in four directions) and squared up
+  (staircases replaced by one corner where it stays on the water), so the
+  ferry always heads along an axis and the view on deck is exact. Islands
+  the world places at sea from its pool of patches are kept clear of
+  through `SetObstacles` (the world's `Painted`). Routes are computed in
+  the background with the ways
   (`Prefetch`), and the scene only draws ferries whose route is ready.
 - **Timetable:** the same machinery as trains (`transit.Line` with a
   `Kind`): 10 minutes at each pier, casting off slowly (0.3 tiles per tick
@@ -734,8 +739,9 @@ than a fixed tile.
 - **Boarding:** confirm at the end of the pier facing the water for the
   harbour's timetable (board, or wait for the next ferry), or walk into the
   moored ferry.
-- **Deck:** the `ferry` detail map (`tools/art/ferry_interior.py`): planks,
-  railing, benches (rest until the other harbour), a passenger and a
+- **Deck:** the `ferry` detail map (`tools/art/ferry_interior.py`): a hull
+  with a rounded stern and a pointed bow (sea beyond the railing), a
+  wheelhouse with a funnel amidships, benches (rest until the other harbour), a passenger and a
   deckhand, two gangways (`ferry_exit`: up at sea; at a pier, down onto the
   pier beside the ferry). The sea round the deck is the real world: the
   whole screen behind the deck shows the strip along the route, unrolled

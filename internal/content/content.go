@@ -88,7 +88,10 @@ func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 // loadInfra returns the infrastructure of the world's generator, if any.
 func loadInfra(w *world.World) (*infra.Infra, error) {
 	if g, ok := w.Generator().(interface{ Infra() *infra.Infra }); ok {
-		return g.Infra(), nil
+		in := g.Infra()
+		// Ferries keep clear of the islands the world places at sea.
+		in.SetObstacles(w.Painted)
+		return in, nil
 	}
 	return nil, nil
 }

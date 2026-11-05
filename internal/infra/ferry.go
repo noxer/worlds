@@ -18,6 +18,18 @@ const (
 	ferryLead   = 4     // tiles straight out from a pier
 )
 
+// SetObstacles tells ferry routes about cells they can't sail through
+// beyond what infra knows (islands the world places at sea from its pool
+// of patches). f must be safe for concurrent use; it doesn't change the
+// world (nothing drawn depends on ferry routes). Call it before any ferry
+// route is asked for.
+func (in *Infra) SetObstacles(f func(x, y int64) bool) {
+	in.mu.Lock()
+	in.obstacle = f
+	clear(in.ferry)
+	in.mu.Unlock()
+}
+
 // FerryRoute returns the route of the ferry on sea lane e, from A's pier
 // tip to B's, in tiles (each point the shortest way round the world from
 // the one before); nil if either end has no pier or there is no route.
@@ -79,9 +91,13 @@ func (in *Infra) findFerryRoute(e Edge, y *yielder) []Point {
 	for _, c := range append(append([]Point{}, pa.Cells...), pb.Cells...) {
 		pier[c] = true
 	}
+	in.mu.Lock()
+	obstacle := in.obstacle
+	in.mu.Unlock()
 	sea := func(x, y int64) bool {
 		p := in.norm(x, y)
-		return in.water(p.X, p.Y) && !pier[p] && (len(in.avoid) == 0 || !in.avoided(p.X, p.Y, 2))
+		return in.water(p.X, p.Y) && !pier[p] && (len(in.avoid) == 0 || !in.avoided(p.X, p.Y, 2)) &&
+			(obstacle == nil || !obstacle(p.X, p.Y))
 	}
 	// Unwrapped, from A's tip; grid points on land dropped. At each end,
 	// the ferry comes straight out from the pier first (so it lies in
@@ -108,9 +124,9 @@ func (in *Infra) findFerryRoute(e Edge, y *yielder) []Point {
 	for i := 1; i < len(keep); i++ {
 		a, b := keep[i-1], keep[i]
 		if !waterLeg(sea, a, b) {
-			path := in.waterPath(sea, a, b, ferryGrid, 16, y)
+			path := in.waterPath(sea, a, b, ferryGrid, 16, false, y)
 			if path == nil { // round an island: wider, coarser
-				path = in.waterPath(sea, a, b, 2*ferryGrid, 96, y)
+				path = in.waterPath(sea, a, b, 2*ferryGrid, 96, false, y)
 			}
 			if path != nil {
 				route = append(route, path[1:]...)
@@ -119,7 +135,98 @@ func (in *Infra) findFerryRoute(e Edge, y *yielder) []Point {
 		}
 		route = append(route, b)
 	}
-	return straighten(sea, route)
+	return squareUp(sea, in.axisAligned(sea, straighten(sea, route), y))
+}
+
+// axisAligned turns the route's diagonal legs into right angles over the
+// water (as rail does), so the ferry always heads along an axis: a corner
+// either way round, or the leg split in two, or a search on the water in
+// four directions.
+func (in *Infra) axisAligned(sea func(x, y int64) bool, pts []Point, yl *yielder) []Point {
+	out := []Point{pts[0]}
+	var leg func(a, b Point, depth int)
+	leg = func(a, b Point, depth int) {
+		if a.X == b.X || a.Y == b.Y {
+			out = append(out, b)
+			return
+		}
+		for _, c := range []Point{{b.X, a.Y}, {a.X, b.Y}} {
+			if waterLeg(sea, a, c) && waterLeg(sea, c, b) {
+				out = append(out, c, b)
+				return
+			}
+		}
+		if depth < 6 {
+			if m := (Point{a.X + (b.X-a.X)/2, a.Y + (b.Y-a.Y)/2}); m != a && sea(m.X, m.Y) {
+				leg(a, m, depth+1)
+				leg(m, b, depth+1)
+				return
+			}
+		}
+		if depth < 7 {
+			if path := in.waterPath(sea, a, b, ferryGrid, 16, true, yl); path != nil {
+				for k := 1; k < len(path); k++ {
+					leg(path[k-1], path[k], 7)
+				}
+				return
+			}
+		}
+		out = append(out, Point{b.X, a.Y}, b) // no way round: rare
+	}
+	for k := 1; k < len(pts); k++ {
+		leg(pts[k-1], pts[k], 0)
+	}
+	return out
+}
+
+// squareUp replaces runs of corners (a staircase) by a single corner where
+// that stays on the water, keeping the legs out from the piers, and drops
+// points in the middle of straight legs.
+func squareUp(sea func(x, y int64) bool, pts []Point) []Point {
+	n := len(pts)
+	if n < 5 {
+		return pts
+	}
+	out := []Point{pts[0], pts[1]}
+	for i := 1; i < n-2; {
+		done := false
+		for j := min(i+16, n-2); j >= i+2 && !done; j-- {
+			a, b := pts[i], pts[j]
+			if a.X == b.X || a.Y == b.Y {
+				if waterLeg(sea, a, b) {
+					out, i, done = append(out, b), j, true
+				}
+				continue
+			}
+			for _, c := range []Point{{b.X, a.Y}, {a.X, b.Y}} {
+				if !done && waterLeg(sea, a, c) && waterLeg(sea, c, b) {
+					out, i, done = append(out, c, b), j, true
+				}
+			}
+		}
+		if !done {
+			out = append(out, pts[i+1])
+			i++
+		}
+	}
+	out = append(out, pts[n-1])
+	// Drop points between two legs in line.
+	clean := []Point{out[0]}
+	for k := 1; k < len(out); k++ {
+		p := out[k]
+		if p == clean[len(clean)-1] {
+			continue
+		}
+		if m := len(clean); m >= 2 { // (a pier's leg stays straight out)
+			q, r := clean[m-2], clean[m-1]
+			if (q.X == r.X && r.X == p.X) || (q.Y == r.Y && r.Y == p.Y) {
+				clean[m-1] = p
+				continue
+			}
+		}
+		clean = append(clean, p)
+	}
+	return clean
 }
 
 // unwrap returns p as seen from q: the shortest way round the world.
@@ -148,7 +255,7 @@ func waterLeg(sea func(x, y int64) bool, a, b Point) bool {
 // waterPath searches a way over the water from a to b (unwrapped) on a
 // grid of g tiles, in a box around the leg at least margin cells wider;
 // nil if there is none.
-func (in *Infra) waterPath(sea func(x, y int64) bool, a, b Point, g, margin int64, yl *yielder) []Point {
+func (in *Infra) waterPath(sea func(x, y int64) bool, a, b Point, g, margin int64, four bool, yl *yielder) []Point {
 	dx, dy := b.X-a.X, b.Y-a.Y
 	gx, gy := roundDiv(dx, g), roundDiv(dy, g)
 	m := max(margin, (geom.Abs(gx)+geom.Abs(gy))/2)
@@ -164,6 +271,9 @@ func (in *Infra) waterPath(sea func(x, y int64) bool, a, b Point, g, margin int6
 	}
 	heur := func(i, j int64) int64 {
 		ax, ay := geom.Abs(gx-i), geom.Abs(gy-j)
+		if four {
+			return 100 * 10 * (ax + ay) * heuristicWeight / 100
+		}
 		return 100 * (10*max(ax, ay) + 4*min(ax, ay)) * heuristicWeight / 100
 	}
 	start, goal := idx(0, 0), idx(gx, gy)
@@ -174,6 +284,9 @@ func (in *Infra) waterPath(sea func(x, y int64) bool, a, b Point, g, margin int6
 	seq := int64(0)
 	heap.Push(open, pqItem{f: heur(0, 0), i: 0, j: 0})
 	dirs := [][3]int64{{1, 0, 10}, {-1, 0, 10}, {0, 1, 10}, {0, -1, 10}, {1, 1, 14}, {1, -1, 14}, {-1, 1, 14}, {-1, -1, 14}}
+	if four {
+		dirs = dirs[:4]
+	}
 	for expanded := 0; open.Len() > 0; {
 		it := heap.Pop(open).(pqItem)
 		k := idx(it.i, it.j)

@@ -201,6 +201,8 @@ type Infra struct {
 	cities map[ID]*CityPlan
 	ferry  map[edgeKey][]Point
 
+	obstacle func(x, y int64) bool // patches painted at sea, for ferries
+
 	prefetchAt      [2]int64
 	prefetchStarted bool
 	prefetchQueue   chan [2]int64

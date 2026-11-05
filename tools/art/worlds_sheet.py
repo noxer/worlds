@@ -24,13 +24,18 @@ Row 6 (96-107): on the ferry's deck: "ferry deck", "ferry sea" (transparent:
 the game shows the sea passing round the deck), "ferry bench", "ferry
 gangway", and the railing round the deck on its outer sides ("ferry rail
 <mask>", N=1, E=2, S=4, W=8: masks 1, 2, 4, 8, 9, 3, 12, 6), 96-107.
+Row 7 (112-126): the ferry's hull shape: "ferry hull ne" and "ferry hull
+se" (the bow's sides, deck below or above the diagonal, sea beyond),
+"ferry hull e" (the tip of the bow), "ferry hull nw" and "ferry hull sw"
+(the rounded stern), then the wheelhouse roof by its outer sides ("ferry
+roof <mask>", masks 9, 1, 3, 8, 0, 2, 12, 4, 6) and "ferry funnel".
 Deep water lives in water.png."""
 import json, math, sys
 from PIL import Image, ImageDraw
 battle, out, tsj = sys.argv[1], sys.argv[2], sys.argv[3]
 src = Image.open(battle).convert("RGBA")
 def tile(i): return src.crop((i%18*16, i//18*16, i%18*16+16, i//18*16+16))
-sheet = Image.new("RGBA", (16*16, 16*7), (0, 0, 0, 0))
+sheet = Image.new("RGBA", (16*16, 16*8), (0, 0, 0, 0))
 INK = (43, 29, 35, 255)
 def bike(ox, frame, accent, deck=False):
     d = ImageDraw.Draw(sheet)
@@ -374,6 +379,64 @@ def rail(mask):
 RAIL_MASKS = (N, E, S, W, N | W, N | E, S | W, S | E)
 for k, img in enumerate([deck(), Image.new("RGBA", (16, 16), (0, 0, 0, 0)), bench(), gangway()] + [rail(m) for m in RAIL_MASKS]):
     sheet.alpha_composite(img, (16 * k, 96))
+def masked_deck(inside):
+    """Deck where inside(x, y), transparent (the sea) elsewhere, with the
+    railing along the boundary."""
+    base = deck()
+    t = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    for y in range(16):
+        for x in range(16):
+            if inside(x + 0.5, y + 0.5):
+                t.putpixel((x, y), base.getpixel((x, y)))
+    # Railing: cells inside, within 3 px of an outside cell.
+    def near_out(x, y, r):
+        for dy in range(-r, r + 1):
+            for dx in range(-r, r + 1):
+                X, Y = x + dx, y + dy
+                if 0 <= X < 16 and 0 <= Y < 16 and not inside(X + 0.5, Y + 0.5):
+                    return True
+        return False
+    out = t.copy()
+    for y in range(16):
+        for x in range(16):
+            if t.getpixel((x, y))[3] == 0:
+                continue
+            if near_out(x, y, 1):
+                out.putpixel((x, y), INK)
+            elif near_out(x, y, 3):
+                out.putpixel((x, y), RAIL)
+            elif near_out(x, y, 4):
+                out.putpixel((x, y), INK)
+    return out
+hull = [
+    masked_deck(lambda x, y: y >= x),                       # ne: below the falling diagonal
+    masked_deck(lambda x, y: y <= 16 - x),                  # se: above the rising diagonal
+    masked_deck(lambda x, y: y >= x and y <= 16 - x),       # e: the tip
+    masked_deck(lambda x, y: (x - 16) ** 2 + (y - 16) ** 2 <= 256),  # nw: rounded corner
+    masked_deck(lambda x, y: (x - 16) ** 2 + y ** 2 <= 256),         # sw
+]
+ROOFC, ROOF_HI2, ROOF_SH = (178, 188, 206, 255), (214, 222, 236, 255), (140, 150, 170, 255)
+def roof(mask):
+    t = Image.new("RGBA", (16, 16), ROOFC)
+    d = ImageDraw.Draw(t)
+    for y in range(1, 16, 4):
+        d.line((0, y, 15, y), fill=ROOF_SH)
+    if mask & N: d.rectangle((0, 0, 15, 1), fill=INK); d.line((0, 2, 15, 2), fill=ROOF_HI2)
+    if mask & S: d.rectangle((0, 13, 15, 15), fill=INK); d.line((0, 12, 15, 12), fill=ROOF_SH)
+    if mask & W: d.rectangle((0, 0, 1, 15), fill=INK)
+    if mask & E: d.rectangle((14, 0, 15, 15), fill=INK)
+    return t
+ROOF_MASKS = (N | W, N, N | E, W, 0, E, S | W, S, S | E)
+def funnel():
+    t = roof(0)
+    d = ImageDraw.Draw(t)
+    d.ellipse((2, 2, 13, 13), fill=INK)
+    d.ellipse((3, 3, 12, 12), fill=FUNNEL)
+    d.ellipse((5, 5, 10, 10), fill=INK)
+    d.ellipse((4, 3, 8, 6), fill=(230, 110, 84, 255))
+    return t
+for k, img in enumerate(hull + [roof(m) for m in ROOF_MASKS] + [funnel()]):
+    sheet.alpha_composite(img, (16 * k, 112))
 # --- railway fence and ballast ---------------------------------------------
 POST, BAR, BAR_HI = (86, 84, 98, 255), (128, 128, 144, 255), (176, 178, 194, 255)
 def fence(mask):
@@ -427,11 +490,14 @@ for k, name in enumerate(["ferry deck", "ferry sea", "ferry bench", "ferry gangw
     if name != "ferry deck":
         ps.append(prop("solid", "bool", True))
     tiles.append({"id": 96 + k, "properties": ps})
+for k, name in enumerate(["ferry hull ne", "ferry hull se", "ferry hull e", "ferry hull nw", "ferry hull sw"]
+                         + [f"ferry roof {m}" for m in ROOF_MASKS] + ["ferry funnel"]):
+    tiles.append({"id": 112 + k, "properties": [prop("name", "string", name), prop("solid", "bool", True)]})
 tiles += [{"id": 64 + m, "properties": [prop("name", "string", f"fence {m}"), prop("solid", "bool", True)]} for m in range(16)]
 tiles.append({"id": 80, "properties": [prop("name", "string", "ballast"), prop("solid", "bool", True)]})  # no walking on the line in towns
 ts = {"type": "tileset", "version": "1.10", "tiledversion": "1.11.0", "name": "worlds",
-      "tilewidth": 16, "tileheight": 16, "tilecount": 112, "columns": 16,
-      "image": "../tiles/worlds.png", "imagewidth": 256, "imageheight": 112,
+      "tilewidth": 16, "tileheight": 16, "tilecount": 128, "columns": 16,
+      "image": "../tiles/worlds.png", "imagewidth": 256, "imageheight": 128,
       "margin": 0, "spacing": 0, "tiles": tiles}
 with open(tsj, "w") as f:
     f.write(json.dumps(ts, indent=1) + "\n")
