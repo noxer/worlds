@@ -25,6 +25,7 @@ const (
 	Train Kind = iota // on a rail line between two stations
 	Ferry             // on a sea lane between two piers
 	Bus               // on a road between two towns' bus stops
+	Taxi              // one trip, from a taxi rank to where the party asked
 )
 
 // spec is how a kind of vehicle runs.
@@ -41,6 +42,8 @@ var specs = [...]spec{
 	Ferry: {cars: 2, vMax: 600.0 / sim.TicksPerMinute, vSlow: 0.3, aSlow: 0.001, aFast: 0.02, dwell: Dwell},
 	// About 50 km/h; five minutes at a stop.
 	Bus: {cars: 2, vMax: 833.0 / sim.TicksPerMinute, vSlow: 0.25, aSlow: 0.004, aFast: 0.05, dwell: 5 * sim.TicksPerMinute},
+	// About 60 km/h; it leaves as soon as the doors are shut.
+	Taxi: {cars: 2, vMax: 1000.0 / sim.TicksPerMinute, vSlow: 0.3, aSlow: 0.006, aFast: 0.08, dwell: 2 * sim.TicksPerMinute},
 }
 
 // Timing, in ticks (60 per game minute).
@@ -117,6 +120,34 @@ func NewFerry(in *infra.Infra, e infra.Edge, worldW, worldH int64, seed uint64) 
 		}
 	}
 	return newLine(Ferry, e, pts, worldW, worldH, seed)
+}
+
+// NewTaxi makes the trip of a taxi waiting at from (its back; facing dir)
+// to to, for e (A: where it waits, B: where it goes), boarded at clock
+// time now: it leaves at once, along a road-like route with one corner,
+// first straight ahead. Nil if the trip is too short.
+func NewTaxi(e infra.Edge, from infra.Point, dir [2]int64, to infra.Point, now, worldW, worldH int64) *Line {
+	dx, dy := geom.WrapDelta(from.X, to.X, worldW), geom.WrapDelta(from.Y, to.Y, worldH)
+	pts := [][2]int64{{from.X, from.Y}}
+	// Ahead first (along dir's axis), then across.
+	if dir[0] != 0 {
+		pts = append(pts, [2]int64{from.X + dx, from.Y})
+	} else {
+		pts = append(pts, [2]int64{from.X, from.Y + dy})
+	}
+	pts = append(pts, [2]int64{from.X + dx, from.Y + dy})
+	var clean [][2]int64
+	for _, p := range pts {
+		if n := len(clean); n == 0 || clean[n-1] != p {
+			clean = append(clean, p)
+		}
+	}
+	l := newLine(Taxi, e, clean, worldW, worldH, 0)
+	if l == nil {
+		return nil
+	}
+	l.offset = geom.Mod(now, l.Cycle) // the trip starts now, waiting at A
+	return l
 }
 
 func newLine(k Kind, e infra.Edge, pts [][2]int64, worldW, worldH int64, seed uint64) *Line {

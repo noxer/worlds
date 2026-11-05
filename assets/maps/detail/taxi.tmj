@@ -1,0 +1,320 @@
+{
+ "type": "map",
+ "version": "1.10",
+ "tiledversion": "1.11.0",
+ "orientation": "orthogonal",
+ "renderorder": "right-down",
+ "infinite": false,
+ "compressionlevel": -1,
+ "width": 8,
+ "height": 4,
+ "tilewidth": 16,
+ "tileheight": 16,
+ "nextlayerid": 5,
+ "nextobjectid": 8,
+ "properties": [
+  {
+   "name": "vehicle",
+   "type": "string",
+   "value": "taxi"
+  }
+ ],
+ "tilesets": [
+  {
+   "firstgid": 1,
+   "source": "../../tilesets/worlds.tsj"
+  },
+  {
+   "firstgid": 129,
+   "source": "../../tilesets/tinydungeon.tsj"
+  }
+ ],
+ "layers": [
+  {
+   "id": 1,
+   "name": "ground",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 8,
+   "height": 4,
+   "data": [
+    55,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    55,
+    55,
+    57,
+    57,
+    57,
+    54,
+    54,
+    54,
+    56,
+    55,
+    54,
+    54,
+    54,
+    54,
+    54,
+    54,
+    56,
+    55,
+    55,
+    58,
+    55,
+    55,
+    58,
+    55,
+    55
+   ]
+  },
+  {
+   "id": 2,
+   "name": "deco",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 8,
+   "height": 4,
+   "data": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "id": 3,
+   "name": "overhead",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 8,
+   "height": 4,
+   "data": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "properties": [
+    {
+     "name": "overhead",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "objects",
+   "type": "objectgroup",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "draworder": "topdown",
+   "objects": [
+    {
+     "id": 1,
+     "name": "aboard",
+     "type": "spawn",
+     "x": 32,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "up"
+      }
+     ]
+    },
+    {
+     "id": 2,
+     "name": "exit_2",
+     "type": "train_exit",
+     "x": 32,
+     "y": 48,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "bump",
+       "type": "string",
+       "value": "taxi_exit"
+      }
+     ]
+    },
+    {
+     "id": 3,
+     "name": "exit_5",
+     "type": "train_exit",
+     "x": 80,
+     "y": 48,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "bump",
+       "type": "string",
+       "value": "taxi_exit"
+      }
+     ]
+    },
+    {
+     "id": 4,
+     "name": "seat_1_1",
+     "type": "sign",
+     "x": 16,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "train_seat"
+      }
+     ]
+    },
+    {
+     "id": 5,
+     "name": "seat_2_1",
+     "type": "sign",
+     "x": 32,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "train_seat"
+      }
+     ]
+    },
+    {
+     "id": 6,
+     "name": "seat_3_1",
+     "type": "sign",
+     "x": 48,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "train_seat"
+      }
+     ]
+    },
+    {
+     "id": 7,
+     "name": "driver",
+     "type": "npc",
+     "x": 96,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "taxi_driver"
+      },
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "right"
+      }
+     ],
+     "gid": 226
+    }
+   ]
+  }
+ ]
+}

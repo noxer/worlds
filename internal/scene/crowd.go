@@ -213,13 +213,7 @@ func (e *Explore) debugTravel() {
 			dx, dy, _ := e.w.Delta(from, world.Pos{Map: world.Main, X: s.X, Y: s.Y})
 			if d := dx*dx + dy*dy; best < 0 || d < best {
 				best = d
-				dest, found = world.Pos{Map: world.Main, X: s.X - 1, Y: s.Y + 10}, true
-				if tiers[k] == infra.Village {
-					dest.Y = s.Y + 4 // just below the well
-				}
-				if f, ok := e.infra.StationFront(s); ok && tiers[k] == infra.City {
-					dest = world.Pos{Map: world.Main, X: f.X, Y: f.Y} // at the station's door
-				}
+				dest, found = e.arrivalAt(s), true
 			}
 		}
 	}

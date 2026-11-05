@@ -110,3 +110,18 @@ bus_passenger_1:
       speaker: Passenger
       lines:
         - I ride out to my sister's every Sunday. The fields are lovely this time of year.
+
+taxi_exit:
+  start: main
+  nodes:
+    main:
+      lines:
+        - Not here, love. I'll let you out when we get there.
+
+taxi_driver:
+  start: main
+  nodes:
+    main:
+      speaker: Driver
+      lines:
+        - Sit back, I know a shortcut.

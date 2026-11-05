@@ -773,6 +773,25 @@ than a fixed tile.
   passing (the window view; the windscreen looks out by its row), and two
   doors (`bus_exit`).
 
+**Taxis (implemented: `scene/taxis.go`, `transit.NewTaxi`).**
+- **Ranks:** a taxi always waits on the road's shoulder beside every bus
+  stop, on the post's side, facing into town (`BusStop.Rank`, where it
+  fits). It blocks the way; bump it to hear about it, confirm to talk to
+  the driver.
+- **Where to:** the places the party has been to (noted when it comes
+  within a settlement's radius) and the nearest village, town and city,
+  all within 30 km, nearest first, six at most, with their distance.
+  No fares yet (there is no money).
+- **The trip:** a one-off line from the rank to the drop-off, ahead along
+  the road's axis and then across (one corner, so the window view stays
+  exact), leaving after 2 minutes at about 1,000 tiles a game minute
+  (60 km/h). It is ridden like the others, in the `taxi` detail map
+  (`tools/art/taxi_interior.py`): a back seat (rest until there), the
+  driver, windows and a windscreen with the way passing, doors
+  (`taxi_exit`). The drop-off is a city's station door, a village's
+  well, a town's plaza or, for a hand-made place, the start; the taxi
+  stands there until it drives back.
+
 **Simulation.**
 - Vehicles move in the world simulation, independent of the current scene.
 - Time passes while the party walks around inside.
@@ -1037,7 +1056,9 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    pool islands and along the axes, and a boat-shaped deck. **Buses
    done:** lines on the roads between towns, stops at the town edges with
    posts and timetables, the bus on the road, its inside with the window
-   view; a test of a whole journey. Next: taxis, aircraft.
+   view; a test of a whole journey. **Taxis done:** ranks at the bus
+   stops, the driver's choice of places visited and nearby, the ride in
+   the cab, drop-off; a test of a whole ride. Next: aircraft.
 
 ## Asset delivery
 

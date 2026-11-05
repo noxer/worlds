@@ -22,7 +22,9 @@ N=1, E=2, S=4, W=8): posts and two rails, transparent round it (deco layer).
 Row 3 also (58-63): the ferry outside, seen from above, two tiles long:
 "ferry bow e", "ferry stern e" (west: mirrored), "ferry bow s", "ferry stern
 s", "ferry bow n", "ferry stern n".
-Row 5 (80): "ballast", the gravel bed of tracks in towns.
+Row 5 (80): "ballast", the gravel bed of tracks in towns; 81-86 the taxi
+seen from above, two tiles long: "taxi front e", "taxi back e" (west:
+mirrored), "taxi front s", "taxi back s", "taxi front n", "taxi back n".
 Row 6 (96-107): on the ferry's deck: "ferry deck", "ferry sea" (transparent:
 the game shows the sea passing round the deck), "ferry bench", "ferry
 gangway", and the railing round the deck on its outer sides ("ferry rail
@@ -348,6 +350,36 @@ bn = be.rotate(90, expand=True)   # heading north: front on top
 sheet.alpha_composite(bn.crop((0, 0, 16, 16)), (16 * 10, 0))   # 10 front n
 sheet.alpha_composite(bn.crop((0, 16, 16, 32)), (16 * 11, 0))  # 11 back n
 
+TAXI, TAXI_HI, TAXI_SH = (244, 196, 48, 255), (255, 226, 120, 255), (200, 150, 30, 255)
+def taxi_e():
+    """The taxi heading east, 32x16: back tile, front tile."""
+    t = Image.new("RGBA", (32, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(t)
+    d.rounded_rectangle((3, 3, 29, 12), radius=4, fill=INK)
+    d.rounded_rectangle((4, 4, 28, 11), radius=3, fill=TAXI)
+    d.line((6, 4, 26, 4), fill=TAXI_HI)
+    d.line((6, 11, 26, 11), fill=TAXI_SH)
+    d.rectangle((19, 5, 22, 10), fill=GLASS_T)          # windscreen
+    d.rectangle((8, 5, 10, 10), fill=GLASS_T)           # rear window
+    d.rectangle((11, 5, 18, 10), fill=TAXI_HI)          # the roof
+    d.rectangle((13, 6, 16, 9), fill=INK)               # the roof sign
+    for k, (x, y) in enumerate(((14, 7), (15, 8), (13, 6), (16, 9))):
+        d.point((x, y), fill=(250, 250, 246, 255))
+    d.point((28, 5), fill=(255, 246, 200, 255))          # headlights
+    d.point((28, 10), fill=(255, 246, 200, 255))
+    d.point((4, 5), fill=(220, 60, 50, 255))             # tail lights
+    d.point((4, 10), fill=(220, 60, 50, 255))
+    return t
+te = taxi_e()
+sheet.alpha_composite(te.crop((16, 0, 32, 16)), (16 * 1, 80))  # 81 front e
+sheet.alpha_composite(te.crop((0, 0, 16, 16)), (16 * 2, 80))   # 82 back e
+ts_ = te.rotate(-90, expand=True)
+sheet.alpha_composite(ts_.crop((0, 16, 16, 32)), (16 * 3, 80))  # 83 front s
+sheet.alpha_composite(ts_.crop((0, 0, 16, 16)), (16 * 4, 80))   # 84 back s
+tn = te.rotate(90, expand=True)
+sheet.alpha_composite(tn.crop((0, 0, 16, 16)), (16 * 5, 80))    # 85 front n
+sheet.alpha_composite(tn.crop((0, 16, 16, 32)), (16 * 6, 80))   # 86 back n
+
 # --- the ferry ---------------------------------------------------------------
 HULL, HULL_SH = (236, 238, 242, 255), (196, 200, 210, 255)
 STRIPE = (58, 96, 140, 255)
@@ -531,6 +563,8 @@ tiles = [
     {"id": 3, "properties": [prop("light", "float", 3.5)]},
     {"id": 4, "properties": [prop("solid", "bool", True), prop("above", "int", 5), prop("name", "string", "bus stop")]},
 ]
+for k, name in enumerate(("taxi front e", "taxi back e", "taxi front s", "taxi back s", "taxi front n", "taxi back n")):
+    tiles.append({"id": 81 + k, "properties": [prop("name", "string", name)]})
 for k, name in enumerate(("bus front e", "bus back e", "bus front s", "bus back s", "bus front n", "bus back n")):
     tiles.append({"id": 6 + k, "properties": [prop("name", "string", name)]})
 tiles += [{"id": 16 + m, "properties": [prop("name", "string", f"rail {m}")]} for m in range(16)]

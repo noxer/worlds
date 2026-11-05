@@ -65,6 +65,7 @@ var vehicles = map[transit.Kind]vehicle{
 	transit.Train: {trainMap, "train_exit", "No trains run from here.", "End of the line. Everyone off, please."},
 	transit.Ferry: {ferryMap, "ferry_exit", "No ferries sail from here.", "All ashore, please."},
 	transit.Bus:   {busMap, "bus_exit", "No buses stop here.", "Last stop. Everyone off, please."},
+	transit.Taxi:  {taxiMap, "taxi_exit", "", "Here we are. Mind the door."},
 }
 
 // vehicleMap is the detail map a line's vehicle is ridden in.
@@ -127,9 +128,19 @@ func (e *Explore) updateTrains() {
 			}
 		}
 	}
+	e.updateTaxis()
+	if t := e.lastTaxi; t != nil {
+		if st := t.At(float64(e.clock.Ticks())); st.Moving && !st.ToB && st.Front < t.Length-float64(trainReach) {
+			e.lastTaxi = nil // gone back
+		}
+	}
 	clear(e.trainCells)
 	if l.Pos.Map.IsMain() {
-		for _, line := range e.nearLines {
+		lines := e.nearLines
+		if e.lastTaxi != nil {
+			lines = append(lines[:len(lines):len(lines)], e.lastTaxi)
+		}
+		for _, line := range lines {
 			st := line.At(float64(e.clock.Ticks()))
 			for _, c := range line.CarsAt(st) {
 				p := world.Pos{Map: world.Main, X: geom.Mod(int64(math.Round(c.X)), e.w.W), Y: geom.Mod(int64(math.Round(c.Y)), e.w.H)}
@@ -209,12 +220,15 @@ func (e *Explore) trainBump(p world.Pos) bool {
 			e.say(e.infra.Name(s) + " Station: departures. Press to read the timetable.")
 			return true
 		}
+	case e.ranks != nil && p.Map.IsMain() && func() bool { _, ok := e.ranks[p]; return ok }():
+		e.say("A taxi. Press to talk to the driver.")
+		return true
 	case ok && id == "bus_stop":
 		if s, _, ok := e.busStopAt(p); ok {
 			e.say(e.infra.Name(s) + " bus stop. Press to read the timetable.")
 			return true
 		}
-	case ok && (id == "train_exit" || id == "ferry_exit" || id == "bus_exit"):
+	case ok && (id == "train_exit" || id == "ferry_exit" || id == "bus_exit" || id == "taxi_exit"):
 		e.leaveTrain(false)
 		return true
 	}
@@ -231,6 +245,10 @@ func (e *Explore) trainTalk(ctx *Context, p world.Pos) bool {
 		if !c.st.Moving {
 			e.board(c.line, c.st.ToB)
 		}
+		return true
+	}
+	if st, ok := e.ranks[p]; ok && p.Map.IsMain() {
+		e.taxiOffer(ctx, st)
 		return true
 	}
 	id, _ := e.w.Bump(p)
@@ -411,6 +429,9 @@ func (e *Explore) leaveTrain(forced bool) {
 			if pier, ok = e.infra.Harbour(at); ok { // the end of the pier
 				front = pier.Cells[len(pier.Cells)-1]
 			}
+		case transit.Taxi:
+			a := e.arrivalAt(at)
+			front, ok = infra.Point{X: a.X, Y: a.Y}, true
 		case transit.Bus:
 			br := e.infra.BusRoute(r.line.Edge)
 			if ok = br != nil; ok {
@@ -426,6 +447,9 @@ func (e *Explore) leaveTrain(forced bool) {
 		to = world.Pos{Map: world.Main, X: front.X, Y: front.Y}
 	}
 	e.ride = nil
+	if r.line.Kind == transit.Taxi {
+		e.lastTaxi = r.line // it stands there until it drives back
+	}
 	e.warp = &world.Warp{To: to, Facing: world.Down, HasFacing: true}
 	e.fade = fadeTicks
 	if forced {
@@ -464,45 +488,38 @@ func (e *Explore) restOffer(ctx *Context) {
 }
 
 // trainSprite returns the tile of a car (or half of a ferry).
-func (e *Explore) trainSprite(l *transit.Line, c transit.Car) (img *ebiten.Image, flip bool) {
-	name := "train car h"
-	part := "stern"
-	if c.Loco {
-		part = "bow"
-	}
-	if l.Kind == transit.Bus {
-		part = "back"
-		if c.Loco {
-			part = "front"
+func (e *Explore) trainSprite(kind transit.Kind, c transit.Car) (img *ebiten.Image, flip bool) {
+	var name string
+	if kind == transit.Train {
+		switch {
+		case c.Loco && c.Facing == world.Right:
+			name = "train loco e"
+		case c.Loco && c.Facing == world.Left:
+			name, flip = "train loco e", true
+		case c.Loco && c.Facing == world.Down:
+			name = "train loco s"
+		case c.Loco:
+			name = "train loco n"
+		case c.Facing == world.Up || c.Facing == world.Down:
+			name = "train car v"
+		default:
+			name = "train car h"
 		}
-	}
-	switch {
-	case l.Kind == transit.Bus && c.Facing == world.Right:
-		name = "bus " + part + " e"
-	case l.Kind == transit.Bus && c.Facing == world.Left:
-		name, flip = "bus "+part+" e", true
-	case l.Kind == transit.Bus && c.Facing == world.Down:
-		name = "bus " + part + " s"
-	case l.Kind == transit.Bus:
-		name = "bus " + part + " n"
-	case l.Kind == transit.Ferry && c.Facing == world.Right:
-		name = "ferry " + part + " e"
-	case l.Kind == transit.Ferry && c.Facing == world.Left:
-		name, flip = "ferry "+part+" e", true
-	case l.Kind == transit.Ferry && c.Facing == world.Down:
-		name = "ferry " + part + " s"
-	case l.Kind == transit.Ferry:
-		name = "ferry " + part + " n"
-	case c.Loco && c.Facing == world.Right:
-		name = "train loco e"
-	case c.Loco && c.Facing == world.Left:
-		name, flip = "train loco e", true
-	case c.Loco && c.Facing == world.Down:
-		name = "train loco s"
-	case c.Loco:
-		name = "train loco n"
-	case c.Facing == world.Up || c.Facing == world.Down:
-		name = "train car v"
+	} else {
+		// Two-tile vehicles: "<what> <part> <heading>", west mirrored.
+		what, front, back := "ferry", "bow", "stern"
+		switch kind {
+		case transit.Bus:
+			what, front, back = "bus", "front", "back"
+		case transit.Taxi:
+			what, front, back = "taxi", "front", "back"
+		}
+		part := back
+		if c.Loco {
+			part = front
+		}
+		heading := map[world.Dir]string{world.Right: "e", world.Left: "e", world.Down: "s", world.Up: "n"}[c.Facing]
+		name, flip = what+" "+part+" "+heading, c.Facing == world.Left
 	}
 	t, ok := e.trainTiles[name]
 	if !ok {
@@ -524,14 +541,27 @@ func (e *Explore) trainDrawables(m world.MapRef, alpha float64) []drawable {
 	cx, cy := e.cameraAt(alpha)
 	t := e.trainTick(alpha)
 	var out []drawable
-	for _, line := range e.nearLines {
-		for _, c := range line.CarsAt(line.At(t)) {
+	add := func(kind transit.Kind, cars []transit.Car) {
+		for _, c := range cars {
 			x, y := e.screenAt(m, c.X*tile, c.Y*tile, cx, cy)
 			if x < -tile || y < -tile || x > float64(e.viewW) || y > float64(e.viewH) {
 				continue
 			}
-			img, flip := e.trainSprite(line, c)
+			img, flip := e.trainSprite(kind, c)
 			out = append(out, drawable{img: img, flip: flip, x: x, y: y})
+		}
+	}
+	for _, line := range e.nearLines {
+		add(line.Kind, line.CarsAt(line.At(t)))
+	}
+	if e.lastTaxi != nil {
+		add(transit.Taxi, e.lastTaxi.CarsAt(e.lastTaxi.At(t)))
+	}
+	seen := map[infra.Point]bool{}
+	for _, st := range e.ranks {
+		if !seen[st.Rank] {
+			seen[st.Rank] = true
+			add(transit.Taxi, rankTaxi(st, e.w))
 		}
 	}
 	return out

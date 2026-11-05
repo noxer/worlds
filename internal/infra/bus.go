@@ -12,6 +12,25 @@ type BusStop struct {
 	S    Settlement
 	Stop Point // the road tile where the bus waits
 	Pole Point // the stop's sign beside the road (solid)
+	// A taxi waits on the shoulder beside the bus, on the pole's side,
+	// facing into town: its front at Rank, its back one tile behind
+	// (Rank - RankDir). HasRank is false where it wouldn't fit.
+	Rank    Point
+	RankDir [2]int64
+	HasRank bool
+}
+
+// axis returns the unit step along the main axis of (dx, dy).
+func axis(dx, dy float64) [2]int64 {
+	switch {
+	case math.Abs(dx) >= math.Abs(dy) && dx >= 0:
+		return [2]int64{1, 0}
+	case math.Abs(dx) >= math.Abs(dy):
+		return [2]int64{-1, 0}
+	case dy > 0:
+		return [2]int64{0, 1}
+	}
+	return [2]int64{0, -1}
 }
 
 // BusRoute is the line a bus follows: the road between its two stops.
@@ -173,6 +192,20 @@ func (in *Infra) busRoute(e Edge) *BusRoute {
 			p := in.norm(px, py)
 			if !in.water(p.X, p.Y) && !ins(p) && !in.avoided(p.X, p.Y, 0) {
 				st.Pole = p
+				// The taxi rank: on the shoulder, facing into town (the
+				// way out of town is out*(dx, dy) for B, -… for A).
+				rx := w.OX + int64(math.Round(x-dy*side*1.2))
+				ry := w.OY + int64(math.Round(y+dx*side*1.2))
+				st.Rank, st.RankDir = in.norm(rx, ry), axis(dx*out, dy*out)
+				outA := axis(-dx*out, -dy*out) // the bus's front: one tile out of town
+				back := in.norm(st.Rank.X-st.RankDir[0], st.Rank.Y-st.RankDir[1])
+				busFront := in.norm(st.Stop.X+outA[0], st.Stop.Y+outA[1])
+				st.HasRank = true
+				for _, q := range []Point{st.Rank, back} {
+					if q == st.Stop || q == busFront || q == st.Pole || in.water(q.X, q.Y) || ins(q) {
+						st.HasRank = false
+					}
+				}
 				return st, true
 			}
 		}

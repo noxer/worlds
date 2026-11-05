@@ -83,6 +83,9 @@ type Explore struct {
 	nearLines     []*transit.Line
 	trainCells    map[world.Pos]trainCar
 	trainTiles    map[string]int
+	ranks         map[world.Pos]infra.BusStop   // parked taxis near the party (see taxis.go)
+	visited       map[infra.ID]infra.Settlement // places the party has been to
+	lastTaxi      *transit.Line                 // the taxi just left, until it drives off
 	ride          *ride
 	viewImg       *ebiten.Image
 	pendingNotice string // shown when the fade is over
@@ -127,6 +130,7 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		lines:      map[infra.Edge]*transit.Line{},
 		trainCells: map[world.Pos]trainCar{},
 		trainTiles: map[string]int{},
+		visited:    map[infra.ID]infra.Settlement{},
 		signs:      map[world.Pos]string{},
 		bumps:      map[world.Pos]string{},
 	}
@@ -192,6 +196,9 @@ func (e *Explore) npcAt(p world.Pos) *NPC {
 
 func (e *Explore) blocked(p world.Pos) bool {
 	if _, ok := e.trainAt(p); ok {
+		return true
+	}
+	if _, ok := e.ranks[p]; ok {
 		return true
 	}
 	return e.npcAt(p) != nil
@@ -706,7 +713,7 @@ func (e *Explore) DrawWorld(screen *ebiten.Image, scale, offX, offY int, alpha f
 	mp := e.party.Leader().Pos.Map
 	e.groundImg.Fill(gfx.ColorVoid)
 	switch mp.Template {
-	case trainMap, busMap:
+	case trainMap, busMap, taxiMap:
 		e.drawWindowView(e.groundImg, alpha)
 	case ferryMap:
 		e.drawSeaView(e.groundImg, alpha)
