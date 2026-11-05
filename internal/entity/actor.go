@@ -14,7 +14,8 @@ type Sprite struct {
 	Sheet string
 	Index int
 	// Walk, if set, has animation frames by facing (indexed by world.Dir):
-	// the standing frame, then the walking frames, one per step in turn.
+	// the standing frame, then the walking frames, one per step in turn,
+	// each for the first half of its step (the standing frame between).
 	Walk *[4][]int
 	// FacesLeft says the side frames face left (mirrored when facing
 	// right); otherwise sprites face right (mirrored when facing left).
@@ -174,7 +175,10 @@ func (a *Actor) Frame() (index int, flip bool) {
 	}
 	frames := s.Walk[a.Facing]
 	index = frames[0]
-	if a.stepping && len(frames) > 1 {
+	// Walking, the standing frame is part of the cycle: each step shows
+	// its stepping frame for the first half and stands for the second
+	// (stand, left, stand, right with two stepping frames).
+	if a.stepping && len(frames) > 1 && a.tick < (a.stepTicks+1)/2 {
 		index = frames[1+a.steps%(len(frames)-1)]
 	}
 	if s.FacesLeft {
