@@ -227,23 +227,50 @@ func (c *CityPlan) sb(i, j int64) *superblock {
 	return s
 }
 
-func (c *CityPlan) newSuperblock(i, j int64) *superblock {
+// inPlan reports whether superblock (i, j) is part of the city: within
+// its outline, on dry land and away from hand-made patches (at the centre
+// and corners). Cheap: it builds nothing.
+func (c *CityPlan) inPlan(i, j int64) bool {
 	in := c.in
-	s := &superblock{plots: map[[3]int64][]plot{}}
 	x0, y0 := c.ox+i*c.A, c.oy+j*c.A
-	mx, my := x0+c.A/2, y0+c.A/2
-	dx, dy := in.delta(c.S.X, c.S.Y, mx, my)
-	d2 := dx*dx + dy*dy
-	if r := c.radiusTowards(dx, dy); d2 > r*r {
-		return s
+	dx, dy := in.delta(c.S.X, c.S.Y, x0+c.A/2, y0+c.A/2)
+	if r := c.radiusTowards(dx, dy); dx*dx+dy*dy > r*r {
+		return false
 	}
-	// Dry land and away from hand-made patches, at the centre and corners.
 	for _, p := range [5][2]int64{{c.A / 2, c.A / 2}, {1, 1}, {c.A - 1, 1}, {1, c.A - 1}, {c.A - 1, c.A - 1}} {
 		x, y := geom.Mod(x0+p[0], in.w), geom.Mod(y0+p[1], in.h)
 		if in.elev(x, y) < in.sea+48 || in.avoided(x, y, c.A/4) {
-			return s
+			return false
 		}
 	}
+	return true
+}
+
+// Covers reports whether tile (x, y) belongs to the city (At would not
+// return CNone), without working out what is there.
+func (c *CityPlan) Covers(x, y int64) bool {
+	i, j, u, v := c.grid(x, y)
+	vert, hor := u < arterial, v < arterial
+	switch {
+	case vert && hor:
+		return c.inPlan(i, j) || c.inPlan(i-1, j) || c.inPlan(i, j-1) || c.inPlan(i-1, j-1)
+	case vert:
+		return c.inPlan(i, j) || c.inPlan(i-1, j)
+	case hor:
+		return c.inPlan(i, j) || c.inPlan(i, j-1)
+	}
+	return c.inPlan(i, j)
+}
+
+func (c *CityPlan) newSuperblock(i, j int64) *superblock {
+	in := c.in
+	s := &superblock{plots: map[[3]int64][]plot{}}
+	if !c.inPlan(i, j) {
+		return s
+	}
+	x0, y0 := c.ox+i*c.A, c.oy+j*c.A
+	dx, dy := in.delta(c.S.X, c.S.Y, x0+c.A/2, y0+c.A/2)
+	d2 := dx*dx + dy*dy
 	h := hash(in.seed^salt, 0x63697479, int64(c.S.ID.Tier), c.S.ID.CX, c.S.ID.CY, i, j) // "city"
 	d := c.density(d2)
 	s.district = c.district(i, j)

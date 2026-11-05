@@ -193,7 +193,7 @@ func itoa(i int) string {
 
 // debugTravel jumps (through the usual fade) to the plaza of the nearest
 // generated village, then town, then city, then the end of the nearest
-// ferry pier, then back home: a quick way to
+// ferry pier, then the nearest bus stop, then back home: a quick way to
 // look at places that are hours apart on foot.
 func (e *Explore) debugTravel() {
 	if e.infra == nil {
@@ -234,6 +234,27 @@ func (e *Explore) debugTravel() {
 			facing, _ = e.w.DirBetween(dest, world.Pos{Map: world.Main, X: pier.Tip.X, Y: pier.Tip.Y})
 		}
 	}
+	if !found && e.travel == len(tiers)+1 {
+		// Then the nearest bus stop, beside its post.
+		e.travel++
+		if st, ok := e.busStopNear(from); ok {
+			// Next to the post on the side towards the road, facing it.
+			pole := world.Pos{Map: world.Main, X: st.Pole.X, Y: st.Pole.Y}
+			dx, dy, _ := e.w.Delta(pole, world.Pos{Map: world.Main, X: st.Stop.X, Y: st.Stop.Y})
+			toRoad := world.Down
+			switch {
+			case geom.Abs(dx) >= geom.Abs(dy) && dx > 0:
+				toRoad = world.Right
+			case geom.Abs(dx) >= geom.Abs(dy):
+				toRoad = world.Left
+			case dy < 0:
+				toRoad = world.Up
+			}
+			if q, ok := e.w.Neighbor(pole, toRoad); ok {
+				dest, facing, found = q, opposite(toRoad), true
+			}
+		}
+	}
 	if !found {
 		dest, e.travel = e.home, 0
 	}
@@ -243,6 +264,27 @@ func (e *Explore) debugTravel() {
 	}
 	e.warp = &world.Warp{To: dest, Facing: facing, HasFacing: true}
 	e.fade = fadeTicks
+}
+
+// busStopNear returns the bus stop nearest p (of the towns within reach).
+func (e *Explore) busStopNear(p world.Pos) (infra.BusStop, bool) {
+	best := int64(-1)
+	var bs infra.BusStop
+	for _, s := range e.infra.Near(p.X, p.Y, 4*infra.Town.Cell(), infra.Town) {
+		for _, edge := range e.infra.Edges(infra.Road, s) {
+			r := e.infra.BusRoute(edge)
+			if r == nil {
+				continue
+			}
+			for _, st := range []infra.BusStop{r.A, r.B} {
+				dx, dy, _ := e.w.Delta(p, world.Pos{Map: world.Main, X: st.Stop.X, Y: st.Stop.Y})
+				if d := dx*dx + dy*dy; best < 0 || d < best {
+					best, bs = d, st
+				}
+			}
+		}
+	}
+	return bs, best >= 0
 }
 
 // ferryHarbourNear returns the harbour with a ferry nearest p (as the crow

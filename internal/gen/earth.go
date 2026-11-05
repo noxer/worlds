@@ -35,6 +35,7 @@ type Earth struct {
 	cobble    world.Tile            // road
 	prefabs   []*world.Prefab       // by the index of infra.Building.Prefab
 	lamp      [2]world.Tile         // lamp post and lantern (the tile above)
+	busStop   [2]world.Tile         // bus stop post and sign (the tile above)
 	rail      [16]world.Tile        // track by connected sides (N=1, E=2, S=4, W=8)
 	pier      [16]world.Tile        // pier by connected sides
 	fence     [16]world.Tile        // railway fence by connected sides
@@ -108,6 +109,10 @@ func NewEarth(info world.GenInfo) (world.Generator, error) {
 	if t, err2 := info.Tilesets.Named("worlds", "lamp_post"); err2 == nil {
 		top, _ := info.Tilesets.Above(t)
 		e.lamp = [2]world.Tile{t, top}
+	}
+	if t, err2 := info.Tilesets.Named("worlds", "bus stop"); err2 == nil {
+		top, _ := info.Tilesets.Above(t)
+		e.busStop = [2]world.Tile{t, top}
 	}
 	for m := range 16 {
 		if e.rail[m], err = info.Tilesets.Named("worlds", fmt.Sprintf("rail %d", m)); err != nil {
@@ -373,6 +378,33 @@ func (e *Earth) Generate(seed uint64, b *world.ChunkBuilder) {
 	e.buildings(b, r)
 	e.cityTiles(b, r)
 	e.railsAndPiers(b, r)
+	e.busStops(b)
+}
+
+// busStops puts the bus stop posts (bump "bus_stop") and their signs into
+// the chunk, clearing what grew there.
+func (e *Earth) busStops(b *world.ChunkBuilder) {
+	if e.infra == nil || e.busStop[0].Empty() {
+		return
+	}
+	cx, cy := b.CX*world.ChunkSize, b.CY*world.ChunkSize
+	for _, st := range e.infra.BusStopsIn(cx, cy-1, world.ChunkSize, world.ChunkSize+2) {
+		for k, l := range []int64{0, -1} { // the post, the sign above
+			lx, ly := geom.WrapDelta(cx, st.Pole.X, b.W()), geom.WrapDelta(cy, st.Pole.Y+l, b.H())
+			if lx < 0 || ly < 0 || lx >= world.ChunkSize || ly >= world.ChunkSize {
+				continue
+			}
+			x, y := int(lx), int(ly)
+			b.Set(world.LayerDeco, x, y, 0)
+			b.Set(world.LayerOverhead, x, y, 0)
+			if k == 0 {
+				b.Set(world.LayerDeco, x, y, e.busStop[0])
+				b.Bump(x, y, "bus_stop")
+			} else {
+				b.Set(world.LayerOverhead, x, y, e.busStop[1])
+			}
+		}
+	}
 }
 
 // Tiles of Kenney's RPG Urban Pack used by cities.

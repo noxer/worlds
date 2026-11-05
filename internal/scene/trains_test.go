@@ -84,7 +84,7 @@ func TestTrainJourney(t *testing.T) {
 	// Resting on a seat: woken on arrival.
 	var seat world.Pos
 	for p, id := range h.e.signs {
-		if id == "train_seat" {
+		if id == "train_seat" && p.Map == h.leader().Pos.Map {
 			seat = p
 			break
 		}

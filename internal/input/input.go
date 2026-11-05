@@ -27,8 +27,8 @@ const (
 	Debug
 	// DebugTime skips an hour while the debug overlay is on.
 	DebugTime
-	// DebugTravel jumps to the nearest village, town, city, ferry pier and home in
-	// turn while the debug overlay is on.
+	// DebugTravel jumps to the nearest village, town, city, ferry pier,
+	// bus stop and home in turn while the debug overlay is on.
 	DebugTravel
 	// NumActions is the number of actions.
 	NumActions

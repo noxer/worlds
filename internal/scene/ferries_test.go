@@ -60,7 +60,7 @@ func TestFerryJourney(t *testing.T) {
 	}
 	var gangway world.Pos
 	for p, id := range h.e.bumps {
-		if id == "ferry_exit" {
+		if id == "ferry_exit" && p.Map == h.leader().Pos.Map {
 			gangway = p
 			break
 		}
@@ -105,7 +105,7 @@ func TestFerryJourney(t *testing.T) {
 	// A rest on a bench until the other harbour.
 	var bench world.Pos
 	for p, id := range h.e.signs {
-		if id == "ferry_bench" {
+		if id == "ferry_bench" && p.Map == h.leader().Pos.Map {
 			bench = p
 			break
 		}

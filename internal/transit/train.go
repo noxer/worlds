@@ -24,24 +24,28 @@ type Kind uint8
 const (
 	Train Kind = iota // on a rail line between two stations
 	Ferry             // on a sea lane between two piers
+	Bus               // on a road between two towns' bus stops
 )
 
 // spec is how a kind of vehicle runs.
 type spec struct {
 	cars                      int     // cars (a train's locomotive included; a ferry's bow and stern)
 	vMax, vSlow, aSlow, aFast float64 // tiles per tick and tiles per tick²
+	dwell                     int64   // ticks at each end
 }
 
 var specs = [...]spec{
 	// About 120 km/h; leaving gently up to half a tile per tick.
-	Train: {cars: 4, vMax: 2000.0 / sim.TicksPerMinute, vSlow: 0.5, aSlow: 0.002, aFast: 0.2},
+	Train: {cars: 4, vMax: 2000.0 / sim.TicksPerMinute, vSlow: 0.5, aSlow: 0.002, aFast: 0.2, dwell: Dwell},
 	// About 36 km/h; casting off slowly.
-	Ferry: {cars: 2, vMax: 600.0 / sim.TicksPerMinute, vSlow: 0.3, aSlow: 0.001, aFast: 0.02},
+	Ferry: {cars: 2, vMax: 600.0 / sim.TicksPerMinute, vSlow: 0.3, aSlow: 0.001, aFast: 0.02, dwell: Dwell},
+	// About 50 km/h; five minutes at a stop.
+	Bus: {cars: 2, vMax: 833.0 / sim.TicksPerMinute, vSlow: 0.25, aSlow: 0.004, aFast: 0.05, dwell: 5 * sim.TicksPerMinute},
 }
 
 // Timing, in ticks (60 per game minute).
 const (
-	Dwell  = 10 * sim.TicksPerMinute // waiting at a station or pier before leaving
+	Dwell  = 10 * sim.TicksPerMinute // a train's or ferry's wait at a station or pier before leaving
 	cycleK = 0x747261696e            // "train"
 )
 
@@ -50,6 +54,7 @@ type Line struct {
 	Kind   Kind
 	Edge   infra.Edge
 	Cars   int          // cars of its vehicle
+	Dwell  int64        // ticks it waits at each end
 	ox, oy int64        // the route's first tile (A's end), normalised
 	pts    [][2]float64 // route corners in tiles relative to (ox, oy)
 	cum    []float64    // route distance to each corner
@@ -80,6 +85,16 @@ func NewLine(in *infra.Infra, e infra.Edge, worldW, worldH int64, seed uint64) *
 	return newLine(Train, e, pts, worldW, worldH, seed)
 }
 
+// NewBus makes the bus line of a road edge, between its two towns' bus
+// stops, or returns nil if it has none.
+func NewBus(in *infra.Infra, e infra.Edge, worldW, worldH int64, seed uint64) *Line {
+	r := in.BusRoute(e)
+	if r == nil {
+		return nil
+	}
+	return newLineF(Bus, e, r.OX, r.OY, r.Pts, worldW, worldH, seed)
+}
+
 // NewFerry makes the line of a sea lane, from pier tip to pier tip, or
 // returns nil if it has no ferry route (infra.FerryRoute, which it computes
 // if it isn't ready).
@@ -108,12 +123,22 @@ func newLine(k Kind, e infra.Edge, pts [][2]int64, worldW, worldH int64, seed ui
 	if len(pts) < 2 {
 		return nil
 	}
-	sp := specs[k]
-	l := &Line{Kind: k, Edge: e, Cars: sp.cars, w: worldW, h: worldH}
-	l.ox, l.oy = geom.Mod(pts[0][0], worldW), geom.Mod(pts[0][1], worldH)
-	for _, p := range pts {
-		l.pts = append(l.pts, [2]float64{float64(p[0] - pts[0][0]), float64(p[1] - pts[0][1])})
+	rel := make([][2]float64, len(pts))
+	for i, p := range pts {
+		rel[i] = [2]float64{float64(p[0] - pts[0][0]), float64(p[1] - pts[0][1])}
 	}
+	return newLineF(k, e, pts[0][0], pts[0][1], rel, worldW, worldH, seed)
+}
+
+// newLineF makes a line through points in tiles relative to (ox, oy).
+func newLineF(k Kind, e infra.Edge, ox, oy int64, pts [][2]float64, worldW, worldH int64, seed uint64) *Line {
+	if len(pts) < 2 {
+		return nil
+	}
+	sp := specs[k]
+	l := &Line{Kind: k, Edge: e, Cars: sp.cars, Dwell: sp.dwell, w: worldW, h: worldH}
+	l.ox, l.oy = geom.Mod(ox, worldW), geom.Mod(oy, worldH)
+	l.pts = pts
 	l.cum = make([]float64, len(l.pts))
 	for i := 1; i < len(l.pts); i++ {
 		a, b := l.pts[i-1], l.pts[i]
@@ -125,7 +150,7 @@ func newLine(k Kind, e infra.Edge, pts [][2]int64, worldW, worldH int64, seed ui
 	}
 	l.prof = newProfile(l.Length-float64(l.Cars-1), sp)
 	l.Travel = int64(math.Ceil(l.prof.total))
-	l.Cycle = 2 * (Dwell + l.Travel)
+	l.Cycle = 2 * (l.Dwell + l.Travel)
 	h := uint64(seed) ^ cycleK ^ uint64(k)
 	for _, v := range []int64{e.A.ID.CX, e.A.ID.CY, e.B.ID.CX, e.B.ID.CY} {
 		h = (h ^ uint64(v)) * 0x9e3779b97f4a7c15
@@ -212,18 +237,18 @@ func (l *Line) At(t float64) State {
 	tr := float64(l.Travel)
 	back := float64(l.Cars - 1) // the locomotive (or bow) is this far from the end
 	switch {
-	case c < Dwell:
-		return State{AtA: true, ToB: true, Front: back, Since: start, Until: start + Dwell}
-	case c < Dwell+l.Travel:
-		run := float64(c-Dwell) + frac
+	case c < l.Dwell:
+		return State{AtA: true, ToB: true, Front: back, Since: start, Until: start + l.Dwell}
+	case c < l.Dwell+l.Travel:
+		run := float64(c-l.Dwell) + frac
 		return State{Moving: true, ToB: true, Front: back + l.prof.at(min(run, tr)),
-			Since: start + Dwell, Until: start + Dwell + l.Travel}
-	case c < 2*Dwell+l.Travel:
-		s := start + Dwell + l.Travel
-		return State{Front: l.Length - back, Since: s, Until: s + Dwell}
+			Since: start + l.Dwell, Until: start + l.Dwell + l.Travel}
+	case c < 2*l.Dwell+l.Travel:
+		s := start + l.Dwell + l.Travel
+		return State{Front: l.Length - back, Since: s, Until: s + l.Dwell}
 	}
-	run := float64(c-2*Dwell-l.Travel) + frac
-	s := start + 2*Dwell + l.Travel
+	run := float64(c-2*l.Dwell-l.Travel) + frac
+	s := start + 2*l.Dwell + l.Travel
 	return State{Moving: true, Front: l.Length - back - l.prof.at(min(run, tr)), Since: s, Until: s + l.Travel}
 }
 
@@ -234,12 +259,12 @@ func (l *Line) NextStop(t int64, atA bool) (arrive, leave int64) {
 	start := t - c
 	at := int64(0) // standing at A from the cycle's start
 	if !atA {
-		at = Dwell + l.Travel
+		at = l.Dwell + l.Travel
 	}
-	if c >= at+Dwell {
+	if c >= at+l.Dwell {
 		start += l.Cycle
 	}
-	return start + at, start + at + Dwell
+	return start + at, start + at + l.Dwell
 }
 
 // Pos returns the tile position (fractional, normalised) of route
@@ -288,8 +313,8 @@ type Car struct {
 // locomotive (or bow) first.
 func (l *Line) CarsAt(st State) []Car {
 	out := make([]Car, l.Cars)
-	if l.Kind == Ferry {
-		return l.ferryAt(st, out)
+	if l.Kind != Train {
+		return l.rigidAt(st, out)
 	}
 	for k := range l.Cars {
 		s := st.Front - float64(k) // heading for B: the cars trail towards A
@@ -305,10 +330,10 @@ func (l *Line) CarsAt(st State) []Car {
 	return out
 }
 
-// ferryAt places a ferry: its bow where the route puts it, its stern
-// right behind, in line along the main direction of the route there (a
-// boat doesn't bend round corners like a train).
-func (l *Line) ferryAt(st State, out []Car) []Car {
+// rigidAt places a ferry or a bus: its front where the route puts it, its
+// back right behind, in line along the main direction of the route there
+// (it doesn't bend round corners like a train).
+func (l *Line) rigidAt(st State, out []Car) []Car {
 	s, back := st.Front, st.Front-1
 	if !st.ToB {
 		back = st.Front + 1

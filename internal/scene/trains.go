@@ -25,6 +25,7 @@ import (
 const (
 	trainMap      world.MapID = "train" // the carriage's detail map
 	ferryMap      world.MapID = "ferry" // the ferry's deck
+	busMap        world.MapID = "bus"   // the inside of a bus
 	trainReach                = 48      // lines this close to the party are drawn
 	ferryReach                = 3000    // harbours this close have their ferries drawn
 	viewSlowTiles             = 150     // near stations, the window shows the real place
@@ -52,13 +53,22 @@ func (e *Explore) trainTick(alpha float64) float64 {
 	return float64(e.clock.Ticks()) + min(max(alpha, 0), 1)
 }
 
-// vehicleMap is the detail map a line's vehicle is ridden in.
-func vehicleMap(l *transit.Line) world.MapID {
-	if l.Kind == transit.Ferry {
-		return ferryMap
-	}
-	return trainMap
+// vehicle is how the scene treats a kind of vehicle.
+type vehicle struct {
+	mapID  world.MapID // the detail map it is ridden in
+	exit   string      // the doors' bump id, and the dialog while they stay shut
+	none   string      // the timetable when nothing runs
+	forced string      // the notice when everyone is put off at the end
 }
+
+var vehicles = map[transit.Kind]vehicle{
+	transit.Train: {trainMap, "train_exit", "No trains run from here.", "End of the line. Everyone off, please."},
+	transit.Ferry: {ferryMap, "ferry_exit", "No ferries sail from here.", "All ashore, please."},
+	transit.Bus:   {busMap, "bus_exit", "No buses stop here.", "Last stop. Everyone off, please."},
+}
+
+// vehicleMap is the detail map a line's vehicle is ridden in.
+func vehicleMap(l *transit.Line) world.MapID { return vehicles[l.Kind].mapID }
 
 // line returns the line of a rail edge or sea lane, made on first use.
 func (e *Explore) line(edge infra.Edge) *transit.Line {
@@ -66,9 +76,12 @@ func (e *Explore) line(edge infra.Edge) *transit.Line {
 		return l
 	}
 	var l *transit.Line
-	if edge.Net == infra.SeaLane {
+	switch edge.Net {
+	case infra.SeaLane:
 		l = transit.NewFerry(e.infra, edge, e.w.W, e.w.H, e.w.Seed)
-	} else {
+	case infra.Road:
+		l = transit.NewBus(e.infra, edge, e.w.W, e.w.H, e.w.Seed)
+	default:
 		l = transit.NewLine(e.infra, edge, e.w.W, e.w.H, e.w.Seed)
 	}
 	if len(e.lines) > 256 {
@@ -89,7 +102,7 @@ func (e *Explore) updateTrains() {
 		e.nearLines = e.nearLines[:0]
 		seen := map[*transit.Line]bool{}
 		for _, w := range e.infra.WaysIn(l.Pos.X-trainReach, l.Pos.Y-trainReach, 2*trainReach, 2*trainReach) {
-			if w.Net != infra.Rail {
+			if w.Net != infra.Rail && w.Net != infra.Road {
 				continue
 			}
 			if line := e.line(w.Edge); line != nil && !seen[line] {
@@ -196,7 +209,12 @@ func (e *Explore) trainBump(p world.Pos) bool {
 			e.say(e.infra.Name(s) + " Station: departures. Press to read the timetable.")
 			return true
 		}
-	case ok && (id == "train_exit" || id == "ferry_exit"):
+	case ok && id == "bus_stop":
+		if s, _, ok := e.busStopAt(p); ok {
+			e.say(e.infra.Name(s) + " bus stop. Press to read the timetable.")
+			return true
+		}
+	case ok && (id == "train_exit" || id == "ferry_exit" || id == "bus_exit"):
 		e.leaveTrain(false)
 		return true
 	}
@@ -215,15 +233,22 @@ func (e *Explore) trainTalk(ctx *Context, p world.Pos) bool {
 		}
 		return true
 	}
-	if id, ok := e.w.Bump(p); ok && id == "station" {
+	id, _ := e.w.Bump(p)
+	if id == "station" {
 		if s, ok := e.stationAt(p); ok {
-			e.timetable(ctx, s, infra.Rail)
+			e.timetable(ctx, s, transit.Train, e.infra.Edges(infra.Rail, s), e.infra.Name(s)+" Station")
+			return true
+		}
+	}
+	if id == "bus_stop" {
+		if s, edges, ok := e.busStopAt(p); ok {
+			e.timetable(ctx, s, transit.Bus, edges, e.infra.Name(s)+" bus stop")
 			return true
 		}
 	}
 	if p.Map.IsMain() {
 		if s, ok := e.harbourAt(p); ok {
-			e.timetable(ctx, s, infra.SeaLane)
+			e.timetable(ctx, s, transit.Ferry, e.infra.Edges(infra.SeaLane, s), e.infra.Name(s)+" Harbour")
 			return true
 		}
 	}
@@ -234,13 +259,28 @@ func (e *Explore) trainTalk(ctx *Context, p world.Pos) bool {
 	return false
 }
 
-// timetable shows the trains from a station (net Rail) or the ferries
-// from a harbour (SeaLane), to board or wait for.
-func (e *Explore) timetable(ctx *Context, s infra.Settlement, net infra.Network) {
+// busStopAt returns the town whose bus stop post is tile p, and the roads
+// whose buses stop there.
+func (e *Explore) busStopAt(p world.Pos) (infra.Settlement, []infra.Edge, bool) {
+	for _, st := range e.infra.BusStopsIn(p.X, p.Y, 1, 1) {
+		var edges []infra.Edge
+		for _, edge := range e.infra.Edges(infra.Road, st.S) {
+			if r := e.infra.BusRoute(edge); r != nil && (r.A.Pole == st.Pole || r.B.Pole == st.Pole) {
+				edges = append(edges, edge)
+			}
+		}
+		return st.S, edges, true
+	}
+	return infra.Settlement{}, nil, false
+}
+
+// timetable shows the vehicles of a kind leaving s on edges (from a
+// station, a harbour or a bus stop), to board or wait for.
+func (e *Explore) timetable(ctx *Context, s infra.Settlement, kind transit.Kind, edges []infra.Edge, speaker string) {
 	now := e.clock.Ticks()
 	var choices []dialog.Choice
 	var lines []*transit.Line
-	for _, edge := range e.infra.Edges(net, s) {
+	for _, edge := range edges {
 		line := e.line(edge)
 		if line == nil {
 			continue
@@ -262,15 +302,8 @@ func (e *Explore) timetable(ctx *Context, s infra.Settlement, net infra.Network)
 		}
 	}
 	text := "Where would you like to go?"
-	speaker := e.infra.Name(s) + " Station"
-	if net == infra.SeaLane {
-		speaker = e.infra.Name(s) + " Harbour"
-	}
 	if len(lines) == 0 {
-		text = "No trains run from here."
-		if net == infra.SeaLane {
-			text = "No ferries sail from here."
-		}
+		text = vehicles[kind].none
 	}
 	choices = append(choices, dialog.Choice{Text: "Not now."})
 	d := &dialog.Dialog{ID: "timetable", Start: "main", Nodes: map[string]*dialog.Node{
@@ -364,11 +397,7 @@ func (e *Explore) leaveTrain(forced bool) {
 	case !st.Moving: // still at the platform where it boarded
 		at = r.from
 	default:
-		if r.line.Kind == transit.Ferry {
-			e.bump0("ferry_exit")
-		} else {
-			e.bump0("train_exit")
-		}
+		e.bump0(vehicles[r.line.Kind].exit)
 		return
 	}
 	// Onto the platform beside the train (or, failing that, out in front
@@ -376,10 +405,19 @@ func (e *Explore) leaveTrain(forced bool) {
 	to, ok := e.platformBeside(r.line, st)
 	if forced || !ok {
 		front, ok := e.infra.StationFront(at)
-		if r.line.Kind == transit.Ferry {
+		switch r.line.Kind {
+		case transit.Ferry:
 			var pier infra.Pier
 			if pier, ok = e.infra.Harbour(at); ok { // the end of the pier
 				front = pier.Cells[len(pier.Cells)-1]
+			}
+		case transit.Bus:
+			br := e.infra.BusRoute(r.line.Edge)
+			if ok = br != nil; ok {
+				front = br.A.Stop // on the road at the stop
+				if br.B.S.ID == at.ID {
+					front = br.B.Stop
+				}
 			}
 		}
 		if !ok {
@@ -390,10 +428,8 @@ func (e *Explore) leaveTrain(forced bool) {
 	e.ride = nil
 	e.warp = &world.Warp{To: to, Facing: world.Down, HasFacing: true}
 	e.fade = fadeTicks
-	if forced && r.line.Kind == transit.Ferry {
-		e.pendingNotice = "All ashore, please."
-	} else if forced {
-		e.pendingNotice = "End of the line. Everyone off, please."
+	if forced {
+		e.pendingNotice = vehicles[r.line.Kind].forced
 	}
 }
 
@@ -434,7 +470,21 @@ func (e *Explore) trainSprite(l *transit.Line, c transit.Car) (img *ebiten.Image
 	if c.Loco {
 		part = "bow"
 	}
+	if l.Kind == transit.Bus {
+		part = "back"
+		if c.Loco {
+			part = "front"
+		}
+	}
 	switch {
+	case l.Kind == transit.Bus && c.Facing == world.Right:
+		name = "bus " + part + " e"
+	case l.Kind == transit.Bus && c.Facing == world.Left:
+		name, flip = "bus "+part+" e", true
+	case l.Kind == transit.Bus && c.Facing == world.Down:
+		name = "bus " + part + " s"
+	case l.Kind == transit.Bus:
+		name = "bus " + part + " n"
 	case l.Kind == transit.Ferry && c.Facing == world.Right:
 		name = "ferry " + part + " e"
 	case l.Kind == transit.Ferry && c.Facing == world.Left:
@@ -555,16 +605,23 @@ func (e *Explore) drawWindowView(dst *ebiten.Image, alpha float64) {
 		return
 	}
 	line := e.ride.line
-	mw, mh, _ := e.w.Size(world.Detail(trainMap))
+	vm := vehicleMap(e.ride.line)
+	mw, mh, _ := e.w.Size(world.Detail(vm))
 	e.viewImg = ensureImage(e.viewImg, tile, tile)
 	u := heading * s // grows as the train goes, either way
 	for cy := int64(0); cy < mh; cy++ {
 		for cx := int64(0); cx < mw; cx++ {
-			p := world.Pos{Map: world.Detail(trainMap), X: cx, Y: cy}
+			p := world.Pos{Map: world.Detail(vm), X: cx, Y: cy}
 			if e.w.Tile(p, world.LayerGround) != win {
 				continue
 			}
-			// The windows side by side show the strip from left to right.
+			// The windows side by side show the strip from left to right;
+			// those along the top row look out to the left, others (a
+			// windscreen) by their row.
+			side := int64(viewSide)
+			if cy > 0 {
+				side = mh/2 - cy
+			}
 			v := u + float64(cx-mw/2)
 			t0 := math.Floor(v)
 			shift := int((v - t0) * tile)
@@ -577,7 +634,7 @@ func (e *Explore) drawWindowView(dst *ebiten.Image, alpha float64) {
 				}
 				nx, ny := leftOf(d)
 				wp, ok := e.w.Normalize(world.Pos{Map: world.Main,
-					X: int64(math.Round(x)) + nx*viewSide, Y: int64(math.Round(y)) + ny*viewSide})
+					X: int64(math.Round(x)) + nx*side, Y: int64(math.Round(y)) + ny*side})
 				if ok {
 					e.drawWorldTile(e.viewImg, wp, k*tile-shift, 0)
 				}

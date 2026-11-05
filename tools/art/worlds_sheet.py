@@ -2,7 +2,10 @@
 its tileset assets/tilesets/worlds.tsj:
     python3 tools/art/worlds_sheet.py assets/tiles/tinybattle.png assets/tiles/worlds.png assets/tilesets/worlds.tsj
 Row 0: 0 bicycle, 1 scooter (placeholders), 2 lamp post, 3 its lantern (the
-tile above).
+tile above), 4 "bus stop" (the post, solid) and 5 its sign (the tile
+above), 6-11 the bus seen from above, two tiles long: "bus front e", "bus
+back e" (west: mirrored), "bus front s", "bus back s", "bus front n", "bus
+back n".
 Row 1 (16-31): rails, by which sides they connect to: tile 16+mask with
 N=1, E=2, S=4, W=8 (named "rail <mask>"). Straights, curves, junctions and
 buffer stops; transparent around the track, so they go on the deco layer
@@ -293,6 +296,58 @@ def door():
     return t
 for k, img in enumerate((floor(), wall(), window(), seat(), door())):
     sheet.alpha_composite(img, (16 * (5 + k), 48))
+# --- buses ------------------------------------------------------------------
+def stop_post(ox):
+    rect(ox+7, 0, ox+8, 15, INK)
+    rect(ox+7, 0, ox+7, 13, IRON_HI)
+    rect(ox+5, 13, ox+10, 15, INK)
+    rect(ox+6, 14, ox+9, 14, IRON)
+    # timetable panel on the post
+    rect(ox+4, 4, ox+11, 10, INK)
+    rect(ox+5, 5, ox+10, 9, (240, 240, 232, 255))
+    for y in (6, 8):
+        rect(ox+6, y, ox+9, y, (120, 120, 132, 255))
+def stop_sign(ox):
+    rect(ox+7, 9, ox+8, 15, INK)
+    rect(ox+7, 9, ox+7, 15, IRON_HI)
+    ImageDraw.Draw(sheet).ellipse((ox+2, 0, ox+13, 11), fill=INK)
+    ImageDraw.Draw(sheet).ellipse((ox+3, 1, ox+12, 10), fill=(244, 196, 48, 255))
+    ImageDraw.Draw(sheet).ellipse((ox+5, 3, ox+10, 8), fill=(46, 120, 74, 255))
+    rect(ox+6, 5, ox+9, 6, (244, 196, 48, 255))  # a little "H"
+    rect(ox+6, 4, ox+6, 7, (244, 196, 48, 255))
+    rect(ox+9, 4, ox+9, 7, (244, 196, 48, 255))
+stop_post(64)
+stop_sign(80)
+BUS, BUS_HI, BUS_SH = (52, 140, 92, 255), (92, 180, 128, 255), (34, 100, 64, 255)
+BUS_ROOF = (226, 230, 222, 255)
+def bus_e():
+    """The bus heading east, 32x16: back tile, front tile."""
+    t = Image.new("RGBA", (32, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(t)
+    d.rounded_rectangle((0, 2, 31, 13), radius=3, fill=INK)
+    d.rounded_rectangle((1, 3, 30, 12), radius=2, fill=BUS)
+    d.line((2, 3, 29, 3), fill=BUS_HI)
+    d.line((2, 12, 29, 12), fill=BUS_SH)
+    d.rectangle((3, 4, 25, 11), fill=BUS_ROOF)            # the roof
+    d.rectangle((3, 4, 25, 4), fill=(250, 250, 246, 255))
+    for x in (8, 14, 20):                                 # roof hatches
+        d.rectangle((x, 6, x + 2, 9), fill=(176, 182, 176, 255))
+    d.rectangle((4, 6, 6, 9), fill=(120, 126, 120, 255))  # the air-con at the back
+    d.rectangle((27, 4, 29, 11), fill=GLASS_T)            # the windscreen
+    d.line((28, 5, 28, 10), fill=(200, 236, 248, 255))
+    d.point((30, 4), fill=(255, 236, 150, 255))           # headlights
+    d.point((30, 11), fill=(255, 236, 150, 255))
+    return t
+be = bus_e()
+sheet.alpha_composite(be.crop((16, 0, 32, 16)), (16 * 6, 0))   # 6 front e
+sheet.alpha_composite(be.crop((0, 0, 16, 16)), (16 * 7, 0))    # 7 back e
+bs = be.rotate(-90, expand=True)  # heading south: back on top
+sheet.alpha_composite(bs.crop((0, 16, 16, 32)), (16 * 8, 0))   # 8 front s
+sheet.alpha_composite(bs.crop((0, 0, 16, 16)), (16 * 9, 0))    # 9 back s
+bn = be.rotate(90, expand=True)   # heading north: front on top
+sheet.alpha_composite(bn.crop((0, 0, 16, 16)), (16 * 10, 0))   # 10 front n
+sheet.alpha_composite(bn.crop((0, 16, 16, 32)), (16 * 11, 0))  # 11 back n
+
 # --- the ferry ---------------------------------------------------------------
 HULL, HULL_SH = (236, 238, 242, 255), (196, 200, 210, 255)
 STRIPE = (58, 96, 140, 255)
@@ -474,7 +529,10 @@ def prop(name, typ, value):
 tiles = [
     {"id": 2, "properties": [prop("solid", "bool", True), prop("above", "int", 3), prop("name", "string", "lamp_post")]},
     {"id": 3, "properties": [prop("light", "float", 3.5)]},
+    {"id": 4, "properties": [prop("solid", "bool", True), prop("above", "int", 5), prop("name", "string", "bus stop")]},
 ]
+for k, name in enumerate(("bus front e", "bus back e", "bus front s", "bus back s", "bus front n", "bus back n")):
+    tiles.append({"id": 6 + k, "properties": [prop("name", "string", name)]})
 tiles += [{"id": 16 + m, "properties": [prop("name", "string", f"rail {m}")]} for m in range(16)]
 tiles += [{"id": 32 + m, "properties": [prop("name", "string", f"pier {m}")]} for m in range(16)]
 for k, name in enumerate(("train car h", "train car v", "train loco e", "train loco s", "train loco n",

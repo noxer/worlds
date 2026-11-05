@@ -84,7 +84,7 @@ func TestTrainRuns(t *testing.T) {
 	// NextStop agrees with the state.
 	for _, atA := range []bool{true, false} {
 		arrive, leave := l.NextStop(12345, atA)
-		if arrive < 12345-transit.Dwell || leave-arrive != transit.Dwell {
+		if arrive < 12345-l.Dwell || leave-arrive != l.Dwell {
 			t.Fatalf("NextStop(atA=%v) = %d, %d", atA, arrive, leave)
 		}
 		st := l.At(float64(arrive))

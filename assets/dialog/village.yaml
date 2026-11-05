@@ -87,3 +87,26 @@ ferry_passenger_2:
       speaker: Deckhand
       lines:
         - Mind the rail. We'll be alongside the pier in no time.
+
+bus_exit:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The doors stay shut until the next stop.
+
+bus_driver:
+  start: main
+  nodes:
+    main:
+      speaker: Driver
+      lines:
+        - Please don't talk to the driver while the bus is moving. Well, all right, just this once.
+
+bus_passenger_1:
+  start: main
+  nodes:
+    main:
+      speaker: Passenger
+      lines:
+        - I ride out to my sister's every Sunday. The fields are lovely this time of year.

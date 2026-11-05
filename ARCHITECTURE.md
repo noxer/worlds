@@ -750,6 +750,29 @@ than a fixed tile.
   starboard; past the route's ends, straight on). At a pier the real
   harbour shows, at sea the passing water at a calm pace.
 
+**Buses (implemented: `transit`, `infra/bus.go`, `scene/trains.go`).**
+- **Lines:** every road edge between two towns (or bigger, or hand-made
+  places) is a bus line. Inside a town the road gives way to the town's
+  streets, so the line ends at a stop where the road leaves the town:
+  going out along the road's smoothed line, the first tile from which it
+  stays outside the town's superblocks (`CityPlan.Covers`, which builds
+  nothing), plus 2 tiles; at a hand-made place, just outside its gate. A
+  town without streets (all its blocks excluded) gets no buses. The bus
+  follows the road's line between the two stops (`infra.BusRoute`).
+- **Stops:** a post with a timetable panel and a round sign above it (bus
+  stop tiles 4-5 of `worlds.png`), 3 tiles to the right of the arriving
+  bus, on dry land outside the town; the generator paints it and its bump
+  `bus_stop`. Confirm at the post for the timetable of the buses that stop
+  there.
+- **Timetable:** the same machinery (`transit.Line`, kind `Bus`): 5 minutes
+  at each stop, up to about 833 tiles a game minute (50 km/h).
+- **Exterior and interior:** two tiles, front and back, in line like the
+  ferry; the `bus` detail map (`tools/art/bus_interior.py`) reuses the
+  carriage tiles: seats (rest until the next stop), a driver, a passenger,
+  windows along the top and a windscreen at the front showing the road
+  passing (the window view; the windscreen looks out by its row), and two
+  doors (`bus_exit`).
+
 **Simulation.**
 - Vehicles move in the world simulation, independent of the current scene.
 - Time passes while the party walks around inside.
@@ -1010,8 +1033,11 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    journey. **Ferries done:** piers that open to the sea, water-only ferry
    routes, the ferry on the map and moored at the pier, harbour
    timetables, the deck with the sea all round, benches and gangways;
-   tests for a ferry's run and a whole crossing. Next: buses, taxis,
-   aircraft.
+   tests for a ferry's run and a whole crossing; then routes clear of
+   pool islands and along the axes, and a boat-shaped deck. **Buses
+   done:** lines on the roads between towns, stops at the town edges with
+   posts and timetables, the bus on the road, its inside with the window
+   view; a test of a whole journey. Next: taxis, aircraft.
 
 ## Asset delivery
 
