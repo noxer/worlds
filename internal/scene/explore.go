@@ -713,7 +713,7 @@ func (e *Explore) DrawWorld(screen *ebiten.Image, scale, offX, offY int, alpha f
 	mp := e.party.Leader().Pos.Map
 	e.groundImg.Fill(gfx.ColorVoid)
 	switch mp.Template {
-	case trainMap, busMap, taxiMap:
+	case trainMap, busMap, taxiMap, planeMap:
 		e.drawWindowView(e.groundImg, alpha)
 	case ferryMap:
 		e.drawSeaView(e.groundImg, alpha)

@@ -8,7 +8,7 @@ right) show the road passing by."""
 import json, sys
 out = sys.argv[1]
 W, H = 12, 5
-WORLDS, DUNGEON = 1, 129
+WORLDS, DUNGEON = 1, 177  # room for the worlds sheet to grow
 FLOOR, WALL, WINDOW, SEAT, DOOR = 53, 54, 55, 56, 57
 ground = [FLOOR] * (W * H)
 def put(x, y, t): ground[y * W + x] = t

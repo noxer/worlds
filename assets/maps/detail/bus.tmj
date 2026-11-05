@@ -25,7 +25,7 @@
    "source": "../../tilesets/worlds.tsj"
   },
   {
-   "firstgid": 129,
+   "firstgid": 177,
    "source": "../../tilesets/tinydungeon.tsj"
   }
  ],
@@ -612,7 +612,7 @@
        "value": "right"
       }
      ],
-     "gid": 214
+     "gid": 262
     },
     {
      "id": 20,
@@ -636,7 +636,7 @@
        "value": "up"
       }
      ],
-     "gid": 228
+     "gid": 276
     }
    ]
   }

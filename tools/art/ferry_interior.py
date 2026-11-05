@@ -9,7 +9,7 @@ map)."""
 import json, sys
 out = sys.argv[1]
 W, H = 21, 9
-WORLDS, DUNGEON = 1, 129
+WORLDS, DUNGEON = 1, 177  # room for the worlds sheet to grow
 DECK, SEA, BENCH, GANGWAY = 96, 97, 98, 99
 N, E, S, Wd = 1, 2, 4, 8
 RAIL = {m: 100 + k for k, m in enumerate((N, E, S, Wd, N | Wd, N | E, S | Wd, S | E))}

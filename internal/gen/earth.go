@@ -25,22 +25,25 @@ import (
 //   - chunk level: per-cell terrain classes, cleaned up so that every
 //     configuration has art, then tiles and decoration.
 type Earth struct {
-	elevation *Field
-	land      *Grassland
-	shore     map[string]world.Tile // Kenney Tiny Battle water tiles, by name
-	deep      map[string]world.Tile // deep water and transitions, by name
-	infra     *infra.Infra          // settlements and networks; nil for odd world sizes
-	dirt      [16]world.Tile        // dirt path tiles by grass edges (see dirtTile)
-	dirtInner [4]world.Tile         // dirt with grass in one corner: nw, ne, se, sw
-	cobble    world.Tile            // road
-	prefabs   []*world.Prefab       // by the index of infra.Building.Prefab
-	lamp      [2]world.Tile         // lamp post and lantern (the tile above)
-	busStop   [2]world.Tile         // bus stop post and sign (the tile above)
-	rail      [16]world.Tile        // track by connected sides (N=1, E=2, S=4, W=8)
-	pier      [16]world.Tile        // pier by connected sides
-	fence     [16]world.Tile        // railway fence by connected sides
-	ballast   world.Tile            // a railway's bed in towns
-	urban     map[int]world.Tile    // RPG Urban tiles cities use, by index
+	elevation  *Field
+	land       *Grassland
+	shore      map[string]world.Tile // Kenney Tiny Battle water tiles, by name
+	deep       map[string]world.Tile // deep water and transitions, by name
+	infra      *infra.Infra          // settlements and networks; nil for odd world sizes
+	dirt       [16]world.Tile        // dirt path tiles by grass edges (see dirtTile)
+	dirtInner  [4]world.Tile         // dirt with grass in one corner: nw, ne, se, sw
+	cobble     world.Tile            // road
+	prefabs    []*world.Prefab       // by the index of infra.Building.Prefab
+	lamp       [2]world.Tile         // lamp post and lantern (the tile above)
+	busStop    [2]world.Tile         // bus stop post and sign (the tile above)
+	departures [2]world.Tile         // the airport's departures board: post and board
+	runway     [4]world.Tile         // runway, centre line, north edge, south edge
+	apron      world.Tile
+	rail       [16]world.Tile     // track by connected sides (N=1, E=2, S=4, W=8)
+	pier       [16]world.Tile     // pier by connected sides
+	fence      [16]world.Tile     // railway fence by connected sides
+	ballast    world.Tile         // a railway's bed in towns
+	urban      map[int]world.Tile // RPG Urban tiles cities use, by index
 }
 
 // Sea levels on the elevation scale [0, MaxValue).
@@ -109,6 +112,14 @@ func NewEarth(info world.GenInfo) (world.Generator, error) {
 	if t, err2 := info.Tilesets.Named("worlds", "lamp_post"); err2 == nil {
 		top, _ := info.Tilesets.Above(t)
 		e.lamp = [2]world.Tile{t, top}
+	}
+	if t, err2 := info.Tilesets.Named("worlds", "departures"); err2 == nil {
+		top, _ := info.Tilesets.Above(t)
+		e.departures = [2]world.Tile{t, top}
+		for k, n := range []string{"runway", "runway mark", "runway edge n", "runway edge s"} {
+			e.runway[k], _ = info.Tilesets.Named("worlds", n)
+		}
+		e.apron, _ = info.Tilesets.Named("worlds", "apron")
 	}
 	if t, err2 := info.Tilesets.Named("worlds", "bus stop"); err2 == nil {
 		top, _ := info.Tilesets.Above(t)
@@ -378,7 +389,62 @@ func (e *Earth) Generate(seed uint64, b *world.ChunkBuilder) {
 	e.buildings(b, r)
 	e.cityTiles(b, r)
 	e.railsAndPiers(b, r)
+	e.airports(seed, b)
 	e.busStops(b)
+}
+
+// airports paints the airports: fence, grass, runway, apron, the
+// departures board (bump "airport") and the terminal.
+func (e *Earth) airports(seed uint64, b *world.ChunkBuilder) {
+	if e.infra == nil || e.apron.Empty() {
+		return
+	}
+	cx, cy := b.CX*world.ChunkSize, b.CY*world.ChunkSize
+	for _, a := range e.infra.AirportsIn(cx, cy, world.ChunkSize, world.ChunkSize) {
+		at := func(lx, ly int) infra.AirportCell {
+			wx, wy := b.Wrap(cx+int64(lx), cy+int64(ly))
+			return a.At(geom.WrapDelta(a.X, wx, b.W()), geom.WrapDelta(a.Y, wy, b.H()))
+		}
+		for ly := 0; ly < world.ChunkSize; ly++ {
+			for lx := 0; lx < world.ChunkSize; lx++ {
+				c := at(lx, ly)
+				if c == infra.AOutside {
+					continue
+				}
+				wx, wy := b.Wrap(cx+int64(lx), cy+int64(ly))
+				b.Set(world.LayerDeco, lx, ly, 0)
+				b.Set(world.LayerOverhead, lx, ly, 0)
+				switch c {
+				case infra.AFence:
+					e.land.ground(seed, b, lx, ly, wx, wy)
+					b.Set(world.LayerDeco, lx, ly, e.fence[mask4(lx, ly, func(x, y int) bool { return at(x, y) == infra.AFence })])
+				case infra.AGrass:
+					e.land.ground(seed, b, lx, ly, wx, wy)
+				case infra.ARunway:
+					b.Set(world.LayerGround, lx, ly, e.runway[0])
+				case infra.ARunwayMark:
+					b.Set(world.LayerGround, lx, ly, e.runway[1])
+				case infra.ARunwayEdgeN:
+					b.Set(world.LayerGround, lx, ly, e.runway[2])
+				case infra.ARunwayEdgeS:
+					b.Set(world.LayerGround, lx, ly, e.runway[3])
+				case infra.AApron:
+					b.Set(world.LayerGround, lx, ly, e.apron)
+				case infra.ABoard:
+					b.Set(world.LayerGround, lx, ly, e.apron)
+					b.Set(world.LayerDeco, lx, ly, e.departures[0])
+					b.Bump(lx, ly, "airport")
+				}
+				// The board above its post.
+				if at(lx, ly+1) == infra.ABoard {
+					b.Set(world.LayerOverhead, lx, ly, e.departures[1])
+				}
+			}
+		}
+		if a.Terminal.Prefab >= 0 {
+			e.place(b, []infra.Building{a.Terminal})
+		}
+	}
 }
 
 // busStops puts the bus stop posts (bump "bus_stop") and their signs into

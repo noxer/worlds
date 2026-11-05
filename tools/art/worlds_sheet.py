@@ -34,13 +34,18 @@ se" (the bow's sides, deck below or above the diagonal, sea beyond),
 "ferry hull e" (the tip of the bow), "ferry hull nw" and "ferry hull sw"
 (the rounded stern), then the wheelhouse roof by its outer sides ("ferry
 roof <mask>", masks 9, 1, 3, 8, 0, 2, 12, 4, 6) and "ferry funnel".
+Rows 8-10 (128-161): the airliner seen from above, 3x3 tiles each way
+("plane e <k>", "plane s <k>", "plane n <k>", k = row*3 + column; west:
+"plane e" mirrored, columns swapped), the "departures" board (post, solid,
+and the board above it), "runway", "runway mark" (the centre line),
+"runway edge n", "runway edge s" (with lights) and "apron".
 Deep water lives in water.png."""
 import json, math, sys
 from PIL import Image, ImageDraw
 battle, out, tsj = sys.argv[1], sys.argv[2], sys.argv[3]
 src = Image.open(battle).convert("RGBA")
 def tile(i): return src.crop((i%18*16, i//18*16, i%18*16+16, i//18*16+16))
-sheet = Image.new("RGBA", (16*16, 16*8), (0, 0, 0, 0))
+sheet = Image.new("RGBA", (16*16, 16*11), (0, 0, 0, 0))
 INK = (43, 29, 35, 255)
 def bike(ox, frame, accent, deck=False):
     d = ImageDraw.Draw(sheet)
@@ -524,6 +529,68 @@ def funnel():
     return t
 for k, img in enumerate(hull + [roof(m) for m in ROOF_MASKS] + [funnel()]):
     sheet.alpha_composite(img, (16 * k, 112))
+# --- aircraft and airports ---------------------------------------------------
+FUSE, FUSE_SH = (240, 242, 246, 255), (196, 200, 212, 255)
+LIVERY = (44, 88, 160, 255)
+WING, WING_SH = (206, 210, 220, 255), (164, 170, 184, 255)
+def plane_e():
+    t = Image.new("RGBA", (48, 48), (0, 0, 0, 0))
+    d = ImageDraw.Draw(t)
+    # wings, swept back, and the tailplane
+    for sgn in (1, -1):
+        def m(pts): return [(x, 24 + sgn * (y - 24)) for x, y in pts]
+        d.polygon(m([(31, 21), (22, 21), (11, 2), (16, 2)]), fill=INK)
+        d.polygon(m([(29, 21), (23, 21), (13, 4), (16, 4)]), fill=WING)
+        d.line(m([(23, 20), (13, 4)]), fill=WING_SH)
+        ey = 11 if sgn == 1 else 35
+        d.rectangle((21, ey, 25, ey + 2), fill=INK)  # engines
+        d.polygon(m([(11, 21), (5, 21), (1, 12), (4, 12)]), fill=INK)
+        d.polygon(m([(10, 21), (6, 21), (3, 14), (4, 14)]), fill=WING)
+    d.rounded_rectangle((0, 20, 47, 27), radius=4, fill=INK)
+    d.rounded_rectangle((1, 21, 46, 26), radius=3, fill=FUSE)
+    d.line((3, 26, 44, 26), fill=FUSE_SH)
+    d.line((3, 25, 42, 25), fill=LIVERY)
+    for x in range(8, 40, 3):
+        d.point((x, 22), fill=(90, 110, 140, 255))  # windows
+    d.rectangle((41, 22, 43, 24), fill=(40, 52, 70, 255))  # the cockpit
+    d.rectangle((1, 23, 9, 24), fill=LIVERY)  # the fin, seen from above
+    return t
+pe = plane_e()
+planes = (pe, pe.rotate(-90), pe.rotate(90))  # east, south, north
+for k, img in enumerate(planes):
+    for i in range(9):
+        r, c = divmod(i, 3)
+        n = 128 + 9 * k + i
+        sheet.alpha_composite(img.crop((16 * c, 16 * r, 16 * c + 16, 16 * r + 16)), (16 * (n % 16), 16 * (n // 16)))
+def at_tile(n): return (16 * (n % 16), 16 * (n // 16))
+# The departures board: a post, and a dark board with amber lines above.
+post = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+dp = ImageDraw.Draw(post)
+dp.rectangle((6, 0, 9, 15), fill=INK); dp.rectangle((7, 0, 8, 13), fill=IRON); dp.rectangle((4, 13, 11, 15), fill=INK)
+board = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+db = ImageDraw.Draw(board)
+db.rectangle((0, 2, 15, 13), fill=INK); db.rectangle((1, 3, 14, 12), fill=(30, 34, 44, 255))
+for y in (5, 8, 11):
+    db.line((3, y, 12, y), fill=(255, 186, 60, 255))
+db.rectangle((6, 14, 9, 15), fill=INK)
+ASPH = (70, 72, 82, 255)
+def asphalt():
+    t = Image.new("RGBA", (16, 16), ASPH)
+    rr = random.Random(11)
+    for _ in range(24):
+        t.putpixel((rr.randrange(16), rr.randrange(16)), (82, 84, 96, 255))
+    return t
+import random
+runway = asphalt()
+mark = asphalt(); ImageDraw.Draw(mark).rectangle((0, 7, 15, 8), fill=(240, 240, 236, 255))
+edge_n = asphalt(); de = ImageDraw.Draw(edge_n)
+de.rectangle((0, 1, 15, 2), fill=(240, 240, 236, 255)); de.rectangle((7, 0, 8, 0), fill=(255, 220, 90, 255))
+edge_s = edge_n.transpose(Image.FLIP_TOP_BOTTOM)
+apron = Image.new("RGBA", (16, 16), (178, 178, 172, 255))
+da = ImageDraw.Draw(apron)
+da.line((0, 15, 15, 15), fill=(150, 150, 146, 255)); da.line((15, 0, 15, 15), fill=(150, 150, 146, 255))
+for k, img in enumerate((post, board, runway, mark, edge_n, edge_s, apron)):
+    sheet.alpha_composite(img, at_tile(155 + k))
 # --- railway fence and ballast ---------------------------------------------
 POST, BAR, BAR_HI = (86, 84, 98, 255), (128, 128, 144, 255), (176, 178, 194, 255)
 def fence(mask):
@@ -585,11 +652,17 @@ for k, name in enumerate(["ferry deck", "ferry sea", "ferry bench", "ferry gangw
 for k, name in enumerate(["ferry hull ne", "ferry hull se", "ferry hull e", "ferry hull nw", "ferry hull sw"]
                          + [f"ferry roof {m}" for m in ROOF_MASKS] + ["ferry funnel"]):
     tiles.append({"id": 112 + k, "properties": [prop("name", "string", name), prop("solid", "bool", True)]})
+for k, name in enumerate(["plane e", "plane s", "plane n"]):
+    for i in range(9):
+        tiles.append({"id": 128 + 9 * k + i, "properties": [prop("name", "string", f"{name} {i}")]})
+tiles.append({"id": 155, "properties": [prop("name", "string", "departures"), prop("solid", "bool", True), prop("above", "int", 156)]})
+for k, name in enumerate(["runway", "runway mark", "runway edge n", "runway edge s", "apron"]):
+    tiles.append({"id": 157 + k, "properties": [prop("name", "string", name)]})
 tiles += [{"id": 64 + m, "properties": [prop("name", "string", f"fence {m}"), prop("solid", "bool", True)]} for m in range(16)]
 tiles.append({"id": 80, "properties": [prop("name", "string", "ballast"), prop("solid", "bool", True)]})  # no walking on the line in towns
 ts = {"type": "tileset", "version": "1.10", "tiledversion": "1.11.0", "name": "worlds",
-      "tilewidth": 16, "tileheight": 16, "tilecount": 128, "columns": 16,
-      "image": "../tiles/worlds.png", "imagewidth": 256, "imageheight": 128,
+      "tilewidth": 16, "tileheight": 16, "tilecount": 176, "columns": 16,
+      "image": "../tiles/worlds.png", "imagewidth": 256, "imageheight": 176,
       "margin": 0, "spacing": 0, "tiles": tiles}
 with open(tsj, "w") as f:
     f.write(json.dumps(ts, indent=1) + "\n")

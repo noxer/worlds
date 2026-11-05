@@ -191,16 +191,17 @@ type Infra struct {
 	avoid     []Rect
 	prefabs   []PrefabSpec
 
-	mu     sync.Mutex
-	cells  map[ID]cellResult
-	routes map[edgeKey]*Route
-	blocks map[[2]int64][]*Way
-	ways   map[edgeKey]*Way
-	sites  map[ID]*Site
-	piers  map[ID]Pier
-	cities map[ID]*CityPlan
-	ferry  map[edgeKey][]Point
-	buses  map[edgeKey]*BusRoute
+	mu       sync.Mutex
+	cells    map[ID]cellResult
+	routes   map[edgeKey]*Route
+	blocks   map[[2]int64][]*Way
+	ways     map[edgeKey]*Way
+	sites    map[ID]*Site
+	piers    map[ID]Pier
+	cities   map[ID]*CityPlan
+	ferry    map[edgeKey][]Point
+	buses    map[edgeKey]*BusRoute
+	airports map[ID]Airport
 
 	obstacle func(x, y int64) bool // patches painted at sea, for ferries
 
@@ -241,20 +242,21 @@ func New(cfg Config) (*Infra, error) {
 	}
 	in := &Infra{
 		seed: cfg.Seed, w: cfg.W, h: cfg.H, relief: cfg.Relief,
-		fixedAt: map[ID]Settlement{},
-		ends:    map[ID][]Gate{},
-		titles:  map[ID]string{},
-		avoid:   cfg.Avoid,
-		prefabs: cfg.Prefabs,
-		sites:   map[ID]*Site{},
-		piers:   map[ID]Pier{},
-		cities:  map[ID]*CityPlan{},
-		ways:    map[edgeKey]*Way{},
-		cells:   map[ID]cellResult{},
-		routes:  map[edgeKey]*Route{},
-		blocks:  map[[2]int64][]*Way{},
-		ferry:   map[edgeKey][]Point{},
-		buses:   map[edgeKey]*BusRoute{},
+		fixedAt:  map[ID]Settlement{},
+		ends:     map[ID][]Gate{},
+		titles:   map[ID]string{},
+		avoid:    cfg.Avoid,
+		prefabs:  cfg.Prefabs,
+		sites:    map[ID]*Site{},
+		piers:    map[ID]Pier{},
+		cities:   map[ID]*CityPlan{},
+		ways:     map[edgeKey]*Way{},
+		cells:    map[ID]cellResult{},
+		routes:   map[edgeKey]*Route{},
+		blocks:   map[[2]int64][]*Way{},
+		ferry:    map[edgeKey][]Point{},
+		buses:    map[edgeKey]*BusRoute{},
+		airports: map[ID]Airport{},
 	}
 	in.sea, in.deep = cfg.Relief.Levels()
 	for _, f := range cfg.Fixed {

@@ -792,6 +792,31 @@ than a fixed tile.
   well, a town's plaza or, for a hand-made place, the start; the taxi
   stands there until it drives back.
 
+**Aircraft (implemented: `infra/airport.go`, `transit.NewPlane`, `scene/trains.go`).**
+- **Airports:** a metropolis with flights gets an airport just outside it
+  (round the city, nearest first: the first 60x22 spot that is dry and
+  clear of the city and hand-made places): a fence with a way in on the
+  south side, a runway along the north side (edges with lights, a dashed
+  centre line), an apron with a gate per flight (up to six), the terminal
+  (a downtown prefab, locked) and a departures board (bump `airport`).
+  Paths, roads and railways ending at the metropolis route round it.
+- **Flights:** every flight edge is a line with one airliner: from its gate
+  at A (facing west) along the apron to the runway's west end, the take-off
+  run eastwards, across to B along the axes (one corner, then in to B's
+  runway from the west), the landing roll, and back to its gate. A quarter
+  of an hour at the gate; it taxis at a tile per tick, then speeds up to
+  about 13,000 tiles a game minute (800 km/h): a 150 km flight takes about
+  20 minutes.
+- **Exterior:** 3x3 tiles round its middle (`plane e/s/n <k>`, west
+  mirrored); the nose, body and tail block the way and board it while it
+  stands at the gate. Planes are drawn at the airports near the party.
+- **Cabin:** the `plane` detail map (`tools/art/plane_interior.py`): rows
+  of seats either side of the aisle (rest until landing), an attendant, a
+  passenger, the locked cockpit, windows along both sides and the door at
+  the back (`plane_exit`; it opens at the gate). Near the airports the
+  windows show the real place (the apron, the runway); at cruise, the sky
+  with clouds drifting past.
+
 **Simulation.**
 - Vehicles move in the world simulation, independent of the current scene.
 - Time passes while the party walks around inside.
@@ -1058,7 +1083,11 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    posts and timetables, the bus on the road, its inside with the window
    view; a test of a whole journey. **Taxis done:** ranks at the bus
    stops, the driver's choice of places visited and nearby, the ride in
-   the cab, drop-off; a test of a whole ride. Next: aircraft.
+   the cab, drop-off; a test of a whole ride. **Aircraft done:** airports
+   outside the metropolises, flights between them, planes at their gates,
+   departures boards, the cabin with the view and the clouds; a test of a
+   whole flight. Step 6 is complete for now; still open: tickets and
+   fares, several vehicles per line, city transit (trams, metro).
 
 ## Asset delivery
 

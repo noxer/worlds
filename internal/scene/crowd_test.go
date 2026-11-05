@@ -133,12 +133,13 @@ func TestVillagersOnTheSquare(t *testing.T) {
 }
 
 // TestDebugTravel: with the overlay on, T goes to the nearest village,
-// town and city in turn, the end of a ferry pier, a bus stop, then home.
+// town and city in turn, the end of a ferry pier, a bus stop, an airport's
+// departures board, then home.
 func TestDebugTravel(t *testing.T) {
 	h, in := newCrowdHarness(t)
 	home := h.leader().Pos
 	h.press(input.Debug)
-	for k, tier := range []infra.Tier{infra.Village, infra.Town, infra.City, 0, 0, 0} {
+	for k, tier := range []infra.Tier{infra.Village, infra.Town, infra.City, 0, 0, 0, 0} {
 		h.press(input.DebugTravel)
 		h.runUntil("the fade", 200, func() bool { return h.e.fade == 0 })
 		p := h.leader().Pos
@@ -157,8 +158,15 @@ func TestDebugTravel(t *testing.T) {
 			continue
 		}
 		if k == 5 {
+			front, _ := h.w.Neighbor(p, h.leader().Facing)
+			if id, ok := h.w.Bump(front); !ok || id != "airport" {
+				t.Errorf("the sixth jump should face an airport's departures board, went to %v", p)
+			}
+			continue
+		}
+		if k == 6 {
 			if p != home {
-				t.Errorf("the sixth jump should go home, went to %v", p)
+				t.Errorf("the seventh jump should go home, went to %v", p)
 			}
 			break
 		}

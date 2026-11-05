@@ -125,3 +125,40 @@ taxi_driver:
       speaker: Driver
       lines:
         - Sit back, I know a shortcut.
+
+plane_exit:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The door is armed. It opens at the gate.
+
+plane_seat:
+  start: main
+  nodes:
+    main:
+      lines:
+        - A window seat, the belt neatly crossed on it.
+
+plane_cockpit:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The cockpit door is locked.
+
+plane_attendant:
+  start: main
+  nodes:
+    main:
+      speaker: Flight attendant
+      lines:
+        - Welcome aboard. Please take any free seat; we'll be on our way shortly.
+
+plane_passenger_1:
+  start: main
+  nodes:
+    main:
+      speaker: Passenger
+      lines:
+        - Three hours to cross by train, half an hour by air. I'll take the peanuts.

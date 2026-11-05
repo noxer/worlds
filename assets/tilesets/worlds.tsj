@@ -5,11 +5,11 @@
  "name": "worlds",
  "tilewidth": 16,
  "tileheight": 16,
- "tilecount": 128,
+ "tilecount": 176,
  "columns": 16,
  "image": "../tiles/worlds.png",
  "imagewidth": 256,
- "imageheight": 128,
+ "imageheight": 176,
  "margin": 0,
  "spacing": 0,
  "tiles": [
@@ -1080,6 +1080,346 @@
      "name": "solid",
      "type": "bool",
      "value": true
+    }
+   ]
+  },
+  {
+   "id": 128,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 0"
+    }
+   ]
+  },
+  {
+   "id": 129,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 1"
+    }
+   ]
+  },
+  {
+   "id": 130,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 2"
+    }
+   ]
+  },
+  {
+   "id": 131,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 3"
+    }
+   ]
+  },
+  {
+   "id": 132,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 4"
+    }
+   ]
+  },
+  {
+   "id": 133,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 5"
+    }
+   ]
+  },
+  {
+   "id": 134,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 6"
+    }
+   ]
+  },
+  {
+   "id": 135,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 7"
+    }
+   ]
+  },
+  {
+   "id": 136,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 8"
+    }
+   ]
+  },
+  {
+   "id": 137,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 0"
+    }
+   ]
+  },
+  {
+   "id": 138,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 1"
+    }
+   ]
+  },
+  {
+   "id": 139,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 2"
+    }
+   ]
+  },
+  {
+   "id": 140,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 3"
+    }
+   ]
+  },
+  {
+   "id": 141,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 4"
+    }
+   ]
+  },
+  {
+   "id": 142,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 5"
+    }
+   ]
+  },
+  {
+   "id": 143,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 6"
+    }
+   ]
+  },
+  {
+   "id": 144,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 7"
+    }
+   ]
+  },
+  {
+   "id": 145,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 8"
+    }
+   ]
+  },
+  {
+   "id": 146,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 0"
+    }
+   ]
+  },
+  {
+   "id": 147,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 1"
+    }
+   ]
+  },
+  {
+   "id": 148,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 2"
+    }
+   ]
+  },
+  {
+   "id": 149,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 3"
+    }
+   ]
+  },
+  {
+   "id": 150,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 4"
+    }
+   ]
+  },
+  {
+   "id": 151,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 5"
+    }
+   ]
+  },
+  {
+   "id": 152,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 6"
+    }
+   ]
+  },
+  {
+   "id": 153,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 7"
+    }
+   ]
+  },
+  {
+   "id": 154,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 8"
+    }
+   ]
+  },
+  {
+   "id": 155,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "departures"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    },
+    {
+     "name": "above",
+     "type": "int",
+     "value": 156
+    }
+   ]
+  },
+  {
+   "id": 157,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "runway"
+    }
+   ]
+  },
+  {
+   "id": 158,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "runway mark"
+    }
+   ]
+  },
+  {
+   "id": 159,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "runway edge n"
+    }
+   ]
+  },
+  {
+   "id": 160,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "runway edge s"
+    }
+   ]
+  },
+  {
+   "id": 161,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "apron"
     }
    ]
   },

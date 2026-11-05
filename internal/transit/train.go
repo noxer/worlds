@@ -26,6 +26,7 @@ const (
 	Ferry             // on a sea lane between two piers
 	Bus               // on a road between two towns' bus stops
 	Taxi              // one trip, from a taxi rank to where the party asked
+	Plane             // a flight between two metropolises' airports
 )
 
 // spec is how a kind of vehicle runs.
@@ -43,7 +44,10 @@ var specs = [...]spec{
 	// About 50 km/h; five minutes at a stop.
 	Bus: {cars: 2, vMax: 833.0 / sim.TicksPerMinute, vSlow: 0.25, aSlow: 0.004, aFast: 0.05, dwell: 5 * sim.TicksPerMinute},
 	// About 60 km/h; it leaves as soon as the doors are shut.
-	Taxi: {cars: 2, vMax: 1000.0 / sim.TicksPerMinute, vSlow: 0.3, aSlow: 0.006, aFast: 0.08, dwell: 2 * sim.TicksPerMinute},
+	// About 800 km/h at cruise; it taxis out at a tile per tick. Boarding
+	// takes a quarter of an hour.
+	Plane: {cars: 3, vMax: 13333.0 / sim.TicksPerMinute, vSlow: 1, aSlow: 1.0 / 120, aFast: 0.4, dwell: 15 * sim.TicksPerMinute},
+	Taxi:  {cars: 2, vMax: 1000.0 / sim.TicksPerMinute, vSlow: 0.3, aSlow: 0.006, aFast: 0.08, dwell: 2 * sim.TicksPerMinute},
 }
 
 // Timing, in ticks (60 per game minute).
@@ -120,6 +124,20 @@ func NewFerry(in *infra.Infra, e infra.Edge, worldW, worldH int64, seed uint64) 
 		}
 	}
 	return newLine(Ferry, e, pts, worldW, worldH, seed)
+}
+
+// NewPlane makes the line of a flight, between the two airports' gates,
+// or returns nil if it has none.
+func NewPlane(in *infra.Infra, e infra.Edge, worldW, worldH int64, seed uint64) *Line {
+	route := in.FlightRoute(e)
+	if len(route) < 2 {
+		return nil
+	}
+	pts := make([][2]int64, len(route))
+	for i, p := range route {
+		pts[i] = [2]int64{p.X, p.Y}
+	}
+	return newLine(Plane, e, pts, worldW, worldH, seed)
 }
 
 // NewTaxi makes the trip of a taxi waiting at from (its back; facing dir)
@@ -361,9 +379,9 @@ func (l *Line) CarsAt(st State) []Car {
 	return out
 }
 
-// rigidAt places a ferry or a bus: its front where the route puts it, its
-// back right behind, in line along the main direction of the route there
-// (it doesn't bend round corners like a train).
+// rigidAt places a ferry, a bus, a taxi or a plane: its front where the
+// route puts it, the rest right behind, in line along the main direction
+// of the route there (it doesn't bend round corners like a train).
 func (l *Line) rigidAt(st State, out []Car) []Car {
 	s, back := st.Front, st.Front-1
 	if !st.ToB {
@@ -385,8 +403,9 @@ func (l *Line) rigidAt(st State, out []Car) []Car {
 		d, uy = world.Up, -1
 	}
 	w, h := float64(l.w), float64(l.h)
-	out[0] = Car{X: bx, Y: by, Facing: d, Loco: true}
-	out[1] = Car{X: math.Mod(bx-ux+w, w), Y: math.Mod(by-uy+h, h), Facing: d}
+	for k := range out {
+		out[k] = Car{X: math.Mod(bx-ux*float64(k)+w, w), Y: math.Mod(by-uy*float64(k)+h, h), Facing: d, Loco: k == 0}
+	}
 	return out
 }
 

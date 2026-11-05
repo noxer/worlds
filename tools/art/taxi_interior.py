@@ -7,7 +7,7 @@ until there); the "train window" tiles show the way passing by."""
 import json, sys
 out = sys.argv[1]
 W, H = 8, 4
-WORLDS, DUNGEON = 1, 129
+WORLDS, DUNGEON = 1, 177  # room for the worlds sheet to grow
 FLOOR, WALL, WINDOW, SEAT, DOOR = 53, 54, 55, 56, 57
 ground = [FLOOR] * (W * H)
 def put(x, y, t): ground[y * W + x] = t

@@ -2,9 +2,11 @@ package scene
 
 import (
 	"fmt"
+	"image/color"
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 
 	"github.com/noxer/worlds/internal/dialog"
 	"github.com/noxer/worlds/internal/geom"
@@ -26,6 +28,8 @@ const (
 	trainMap      world.MapID = "train" // the carriage's detail map
 	ferryMap      world.MapID = "ferry" // the ferry's deck
 	busMap        world.MapID = "bus"   // the inside of a bus
+	planeMap      world.MapID = "plane" // an airliner's cabin
+	airportReach              = 400     // airports this close have their planes drawn
 	trainReach                = 48      // lines this close to the party are drawn
 	ferryReach                = 3000    // harbours this close have their ferries drawn
 	viewSlowTiles             = 150     // near stations, the window shows the real place
@@ -66,6 +70,7 @@ var vehicles = map[transit.Kind]vehicle{
 	transit.Ferry: {ferryMap, "ferry_exit", "No ferries sail from here.", "All ashore, please."},
 	transit.Bus:   {busMap, "bus_exit", "No buses stop here.", "Last stop. Everyone off, please."},
 	transit.Taxi:  {taxiMap, "taxi_exit", "", "Here we are. Mind the door."},
+	transit.Plane: {planeMap, "plane_exit", "No flights leave from here.", "Thank you for flying with us. Everyone off, please."},
 }
 
 // vehicleMap is the detail map a line's vehicle is ridden in.
@@ -82,6 +87,8 @@ func (e *Explore) line(edge infra.Edge) *transit.Line {
 		l = transit.NewFerry(e.infra, edge, e.w.W, e.w.H, e.w.Seed)
 	case infra.Road:
 		l = transit.NewBus(e.infra, edge, e.w.W, e.w.H, e.w.Seed)
+	case infra.Flight:
+		l = transit.NewPlane(e.infra, edge, e.w.W, e.w.H, e.w.Seed)
 	default:
 		l = transit.NewLine(e.infra, edge, e.w.W, e.w.H, e.w.Seed)
 	}
@@ -109,6 +116,15 @@ func (e *Explore) updateTrains() {
 			if line := e.line(w.Edge); line != nil && !seen[line] {
 				seen[line] = true
 				e.nearLines = append(e.nearLines, line)
+			}
+		}
+		// Planes at the airports around.
+		for _, a := range e.infra.AirportsIn(l.Pos.X-airportReach, l.Pos.Y-airportReach, 2*airportReach, 2*airportReach) {
+			for _, edge := range a.Flight {
+				if line := e.line(edge); line != nil && !seen[line] {
+					seen[line] = true
+					e.nearLines = append(e.nearLines, line)
+				}
 			}
 		}
 		// Ferries from the harbours around, once their routes are ready
@@ -223,12 +239,17 @@ func (e *Explore) trainBump(p world.Pos) bool {
 	case e.ranks != nil && p.Map.IsMain() && func() bool { _, ok := e.ranks[p]; return ok }():
 		e.say("A taxi. Press to talk to the driver.")
 		return true
+	case ok && id == "airport":
+		if a, ok := e.airportAt(p); ok {
+			e.say(e.infra.Name(a.S) + " Airport: departures. Press to read the board.")
+			return true
+		}
 	case ok && id == "bus_stop":
 		if s, _, ok := e.busStopAt(p); ok {
 			e.say(e.infra.Name(s) + " bus stop. Press to read the timetable.")
 			return true
 		}
-	case ok && (id == "train_exit" || id == "ferry_exit" || id == "bus_exit" || id == "taxi_exit"):
+	case ok && (id == "train_exit" || id == "ferry_exit" || id == "bus_exit" || id == "taxi_exit" || id == "plane_exit"):
 		e.leaveTrain(false)
 		return true
 	}
@@ -258,6 +279,12 @@ func (e *Explore) trainTalk(ctx *Context, p world.Pos) bool {
 			return true
 		}
 	}
+	if id == "airport" {
+		if a, ok := e.airportAt(p); ok {
+			e.timetable(ctx, a.S, transit.Plane, a.Flight, e.infra.Name(a.S)+" Airport")
+			return true
+		}
+	}
 	if id == "bus_stop" {
 		if s, edges, ok := e.busStopAt(p); ok {
 			e.timetable(ctx, s, transit.Bus, edges, e.infra.Name(s)+" bus stop")
@@ -270,11 +297,21 @@ func (e *Explore) trainTalk(ctx *Context, p world.Pos) bool {
 			return true
 		}
 	}
-	if sg := e.signs[p]; (sg == "train_seat" || sg == "ferry_bench") && e.ride != nil && !e.ride.arrived {
+	if sg := e.signs[p]; (sg == "train_seat" || sg == "ferry_bench" || sg == "plane_seat") && e.ride != nil && !e.ride.arrived {
 		e.restOffer(ctx)
 		return true
 	}
 	return false
+}
+
+// airportAt returns the airport whose departures board is tile p.
+func (e *Explore) airportAt(p world.Pos) (infra.Airport, bool) {
+	for _, a := range e.infra.AirportsIn(p.X, p.Y, 1, 1) {
+		if b := a.Board(); b.X == p.X && b.Y == p.Y {
+			return a, true
+		}
+	}
+	return infra.Airport{}, false
 }
 
 // busStopAt returns the town whose bus stop post is tile p, and the roads
@@ -429,6 +466,13 @@ func (e *Explore) leaveTrain(forced bool) {
 			if pier, ok = e.infra.Harbour(at); ok { // the end of the pier
 				front = pier.Cells[len(pier.Cells)-1]
 			}
+		case transit.Plane:
+			var ap infra.Airport
+			if ap, ok = e.infra.Airport(at); ok { // on the apron below the gate
+				k, _ := ap.GateOf(r.line.Edge)
+				g := ap.Gate(k)
+				front = infra.Point{X: g.X + 1, Y: g.Y + 3}
+			}
 		case transit.Taxi:
 			a := e.arrivalAt(at)
 			front, ok = infra.Point{X: a.X, Y: a.Y}, true
@@ -552,7 +596,12 @@ func (e *Explore) trainDrawables(m world.MapRef, alpha float64) []drawable {
 		}
 	}
 	for _, line := range e.nearLines {
-		add(line.Kind, line.CarsAt(line.At(t)))
+		cars := line.CarsAt(line.At(t))
+		if line.Kind == transit.Plane {
+			out = append(out, e.planeDrawables(m, cars[1], cx, cy)...)
+			continue
+		}
+		add(line.Kind, cars)
 	}
 	if e.lastTaxi != nil {
 		add(transit.Taxi, e.lastTaxi.CarsAt(e.lastTaxi.At(t)))
@@ -563,6 +612,43 @@ func (e *Explore) trainDrawables(m world.MapRef, alpha float64) []drawable {
 			seen[st.Rank] = true
 			add(transit.Taxi, rankTaxi(st, e.w))
 		}
+	}
+	return out
+}
+
+// planeDrawables are the 3x3 tiles of a plane, around its middle car.
+func (e *Explore) planeDrawables(m world.MapRef, mid transit.Car, cx, cy float64) []drawable {
+	name, flip := "plane e", false
+	switch mid.Facing {
+	case world.Left:
+		flip = true
+	case world.Down:
+		name = "plane s"
+	case world.Up:
+		name = "plane n"
+	}
+	var out []drawable
+	for i := 0; i < 9; i++ {
+		r, c := i/3, i%3
+		dx := c - 1
+		if flip {
+			dx = 1 - c
+		}
+		x, y := e.screenAt(m, (mid.X+float64(dx))*tile, (mid.Y+float64(r-1))*tile, cx, cy)
+		if x < -tile || y < -tile || x > float64(e.viewW) || y > float64(e.viewH) {
+			continue
+		}
+		key := fmt.Sprintf("%s %d", name, i)
+		t, ok := e.trainTiles[key]
+		if !ok {
+			tt, err := e.w.Tilesets().Named("worlds", key)
+			if err != nil {
+				return nil
+			}
+			t = tt.Index()
+			e.trainTiles[key] = t
+		}
+		out = append(out, drawable{img: e.sheets.Tile(sheetWorlds, t), flip: flip, x: x, y: y})
 	}
 	return out
 }
@@ -639,6 +725,13 @@ func (e *Explore) drawWindowView(dst *ebiten.Image, alpha float64) {
 	mw, mh, _ := e.w.Size(world.Detail(vm))
 	e.viewImg = ensureImage(e.viewImg, tile, tile)
 	u := heading * s // grows as the train goes, either way
+	// A plane at cruise (the view no longer at its real place) is above
+	// the clouds.
+	sky := false
+	if line.Kind == transit.Plane {
+		st := line.At(e.trainTick(alpha))
+		sky = st.Moving && math.Abs(st.Front-s) > 2
+	}
 	for cy := int64(0); cy < mh; cy++ {
 		for cx := int64(0); cx < mw; cx++ {
 			p := world.Pos{Map: world.Detail(vm), X: cx, Y: cy}
@@ -656,6 +749,13 @@ func (e *Explore) drawWindowView(dst *ebiten.Image, alpha float64) {
 			t0 := math.Floor(v)
 			shift := int((v - t0) * tile)
 			e.viewImg.Clear()
+			if sky {
+				drawSky(e.viewImg, t0, shift, cy)
+				op := &ebiten.DrawImageOptions{}
+				op.GeoM.Translate(float64(cx*tile-e.camX), float64(cy*tile-e.camY))
+				dst.DrawImage(e.viewImg, op)
+				continue
+			}
 			for k := 0; k < 2; k++ {
 				sd := heading * (t0 + float64(k)) // back to track distance
 				x, y, d := line.Pos(sd)
@@ -726,6 +826,24 @@ func dirVec(d world.Dir) (dx, dy float64) {
 		return 0, 1
 	}
 	return 0, -1
+}
+
+// drawSky draws the sky over the clouds into a window tile: blue, with
+// white clouds drifting by (by view distance t0, shifted by shift pixels).
+func drawSky(dst *ebiten.Image, t0 float64, shift int, row int64) {
+	dst.Fill(color.RGBA{136, 190, 236, 255})
+	for k := 0; k < 2; k++ {
+		h := uint64(int64(t0)+int64(k))*0x9e3779b97f4a7c15 ^ uint64(row)*0xbf58476d1ce4e5b9
+		h ^= h >> 29
+		if h%3 != 0 {
+			continue
+		}
+		x := k*tile - shift + int(h>>8)%6
+		y := 3 + int(h>>16)%6
+		w := 7 + int(h>>24)%6
+		vector.DrawFilledRect(dst, float32(x), float32(y), float32(w), 4, color.RGBA{250, 250, 252, 255}, false)
+		vector.DrawFilledRect(dst, float32(x+2), float32(y-2), float32(w-4), 2, color.RGBA{250, 250, 252, 255}, false)
+	}
 }
 
 // leftOf returns the offset to the left of a direction of travel.

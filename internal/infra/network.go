@@ -401,6 +401,7 @@ func (in *Infra) search(e Edge, a, b Point, g int64, y *yielder) ([][2]int64, in
 			stations = append(stations, r)
 		}
 	}
+	airports := in.airportRects(e)
 
 	// The search area: a box around the straight line, narrowed to a
 	// corridor around the coarse route for long routes.
@@ -471,6 +472,12 @@ func (in *Infra) search(e Edge, a, b Point, g int64, y *yielder) ([][2]int64, in
 			if in.avoided(geom.Mod(a.X+(i+pi)*g/2, in.w), geom.Mod(a.Y+(j+pj)*g/2, in.h), g/4) {
 				return -1
 			}
+		}
+		// Ways keep out of their cities' airports.
+		if len(airports) > 0 && (in.crosses(airports, Point{a.X + pi*g, a.Y + pj*g}, Point{a.X + i*g, a.Y + j*g}) ||
+			in.inRect(airports[0], geom.Mod(a.X+i*g, in.w), geom.Mod(a.Y+j*g, in.h)) ||
+			(len(airports) > 1 && in.inRect(airports[1], geom.Mod(a.X+i*g, in.w), geom.Mod(a.Y+j*g, in.h)))) {
+			return -1
 		}
 		// Rail keeps out of the station plazas (bar the buffer stops).
 		if len(stations) > 0 && (i != gx || j != gy) && in.crosses(stations,

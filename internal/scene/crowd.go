@@ -193,7 +193,8 @@ func itoa(i int) string {
 
 // debugTravel jumps (through the usual fade) to the plaza of the nearest
 // generated village, then town, then city, then the end of the nearest
-// ferry pier, then the nearest bus stop, then back home: a quick way to
+// ferry pier, the nearest bus stop, the nearest airport, then back home:
+// a quick way to
 // look at places that are hours apart on foot.
 func (e *Explore) debugTravel() {
 	if e.infra == nil {
@@ -249,6 +250,14 @@ func (e *Explore) debugTravel() {
 			}
 		}
 	}
+	if !found && e.travel == len(tiers)+2 {
+		// Then the nearest airport, before its departures board.
+		e.travel++
+		if a, ok := e.airportNear(from); ok {
+			b := a.Board()
+			dest, facing, found = world.Pos{Map: world.Main, X: b.X, Y: b.Y + 1}, world.Up, true
+		}
+	}
 	if !found {
 		dest, e.travel = e.home, 0
 	}
@@ -258,6 +267,23 @@ func (e *Explore) debugTravel() {
 	}
 	e.warp = &world.Warp{To: dest, Facing: facing, HasFacing: true}
 	e.fade = fadeTicks
+}
+
+// airportNear returns the airport nearest p.
+func (e *Explore) airportNear(p world.Pos) (infra.Airport, bool) {
+	best := int64(-1)
+	var ba infra.Airport
+	for _, s := range e.infra.Near(p.X, p.Y, 400000, infra.Metropolis) {
+		a, ok := e.infra.Airport(s)
+		if !ok {
+			continue
+		}
+		dx, dy, _ := e.w.Delta(p, world.Pos{Map: world.Main, X: a.X, Y: a.Y})
+		if d := dx*dx + dy*dy; best < 0 || d < best {
+			best, ba = d, a
+		}
+	}
+	return ba, best >= 0
 }
 
 // busStopNear returns the bus stop nearest p (of the towns within reach).

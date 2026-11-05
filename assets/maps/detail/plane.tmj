@@ -1,0 +1,1166 @@
+{
+ "type": "map",
+ "version": "1.10",
+ "tiledversion": "1.11.0",
+ "orientation": "orthogonal",
+ "renderorder": "right-down",
+ "infinite": false,
+ "compressionlevel": -1,
+ "width": 18,
+ "height": 6,
+ "tilewidth": 16,
+ "tileheight": 16,
+ "nextlayerid": 5,
+ "nextobjectid": 42,
+ "properties": [
+  {
+   "name": "vehicle",
+   "type": "string",
+   "value": "plane"
+  }
+ ],
+ "tilesets": [
+  {
+   "firstgid": 1,
+   "source": "../../tilesets/worlds.tsj"
+  },
+  {
+   "firstgid": 177,
+   "source": "../../tilesets/tinydungeon.tsj"
+  }
+ ],
+ "layers": [
+  {
+   "id": 1,
+   "name": "ground",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 18,
+   "height": 6,
+   "data": [
+    55,
+    55,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    55,
+    55,
+    55,
+    55,
+    54,
+    54,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    54,
+    54,
+    55,
+    58,
+    54,
+    54,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    54,
+    54,
+    55,
+    55,
+    54,
+    54,
+    54,
+    54,
+    54,
+    54,
+    54,
+    54,
+    54,
+    54,
+    54,
+    54,
+    54,
+    54,
+    54,
+    58,
+    55,
+    55,
+    54,
+    54,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    57,
+    54,
+    54,
+    55,
+    55,
+    55,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    56,
+    55,
+    55,
+    55
+   ]
+  },
+  {
+   "id": 2,
+   "name": "deco",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 18,
+   "height": 6,
+   "data": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "id": 3,
+   "name": "overhead",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 18,
+   "height": 6,
+   "data": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "properties": [
+    {
+     "name": "overhead",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "objects",
+   "type": "objectgroup",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "draworder": "topdown",
+   "objects": [
+    {
+     "id": 1,
+     "name": "aboard",
+     "type": "spawn",
+     "x": 32,
+     "y": 48,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "right"
+      }
+     ]
+    },
+    {
+     "id": 2,
+     "name": "exit",
+     "type": "train_exit",
+     "x": 0,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "bump",
+       "type": "string",
+       "value": "plane_exit"
+      }
+     ]
+    },
+    {
+     "id": 3,
+     "name": "cockpit",
+     "type": "sign",
+     "x": 256,
+     "y": 48,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_cockpit"
+      }
+     ]
+    },
+    {
+     "id": 4,
+     "name": "seat_3_1",
+     "type": "sign",
+     "x": 48,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 5,
+     "name": "seat_4_1",
+     "type": "sign",
+     "x": 64,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 6,
+     "name": "seat_5_1",
+     "type": "sign",
+     "x": 80,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 7,
+     "name": "seat_6_1",
+     "type": "sign",
+     "x": 96,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 8,
+     "name": "seat_7_1",
+     "type": "sign",
+     "x": 112,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 9,
+     "name": "seat_8_1",
+     "type": "sign",
+     "x": 128,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 10,
+     "name": "seat_9_1",
+     "type": "sign",
+     "x": 144,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 11,
+     "name": "seat_10_1",
+     "type": "sign",
+     "x": 160,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 12,
+     "name": "seat_11_1",
+     "type": "sign",
+     "x": 176,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 13,
+     "name": "seat_12_1",
+     "type": "sign",
+     "x": 192,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 14,
+     "name": "seat_13_1",
+     "type": "sign",
+     "x": 208,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 15,
+     "name": "seat_14_1",
+     "type": "sign",
+     "x": 224,
+     "y": 16,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 16,
+     "name": "seat_3_2",
+     "type": "sign",
+     "x": 48,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 17,
+     "name": "seat_4_2",
+     "type": "sign",
+     "x": 64,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 18,
+     "name": "seat_5_2",
+     "type": "sign",
+     "x": 80,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 19,
+     "name": "seat_6_2",
+     "type": "sign",
+     "x": 96,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 20,
+     "name": "seat_7_2",
+     "type": "sign",
+     "x": 112,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 21,
+     "name": "seat_8_2",
+     "type": "sign",
+     "x": 128,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 22,
+     "name": "seat_9_2",
+     "type": "sign",
+     "x": 144,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 23,
+     "name": "seat_10_2",
+     "type": "sign",
+     "x": 160,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 24,
+     "name": "seat_11_2",
+     "type": "sign",
+     "x": 176,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 25,
+     "name": "seat_12_2",
+     "type": "sign",
+     "x": 192,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 26,
+     "name": "seat_13_2",
+     "type": "sign",
+     "x": 208,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 27,
+     "name": "seat_14_2",
+     "type": "sign",
+     "x": 224,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 28,
+     "name": "seat_3_4",
+     "type": "sign",
+     "x": 48,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 29,
+     "name": "seat_4_4",
+     "type": "sign",
+     "x": 64,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 30,
+     "name": "seat_5_4",
+     "type": "sign",
+     "x": 80,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 31,
+     "name": "seat_6_4",
+     "type": "sign",
+     "x": 96,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 32,
+     "name": "seat_7_4",
+     "type": "sign",
+     "x": 112,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 33,
+     "name": "seat_8_4",
+     "type": "sign",
+     "x": 128,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 34,
+     "name": "seat_9_4",
+     "type": "sign",
+     "x": 144,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 35,
+     "name": "seat_10_4",
+     "type": "sign",
+     "x": 160,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 36,
+     "name": "seat_11_4",
+     "type": "sign",
+     "x": 176,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 37,
+     "name": "seat_12_4",
+     "type": "sign",
+     "x": 192,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 38,
+     "name": "seat_13_4",
+     "type": "sign",
+     "x": 208,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 39,
+     "name": "seat_14_4",
+     "type": "sign",
+     "x": 224,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_seat"
+      }
+     ]
+    },
+    {
+     "id": 40,
+     "name": "attendant",
+     "type": "npc",
+     "x": 144,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_attendant"
+      },
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "left"
+      }
+     ],
+     "gid": 275
+    },
+    {
+     "id": 41,
+     "name": "passenger_1",
+     "type": "npc",
+     "x": 224,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "plane_passenger_1"
+      },
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "up"
+      }
+     ],
+     "gid": 264
+    }
+   ]
+  }
+ ]
+}
