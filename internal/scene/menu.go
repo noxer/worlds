@@ -172,13 +172,21 @@ func (m *Menu) Update(ctx *Context) {
 		step(1)
 	}
 	if p, ok := in.Tap(); ok {
-		_, rows := m.rects()
+		box, rows := m.rects()
 		for i, r := range rows {
 			if p.In(r) && !its[i].off {
 				m.cursor = i
 				its[i].do(m, ctx)
 				return
 			}
+		}
+		if !p.In(box) { // a tap beside the menu goes back, or closes it
+			if m.page != menuMain {
+				m.open(menuMain)
+			} else {
+				ctx.Pop()
+			}
+			return
 		}
 	}
 	if in.Pressed(input.Confirm) && m.cursor < len(its) && !its[m.cursor].off {

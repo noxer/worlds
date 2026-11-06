@@ -291,6 +291,11 @@ func (e *Explore) Update(ctx *Context) {
 	// Taps are accepted while walking; the new goal is picked up as soon as
 	// the leader reaches the next tile.
 	if p, ok := in.Tap(); ok {
+		if p.In(cornerButton(ctx.W, 0)) { // the menu button
+			e.cancelPath()
+			ctx.Push(NewMenu(e, e.saves))
+			return
+		}
 		e.tapAt(p)
 	}
 
@@ -773,6 +778,7 @@ func (e *Explore) Draw(dst *ebiten.Image) {
 	if e.debug {
 		e.drawDebug(dst)
 	}
+	drawButton(dst, cornerButton(dst.Bounds().Dx(), 0), iconMenu)
 	if e.fade != 0 {
 		a := float64(fadeTicks-abs(e.fade)) / fadeTicks
 		if e.fade < 0 {

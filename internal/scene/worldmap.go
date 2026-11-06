@@ -20,7 +20,8 @@ import (
 // with the settlements that suit the zoom, the names of cities and of the
 // places the party has been to, and where the party is. Arrows pan,
 // Confirm (or a tap) zooms in, Cancel zooms out and, at the widest, closes;
-// Menu closes.
+// Menu closes. Buttons in the top-right corner zoom in and out and close
+// (for touch screens).
 type WorldMap struct {
 	e    *Explore
 	zoom int   // index into mapZooms
@@ -118,10 +119,28 @@ func (m *WorldMap) Update(ctx *Context) {
 		m.zoom++
 		m.reset()
 	}
-	if p, ok := in.Tap(); ok && m.zoom < len(mapZooms)-1 {
-		m.cx, m.cy = m.worldAt(p.X, p.Y)
-		m.zoom++
-		m.reset()
+	if p, ok := in.Tap(); ok {
+		// The buttons in the corner: close, wider, closer; elsewhere a tap
+		// zooms in on that spot.
+		switch {
+		case p.In(cornerButton(m.w, 0)):
+			ctx.Pop()
+			return
+		case p.In(cornerButton(m.w, 1)):
+			if m.zoom > 0 {
+				m.zoom--
+				m.reset()
+			}
+		case p.In(cornerButton(m.w, 2)):
+			if m.zoom < len(mapZooms)-1 {
+				m.zoom++
+				m.reset()
+			}
+		case m.zoom < len(mapZooms)-1:
+			m.cx, m.cy = m.worldAt(p.X, p.Y)
+			m.zoom++
+			m.reset()
+		}
 	}
 	if d, ok := in.Dir(); ok && in.DirPressed() {
 		dx, dy := d.Delta()
@@ -258,8 +277,11 @@ func (m *WorldMap) Draw(dst *ebiten.Image) {
 	gfx.Text(dst, fmt.Sprintf("1 px = %s  Enter + Esc -  Tab close", mapDistance(m.scale())),
 		3, bar.Min.Y, gfx.ColorPaper)
 	if m.row < m.h {
-		gfx.Text(dst, "...", m.w-24, 2, gfx.ColorPaper)
+		gfx.Text(dst, "...", m.w-24, bar.Min.Y, gfx.ColorPaper)
 	}
+	drawButton(dst, cornerButton(m.w, 0), iconClose)
+	drawButton(dst, cornerButton(m.w, 1), iconMinus)
+	drawButton(dst, cornerButton(m.w, 2), iconPlus)
 }
 
 func overlaps(rs []image.Rectangle, r image.Rectangle) bool {

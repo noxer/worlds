@@ -1128,6 +1128,11 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       drawing, zoom, marks and panning;
    3. the party screen: the members, and who leads.
 
+   On touch screens (and with a mouse): a half-transparent menu button
+   is always in the top-right corner while exploring; the world map has
+   plus, minus and close buttons there; a tap beside the menu goes back
+   or closes it (`scene/buttons.go`; a test drives it all with taps).
+
 ## Asset delivery
 
 The world itself costs almost nothing to ship: generated chunks come from the
