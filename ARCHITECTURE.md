@@ -1118,8 +1118,14 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       in the user's config directory on desktop, `localStorage` in the
       browser; tests for the format, both file and memory stores, a save
       and load through the menu, and no saving on a journey;
-   2. the world map: an overview of the whole world from the terrain
-      preview, with zoom, settlements, the places visited and the party;
+   2. **done:** the world map (Menu, Map; `scene/worldmap.go`): drawn
+      from the generator's terrain preview a few rows a frame (6 ms), at
+      4096, 512, 64 and 8 tiles a pixel (the whole world to a few
+      streets); metropolises, then cities, towns and villages as the zoom
+      allows, with names by size, the places visited at every zoom but the
+      widest (ringed, their names in red), and the party; arrows pan,
+      Confirm or a tap zooms in, Cancel zooms out or closes; a test of the
+      drawing, zoom, marks and panning;
    3. the party screen: the members, and who leads.
 
 ## Asset delivery

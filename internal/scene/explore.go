@@ -89,8 +89,9 @@ type Explore struct {
 	lastTaxi      *transit.Line                 // the taxi just left, until it drives off
 	ride          *ride
 	viewImg       *ebiten.Image
-	pendingNotice string // shown when the fade is over
-	restoreRiding bool   // ride on after the fade (a loaded game)
+	pendingNotice string    // shown when the fade is over
+	restoreRiding bool      // ride on after the fade (a loaded game)
+	lastMain      world.Pos // the party's last place outside (for the world map)
 	saves         save.Store
 	fade          int // >0 fading out, <0 fading in
 	warp          *world.Warp
@@ -293,6 +294,9 @@ func (e *Explore) Update(ctx *Context) {
 		e.tapAt(p)
 	}
 
+	if l := e.party.Leader(); l.Pos.Map.IsMain() {
+		e.lastMain = l.Pos
+	}
 	arrived := e.party.Update()
 	e.updateNPCs()
 	e.updateCrowd()

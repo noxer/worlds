@@ -14,7 +14,7 @@ import (
 )
 
 // Menu is the pause menu, opened with Menu (or Cancel) while exploring:
-// Resume, Save, Load and, on desktop, Quit. The world stands still while
+// Resume, Map (the world map), Save, Load and, on desktop, Quit. The world stands still while
 // it is open. Save and Load list the slots with where and when.
 type Menu struct {
 	e      *Explore
@@ -63,6 +63,7 @@ func (m *Menu) items() []menuItem {
 	}
 	out := []menuItem{
 		{text: "Resume", do: func(m *Menu, ctx *Context) { ctx.Pop() }},
+		{text: "Map", do: func(m *Menu, ctx *Context) { ctx.Pop(); ctx.Push(NewWorldMap(m.e)) }},
 		{text: "Save", off: m.store == nil, do: func(m *Menu, ctx *Context) { m.open(menuSave) }},
 		{text: "Load", off: m.store == nil, do: func(m *Menu, ctx *Context) { m.open(menuLoad) }},
 	}
