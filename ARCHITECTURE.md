@@ -1126,7 +1126,11 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       widest (ringed, their names in red), and the party; arrows pan,
       Confirm or a tap zooms in, Cancel zooms out or closes; a test of the
       drawing, zoom, marks and panning;
-   3. the party screen: the members, and who leads.
+   3. **done:** the party screen (Menu, Party; `scene/partyscreen.go`):
+      each member with their portrait, the first leading; pick two (keys
+      or taps) to swap them; a new leader takes the leader's tile and the
+      party unfolds behind it, as after a door; the order is saved; a test
+      of swapping by keys and taps.
 
    On touch screens (and with a mouse): a half-transparent menu button
    is always in the top-right corner while exploring; the world map has
