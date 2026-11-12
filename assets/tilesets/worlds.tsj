@@ -1,0 +1,1682 @@
+{
+ "type": "tileset",
+ "version": "1.10",
+ "tiledversion": "1.11.0",
+ "name": "worlds",
+ "tilewidth": 16,
+ "tileheight": 16,
+ "tilecount": 176,
+ "columns": 16,
+ "image": "../tiles/worlds.png",
+ "imagewidth": 256,
+ "imageheight": 176,
+ "margin": 0,
+ "spacing": 0,
+ "tiles": [
+  {
+   "id": 2,
+   "properties": [
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    },
+    {
+     "name": "above",
+     "type": "int",
+     "value": 3
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "value": "lamp_post"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "properties": [
+    {
+     "name": "light",
+     "type": "float",
+     "value": 3.5
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "properties": [
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    },
+    {
+     "name": "above",
+     "type": "int",
+     "value": 5
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "value": "bus stop"
+    }
+   ]
+  },
+  {
+   "id": 81,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "taxi front e"
+    }
+   ]
+  },
+  {
+   "id": 82,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "taxi back e"
+    }
+   ]
+  },
+  {
+   "id": 83,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "taxi front s"
+    }
+   ]
+  },
+  {
+   "id": 84,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "taxi back s"
+    }
+   ]
+  },
+  {
+   "id": 85,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "taxi front n"
+    }
+   ]
+  },
+  {
+   "id": 86,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "taxi back n"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "bus front e"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "bus back e"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "bus front s"
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "bus back s"
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "bus front n"
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "bus back n"
+    }
+   ]
+  },
+  {
+   "id": 16,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 0"
+    }
+   ]
+  },
+  {
+   "id": 17,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 1"
+    }
+   ]
+  },
+  {
+   "id": 18,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 2"
+    }
+   ]
+  },
+  {
+   "id": 19,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 3"
+    }
+   ]
+  },
+  {
+   "id": 20,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 4"
+    }
+   ]
+  },
+  {
+   "id": 21,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 5"
+    }
+   ]
+  },
+  {
+   "id": 22,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 6"
+    }
+   ]
+  },
+  {
+   "id": 23,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 7"
+    }
+   ]
+  },
+  {
+   "id": 24,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 8"
+    }
+   ]
+  },
+  {
+   "id": 25,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 9"
+    }
+   ]
+  },
+  {
+   "id": 26,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 10"
+    }
+   ]
+  },
+  {
+   "id": 27,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 11"
+    }
+   ]
+  },
+  {
+   "id": 28,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 12"
+    }
+   ]
+  },
+  {
+   "id": 29,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 13"
+    }
+   ]
+  },
+  {
+   "id": 30,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 14"
+    }
+   ]
+  },
+  {
+   "id": 31,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "rail 15"
+    }
+   ]
+  },
+  {
+   "id": 32,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 0"
+    }
+   ]
+  },
+  {
+   "id": 33,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 1"
+    }
+   ]
+  },
+  {
+   "id": 34,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 2"
+    }
+   ]
+  },
+  {
+   "id": 35,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 3"
+    }
+   ]
+  },
+  {
+   "id": 36,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 4"
+    }
+   ]
+  },
+  {
+   "id": 37,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 5"
+    }
+   ]
+  },
+  {
+   "id": 38,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 6"
+    }
+   ]
+  },
+  {
+   "id": 39,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 7"
+    }
+   ]
+  },
+  {
+   "id": 40,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 8"
+    }
+   ]
+  },
+  {
+   "id": 41,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 9"
+    }
+   ]
+  },
+  {
+   "id": 42,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 10"
+    }
+   ]
+  },
+  {
+   "id": 43,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 11"
+    }
+   ]
+  },
+  {
+   "id": 44,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 12"
+    }
+   ]
+  },
+  {
+   "id": 45,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 13"
+    }
+   ]
+  },
+  {
+   "id": 46,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 14"
+    }
+   ]
+  },
+  {
+   "id": 47,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "pier 15"
+    }
+   ]
+  },
+  {
+   "id": 48,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train car h"
+    }
+   ]
+  },
+  {
+   "id": 49,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train car v"
+    }
+   ]
+  },
+  {
+   "id": 50,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train loco e"
+    }
+   ]
+  },
+  {
+   "id": 51,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train loco s"
+    }
+   ]
+  },
+  {
+   "id": 52,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train loco n"
+    }
+   ]
+  },
+  {
+   "id": 53,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train floor"
+    }
+   ]
+  },
+  {
+   "id": 54,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train wall"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 55,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train window"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 56,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train seat"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 57,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "train door"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 58,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry bow e"
+    }
+   ]
+  },
+  {
+   "id": 59,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry stern e"
+    }
+   ]
+  },
+  {
+   "id": 60,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry bow s"
+    }
+   ]
+  },
+  {
+   "id": 61,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry stern s"
+    }
+   ]
+  },
+  {
+   "id": 62,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry bow n"
+    }
+   ]
+  },
+  {
+   "id": 63,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry stern n"
+    }
+   ]
+  },
+  {
+   "id": 96,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry deck"
+    }
+   ]
+  },
+  {
+   "id": 97,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry sea"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 98,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry bench"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 99,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry gangway"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 100,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 1"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 101,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 2"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 102,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 4"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 103,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 8"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 104,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 9"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 105,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 3"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 106,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 12"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 107,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry rail 6"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 112,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry hull ne"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 113,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry hull se"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 114,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry hull e"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 115,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry hull nw"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 116,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry hull sw"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 117,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry roof 9"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 118,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry roof 1"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 119,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry roof 3"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 120,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry roof 8"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 121,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry roof 0"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 122,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry roof 2"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 123,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry roof 12"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 124,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry roof 4"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 125,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry roof 6"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 126,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ferry funnel"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 128,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 0"
+    }
+   ]
+  },
+  {
+   "id": 129,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 1"
+    }
+   ]
+  },
+  {
+   "id": 130,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 2"
+    }
+   ]
+  },
+  {
+   "id": 131,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 3"
+    }
+   ]
+  },
+  {
+   "id": 132,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 4"
+    }
+   ]
+  },
+  {
+   "id": 133,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 5"
+    }
+   ]
+  },
+  {
+   "id": 134,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 6"
+    }
+   ]
+  },
+  {
+   "id": 135,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 7"
+    }
+   ]
+  },
+  {
+   "id": 136,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane e 8"
+    }
+   ]
+  },
+  {
+   "id": 137,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 0"
+    }
+   ]
+  },
+  {
+   "id": 138,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 1"
+    }
+   ]
+  },
+  {
+   "id": 139,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 2"
+    }
+   ]
+  },
+  {
+   "id": 140,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 3"
+    }
+   ]
+  },
+  {
+   "id": 141,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 4"
+    }
+   ]
+  },
+  {
+   "id": 142,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 5"
+    }
+   ]
+  },
+  {
+   "id": 143,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 6"
+    }
+   ]
+  },
+  {
+   "id": 144,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 7"
+    }
+   ]
+  },
+  {
+   "id": 145,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane s 8"
+    }
+   ]
+  },
+  {
+   "id": 146,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 0"
+    }
+   ]
+  },
+  {
+   "id": 147,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 1"
+    }
+   ]
+  },
+  {
+   "id": 148,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 2"
+    }
+   ]
+  },
+  {
+   "id": 149,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 3"
+    }
+   ]
+  },
+  {
+   "id": 150,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 4"
+    }
+   ]
+  },
+  {
+   "id": 151,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 5"
+    }
+   ]
+  },
+  {
+   "id": 152,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 6"
+    }
+   ]
+  },
+  {
+   "id": 153,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 7"
+    }
+   ]
+  },
+  {
+   "id": 154,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plane n 8"
+    }
+   ]
+  },
+  {
+   "id": 155,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "departures"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    },
+    {
+     "name": "above",
+     "type": "int",
+     "value": 156
+    }
+   ]
+  },
+  {
+   "id": 157,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "runway"
+    }
+   ]
+  },
+  {
+   "id": 158,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "runway mark"
+    }
+   ]
+  },
+  {
+   "id": 159,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "runway edge n"
+    }
+   ]
+  },
+  {
+   "id": 160,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "runway edge s"
+    }
+   ]
+  },
+  {
+   "id": 161,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "apron"
+    }
+   ]
+  },
+  {
+   "id": 64,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 0"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 65,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 1"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 66,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 2"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 67,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 3"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 68,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 4"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 69,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 5"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 70,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 6"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 71,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 7"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 72,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 8"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 73,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 9"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 74,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 10"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 75,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 11"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 76,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 12"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 77,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 13"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 78,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 14"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 79,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "fence 15"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 80,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "ballast"
+    },
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  }
+ ]
+}

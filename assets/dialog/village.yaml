@@ -1,0 +1,164 @@
+# Messages of generated villages.
+
+house_locked:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The door is locked. Nobody seems to be home.
+
+building_locked:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The door is locked.
+
+shop_closed:
+  start: main
+  nodes:
+    main:
+      lines:
+        - "CLOSED  -  Back soon."
+
+station:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The station. Ask inside for the timetable.
+
+train_exit:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The doors stay closed until the next station.
+
+train_seat:
+  start: main
+  nodes:
+    main:
+      lines:
+        - A comfortable seat by the window.
+
+train_passenger_1:
+  start: main
+  nodes:
+    main:
+      speaker: Passenger
+      lines:
+        - I take this train every week. The view never gets old.
+
+train_passenger_2:
+  start: main
+  nodes:
+    main:
+      speaker: Passenger
+      lines:
+        - Wake me when we get there, would you?
+
+ferry_exit:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The gangway is up until we reach the harbour.
+
+ferry_bench:
+  start: main
+  nodes:
+    main:
+      lines:
+        - A bench on deck, salt on the breeze.
+
+ferry_passenger_1:
+  start: main
+  nodes:
+    main:
+      speaker: Passenger
+      lines:
+        - On a clear day you can see the other shore from halfway across.
+
+ferry_passenger_2:
+  start: main
+  nodes:
+    main:
+      speaker: Deckhand
+      lines:
+        - Mind the rail. We'll be alongside the pier in no time.
+
+bus_exit:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The doors stay shut until the next stop.
+
+bus_driver:
+  start: main
+  nodes:
+    main:
+      speaker: Driver
+      lines:
+        - Please don't talk to the driver while the bus is moving. Well, all right, just this once.
+
+bus_passenger_1:
+  start: main
+  nodes:
+    main:
+      speaker: Passenger
+      lines:
+        - I ride out to my sister's every Sunday. The fields are lovely this time of year.
+
+taxi_exit:
+  start: main
+  nodes:
+    main:
+      lines:
+        - Not here, love. I'll let you out when we get there.
+
+taxi_driver:
+  start: main
+  nodes:
+    main:
+      speaker: Driver
+      lines:
+        - Sit back, I know a shortcut.
+
+plane_exit:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The door is armed. It opens at the gate.
+
+plane_seat:
+  start: main
+  nodes:
+    main:
+      lines:
+        - A window seat, the belt neatly crossed on it.
+
+plane_cockpit:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The cockpit door is locked.
+
+plane_attendant:
+  start: main
+  nodes:
+    main:
+      speaker: Flight attendant
+      lines:
+        - Welcome aboard. Please take any free seat; we'll be on our way shortly.
+
+plane_passenger_1:
+  start: main
+  nodes:
+    main:
+      speaker: Passenger
+      lines:
+        - Three hours to cross by train, half an hour by air. I'll take the peanuts.

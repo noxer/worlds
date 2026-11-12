@@ -1,0 +1,452 @@
+// Package nav finds paths through the world: across chunk borders and the
+// wrap seam of the main map, and through warps between the main map and
+// detail maps.
+//
+// Planning is hierarchical:
+//
+// Costs are travel times in ticks, which depend on the terrain and the
+// mover's Mode (walking, swimming, riding). Paths are the fastest routes, not
+// the ones with the fewest tiles.
+//
+//  1. Within one map, A* runs on the tile grid inside a window around start
+//     and goal (the main map is far too big to search as a whole). Coordinates
+//     in the window are offsets from the start, so the seam is invisible.
+//  2. Across maps, Dijkstra runs on a small graph whose nodes are warp
+//     entries and exits. Edge weights between nodes on the same map are
+//     static A* distances, computed lazily and cached until the world's
+//     passability version changes. On the main map only warps within
+//     MaxRange are considered.
+//
+// Only the current leg (up to the first warp, or to the goal) is refined into
+// concrete moves, avoiding dynamic blockers such as NPCs. After a warp the
+// caller plans again.
+//
+// Long-distance travel on the main map (beyond MaxRange) will use a chunk
+// portal graph; see ARCHITECTURE.md.
+package nav
+
+import (
+	"container/heap"
+
+	"github.com/noxer/worlds/internal/geom"
+	"github.com/noxer/worlds/internal/world"
+)
+
+// Move is one step of a path.
+type Move struct {
+	Dir  world.Dir
+	To   world.Pos   // tile reached by the step
+	Warp *world.Warp // set if reaching To triggers this warp
+}
+
+// Blocked reports dynamic obstacles (other actors). It may be nil.
+type Blocked func(world.Pos) bool
+
+const (
+	// DefaultWarpCost is the cost of using a warp, in ticks (about the time
+	// of the fade plus a few steps).
+	DefaultWarpCost = 8 * WalkTicks
+	// DefaultMaxRange is the largest Manhattan distance a local search covers.
+	DefaultMaxRange = 256
+	// margin is how far the search window extends beyond start and goal.
+	margin = 24
+	// maxCache bounds the static distance cache.
+	maxCache = 8192
+)
+
+// Planner plans paths in a world. It is not safe for concurrent use.
+type Planner struct {
+	w        *world.World
+	WarpCost int
+	MaxRange int64
+
+	version  uint64
+	cache    map[distKey]int
+	costs    map[costKey]costEntry // chunk costs for long-distance corridors
+	badEdges map[edgeKey]bool      // chunk steps found to be dead ends
+}
+
+type distKey struct {
+	from, to world.Pos
+	mode     Mode
+}
+
+// NewPlanner creates a planner for w.
+func NewPlanner(w *world.World) *Planner {
+	return &Planner{w: w, WarpCost: DefaultWarpCost, MaxRange: DefaultMaxRange,
+		cache: map[distKey]int{}, version: w.Version(),
+		costs: map[costKey]costEntry{}, badEdges: map[edgeKey]bool{}}
+}
+
+// Plan returns the moves of the current leg from `from` towards goal, for a
+// mover in mode m (after a warp, movers are always on foot): either
+// all moves to goal, or the moves up to and including the step onto the first
+// warp of the route (that move has Warp set). ok is false if goal is
+// unreachable within range.
+//
+// The leg avoids dynamic blockers if possible. If blockers cut it off
+// completely, the statically valid leg is returned; the mover should wait and
+// plan again.
+func (p *Planner) Plan(from, goal world.Pos, m Mode, blocked Blocked) (moves []Move, ok bool) {
+	if from == goal {
+		return nil, true
+	}
+	if p.w.Solid(goal) {
+		return nil, false
+	}
+	m = effective(from, m)
+	if from.Map == goal.Map && p.enclosed(from, goal, m) {
+		return nil, false
+	}
+	if p.version != p.w.Version() || len(p.cache) > maxCache {
+		clear(p.cache)
+		clear(p.badEdges)
+		clear(p.costs)
+		p.version = p.w.Version()
+	}
+	if from.Map.IsMain() && goal.Map.IsMain() && !p.inRange(from, goal) {
+		dx, dy, _ := p.w.Delta(from, goal)
+		if geom.Abs(dx)+geom.Abs(dy) > MaxFarRange {
+			return nil, false
+		}
+		return p.planFar(from, goal, m, blocked)
+	}
+	target, warp, ok := p.firstLeg(from, goal, m)
+	if !ok {
+		if from.Map.IsMain() && goal.Map.IsMain() {
+			// Near, but the detour doesn't fit the local search window
+			// (a lake, a long fence): route through the chunk corridor.
+			return p.planFar(from, goal, m, blocked)
+		}
+		return nil, false
+	}
+	moves, _, ok = p.local(from, target, m, blocked)
+	if !ok {
+		if moves, _, ok = p.local(from, target, m, nil); !ok {
+			return nil, false
+		}
+	}
+	if warp != nil && len(moves) > 0 {
+		moves[len(moves)-1].Warp = warp
+	}
+	return moves, true
+}
+
+// enclosedLimit bounds the flood fill of enclosed.
+const enclosedLimit = 4096
+
+// enclosed reports that goal lies in a small closed-off area that from is
+// not part of and no warp leads into: a walled-in spot, an island, a pond.
+// Then goal is unreachable, and planning can give up at once instead of
+// searching wide windows and corridors. It floods at most enclosedLimit
+// cells; bigger areas are left to the planner.
+func (p *Planner) enclosed(from, goal world.Pos, m Mode) bool {
+	if _, ok := StepTicks(p.w, goal, m); !ok {
+		return false // not ours to judge (e.g. a warp target); let the planner decide
+	}
+	seen := map[world.Pos]bool{goal: true}
+	queue := []world.Pos{goal}
+	for len(queue) > 0 {
+		if len(seen) > enclosedLimit {
+			return false
+		}
+		c := queue[0]
+		queue = queue[1:]
+		for _, d := range world.Dirs {
+			n, ok := p.w.Neighbor(c, d)
+			if !ok || seen[n] {
+				continue
+			}
+			if n == from {
+				return false
+			}
+			if _, ok := StepTicks(p.w, n, m); !ok {
+				continue
+			}
+			seen[n] = true
+			queue = append(queue, n)
+		}
+	}
+	for _, wp := range p.w.Warps() {
+		if seen[wp.To] {
+			return false // reachable through a door
+		}
+	}
+	return true
+}
+
+// Distance returns the static travel time in ticks between two tiles of the
+// same map, ignoring warps and dynamic blockers. It is -1 if unreachable
+// within range.
+func (p *Planner) Distance(from, to world.Pos, m Mode) int {
+	m = effective(from, m)
+	key := distKey{from, to, m}
+	if d, ok := p.cache[key]; ok {
+		return d
+	}
+	d := -1
+	if _, cost, ok := p.local(from, to, m, nil); ok {
+		d = cost
+	}
+	p.cache[key] = d
+	return d
+}
+
+// effective returns the mode a mover can actually use at p: riding is only
+// possible on the main map.
+func effective(p world.Pos, m Mode) Mode {
+	if m == Ride && !p.Map.IsMain() {
+		return Foot
+	}
+	return m
+}
+
+// inRange reports whether a local search between a and b is allowed.
+func (p *Planner) inRange(a, b world.Pos) bool {
+	dx, dy, ok := p.w.Delta(a, b)
+	return ok && geom.Abs(dx)+geom.Abs(dy) <= p.MaxRange
+}
+
+// firstLeg runs Dijkstra over the abstract warp graph and returns the target
+// of the first leg: goal itself, or the trigger tile of the first warp used.
+// The first leg uses mode m; every leg after a warp is on foot, since movers
+// dismount when they go through a door.
+func (p *Planner) firstLeg(from, goal world.Pos, m Mode) (target world.Pos, warp *world.Warp, ok bool) {
+	warps := p.w.Warps()
+	// Node ids: 0 = start, 1 = goal, 2+2i = trigger of warp i, 3+2i = exit of warp i.
+	const start, gl = 0, 1
+	pos := func(n int) world.Pos {
+		switch {
+		case n == start:
+			return from
+		case n == gl:
+			return goal
+		case n%2 == 0:
+			return warps[(n-2)/2].From
+		default:
+			return warps[(n-3)/2].To
+		}
+	}
+
+	dist := map[int]int{start: 0}
+	prev := map[int]int{}
+	done := map[int]bool{}
+	pq := &nodeHeap{{n: start}}
+	for pq.Len() > 0 {
+		cur := heap.Pop(pq).(nodeItem)
+		if done[cur.n] {
+			continue
+		}
+		done[cur.n] = true
+		if cur.n == gl {
+			break
+		}
+		relax := func(n, cost int) {
+			if cost < 0 {
+				return
+			}
+			nd := cur.d + cost
+			if d, seen := dist[n]; !seen || nd < d {
+				dist[n] = nd
+				prev[n] = cur.n
+				heap.Push(pq, nodeItem{n: n, d: nd})
+			}
+		}
+		if cur.n >= 2 && cur.n%2 == 0 {
+			relax(cur.n+1, p.WarpCost) // the warp itself
+			continue
+		}
+		at := pos(cur.n)
+		mode := Foot
+		if cur.n == start {
+			mode = m
+		}
+		if p.inRange(at, goal) {
+			relax(gl, p.Distance(at, goal, mode))
+		}
+		for i, wp := range warps {
+			if p.inRange(at, wp.From) {
+				relax(2+2*i, p.Distance(at, wp.From, mode))
+			}
+		}
+	}
+	if !done[gl] {
+		return world.Pos{}, nil, false
+	}
+	n := gl
+	for prev[n] != start {
+		n = prev[n]
+	}
+	if n == gl {
+		return goal, nil, true
+	}
+	return pos(n), warps[(n-2)/2], true
+}
+
+// local runs A* on one map within a window around from and to, minimising
+// travel time in mode m. It returns the moves and their total cost in ticks.
+// Warp tiles are impassable unless they are the target, so a path never
+// teleports by accident.
+func (p *Planner) local(from, to world.Pos, m Mode, blocked Blocked) ([]Move, int, bool) {
+	if from == to {
+		return nil, 0, true
+	}
+	if _, ok := StepTicks(p.w, to, m); !ok {
+		return nil, 0, false
+	}
+	return p.search(from, to, func(q world.Pos) bool { return q == to }, m, blocked)
+}
+
+// searchMargins are the margins tried around start and aim, smallest first:
+// most paths fit the small window; detours around a fenced village or a
+// lake need the bigger ones.
+var searchMargins = [...]int64{margin, 96, 160}
+
+// search runs A* from `from` to the first cell satisfying goal. aim is a
+// representative goal position: the search window is the box around from
+// and aim plus a margin, widened step by step when no path fits, and the
+// heuristic estimates the distance to aim. Goal cells may be warp tiles;
+// other warp tiles are impassable.
+func (p *Planner) search(from, aim world.Pos, goal func(world.Pos) bool, m Mode, blocked Blocked) ([]Move, int, bool) {
+	return p.searchUpTo(from, aim, goal, m, blocked, len(searchMargins))
+}
+
+// searchUpTo is search with at most n window sizes.
+func (p *Planner) searchUpTo(from, aim world.Pos, goal func(world.Pos) bool, m Mode, blocked Blocked, n int) ([]Move, int, bool) {
+	for _, mg := range searchMargins[:n] {
+		moves, cost, ok, whole := p.searchWindow(from, aim, goal, m, blocked, mg)
+		if ok || whole {
+			return moves, cost, ok
+		}
+	}
+	return nil, 0, false
+}
+
+// searchWindow is one A* run with the given margin. whole reports that the
+// window already covered the whole map, so a larger one can't help.
+func (p *Planner) searchWindow(from, aim world.Pos, goal func(world.Pos) bool, m Mode, blocked Blocked, margin int64) (moves []Move, cost int, ok, whole bool) {
+	tx, ty, ok := p.w.Delta(from, aim)
+	if !ok || geom.Abs(tx)+geom.Abs(ty) > p.MaxRange {
+		return nil, 0, false, true
+	}
+	// Window in offsets relative to from.
+	minX, maxX := min(0, tx)-margin, max(0, tx)+margin
+	minY, maxY := min(0, ty)-margin, max(0, ty)+margin
+	if mw, mh, wraps := p.w.Size(from.Map); !wraps {
+		// Clip to the detail map.
+		minX, maxX = max(minX, -from.X), min(maxX, mw-1-from.X)
+		minY, maxY = max(minY, -from.Y), min(maxY, mh-1-from.Y)
+		whole = minX == -from.X && maxX == mw-1-from.X && minY == -from.Y && maxY == mh-1-from.Y
+	} else {
+		// Never let the window wrap onto itself.
+		if maxX-minX+1 > mw {
+			minX, maxX = -mw/2, mw-1-mw/2
+		}
+		if maxY-minY+1 > mh {
+			minY, maxY = -mh/2, mh-1-mh/2
+		}
+		whole = maxX-minX+1 >= mw && maxY-minY+1 >= mh
+	}
+	ww, wh := maxX-minX+1, maxY-minY+1
+	idx := func(x, y int64) int { return int((y-minY)*ww + (x - minX)) }
+	n := int(ww * wh)
+	g := make([]int32, n)
+	steps := make([]int32, n)
+	parent := make([]int32, n)
+	for i := range g {
+		g[i] = -1
+	}
+	unit := int64(m.minTicks())
+	h := func(x, y int64) int { return int((geom.Abs(x-tx) + geom.Abs(y-ty)) * unit) }
+
+	si := idx(0, 0)
+	g[si] = 0
+	parent[si] = -1
+	found := -1
+	open := &nodeHeap{{n: si, d: h(0, 0)}}
+	for open.Len() > 0 {
+		cur := heap.Pop(open).(nodeItem)
+		cx, cy := int64(cur.n)%ww+minX, int64(cur.n)/ww+minY
+		cg := g[cur.n]
+		if int(cg)+h(cx, cy) < cur.d {
+			continue // stale entry
+		}
+		if cur.n != si {
+			if cp, _ := p.w.Offset(from, cx, cy); goal(cp) {
+				found = cur.n
+				break
+			}
+		}
+		for _, d := range world.Dirs {
+			dx, dy := d.Delta()
+			nx, ny := cx+dx, cy+dy
+			if nx < minX || nx > maxX || ny < minY || ny > maxY {
+				continue
+			}
+			np, ok := p.w.Offset(from, nx, ny)
+			if !ok {
+				continue
+			}
+			cost, ok := StepTicks(p.w, np, m)
+			if !ok {
+				continue
+			}
+			ni := idx(nx, ny)
+			ng := cg + int32(cost)
+			if g[ni] >= 0 && g[ni] <= ng {
+				continue
+			}
+			if p.w.WarpAt(np) != nil && !goal(np) {
+				continue
+			}
+			if blocked != nil && blocked(np) {
+				continue
+			}
+			g[ni] = ng
+			steps[ni] = steps[cur.n] + 1
+			parent[ni] = int32(cur.n)
+			heap.Push(open, nodeItem{n: ni, d: int(ng) + h(nx, ny)})
+		}
+	}
+	if found < 0 {
+		return nil, 0, false, whole
+	}
+	moves = make([]Move, steps[found])
+	for i, c := len(moves)-1, found; i >= 0; i-- {
+		pi := int(parent[c])
+		cx, cy := int64(c)%ww+minX, int64(c)/ww+minY
+		px, py := int64(pi)%ww+minX, int64(pi)/ww+minY
+		to, _ := p.w.Offset(from, cx, cy)
+		moves[i] = Move{Dir: dirOf(cx-px, cy-py), To: to}
+		c = pi
+	}
+	return moves, int(g[found]), true, whole
+}
+
+func dirOf(dx, dy int64) world.Dir {
+	switch {
+	case dx > 0:
+		return world.Right
+	case dx < 0:
+		return world.Left
+	case dy < 0:
+		return world.Up
+	default:
+		return world.Down
+	}
+}
+
+type nodeItem struct{ n, d int }
+
+type nodeHeap []nodeItem
+
+func (h nodeHeap) Len() int           { return len(h) }
+func (h nodeHeap) Less(i, j int) bool { return h[i].d < h[j].d }
+func (h nodeHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *nodeHeap) Push(x any)        { *h = append(*h, x.(nodeItem)) }
+func (h *nodeHeap) Pop() any {
+	old := *h
+	it := old[len(old)-1]
+	*h = old[:len(old)-1]
+	return it
+}

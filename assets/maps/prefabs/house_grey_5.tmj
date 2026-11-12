@@ -1,0 +1,176 @@
+{
+ "type": "map",
+ "version": "1.10",
+ "tiledversion": "1.11.0",
+ "orientation": "orthogonal",
+ "renderorder": "right-down",
+ "infinite": false,
+ "compressionlevel": -1,
+ "width": 5,
+ "height": 4,
+ "tilewidth": 16,
+ "tileheight": 16,
+ "nextlayerid": 5,
+ "nextobjectid": 2,
+ "properties": [
+  {
+   "name": "kind",
+   "type": "string",
+   "value": "house"
+  },
+  {
+   "name": "weight",
+   "type": "int",
+   "value": 1
+  }
+ ],
+ "tilesets": [
+  {
+   "firstgid": 1,
+   "source": "../../tilesets/tinytown.tsj"
+  }
+ ],
+ "layers": [
+  {
+   "id": 1,
+   "name": "ground",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 5,
+   "height": 4,
+   "data": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    44,
+    0,
+    0
+   ]
+  },
+  {
+   "id": 2,
+   "name": "deco",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 5,
+   "height": 4,
+   "data": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    61,
+    62,
+    64,
+    62,
+    63,
+    73,
+    85,
+    86,
+    85,
+    76,
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "id": 3,
+   "name": "overhead",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 5,
+   "height": 4,
+   "data": [
+    49,
+    50,
+    50,
+    50,
+    51,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "properties": [
+    {
+     "name": "overhead",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "objects",
+   "type": "objectgroup",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "draworder": "topdown",
+   "objects": [
+    {
+     "name": "door",
+     "type": "door",
+     "x": 32,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "bump",
+       "type": "string",
+       "value": "house_locked"
+      },
+      {
+       "name": "solid",
+       "type": "bool",
+       "value": true
+      }
+     ],
+     "id": 1
+    }
+   ]
+  }
+ ]
+}

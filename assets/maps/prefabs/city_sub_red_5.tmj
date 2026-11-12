@@ -1,0 +1,195 @@
+{
+ "type": "map",
+ "version": "1.10",
+ "tiledversion": "1.11.0",
+ "orientation": "orthogonal",
+ "renderorder": "right-down",
+ "infinite": false,
+ "compressionlevel": -1,
+ "width": 5,
+ "height": 4,
+ "tilewidth": 16,
+ "tileheight": 16,
+ "nextlayerid": 5,
+ "nextobjectid": 2,
+ "properties": [
+  {
+   "name": "kind",
+   "type": "string",
+   "value": "building"
+  },
+  {
+   "name": "style",
+   "type": "string",
+   "value": "suburb"
+  },
+  {
+   "name": "material",
+   "type": "string",
+   "value": "red"
+  },
+  {
+   "name": "shop",
+   "type": "bool",
+   "value": false
+  },
+  {
+   "name": "weight",
+   "type": "int",
+   "value": 1
+  }
+ ],
+ "tilesets": [
+  {
+   "firstgid": 1,
+   "source": "../../tilesets/rpgurban.tsj"
+  },
+  {
+   "firstgid": 487,
+   "source": "../../tilesets/worlds.tsj"
+  }
+ ],
+ "layers": [
+  {
+   "id": 1,
+   "name": "ground",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 5,
+   "height": 4,
+   "data": [
+    82,
+    83,
+    83,
+    83,
+    84,
+    136,
+    137,
+    137,
+    137,
+    138,
+    18,
+    19,
+    19,
+    19,
+    20,
+    99,
+    100,
+    100,
+    100,
+    101
+   ]
+  },
+  {
+   "id": 2,
+   "name": "deco",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 5,
+   "height": 4,
+   "data": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    365,
+    0,
+    365,
+    0,
+    364,
+    0,
+    284,
+    0,
+    364
+   ]
+  },
+  {
+   "id": 3,
+   "name": "overhead",
+   "type": "tilelayer",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "width": 5,
+   "height": 4,
+   "data": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "properties": [
+    {
+     "name": "overhead",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "objects",
+   "type": "objectgroup",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "draworder": "topdown",
+   "objects": [
+    {
+     "id": 1,
+     "name": "door",
+     "type": "door",
+     "x": 32,
+     "y": 48,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "bump",
+       "type": "string",
+       "value": "building_locked"
+      },
+      {
+       "name": "solid",
+       "type": "bool",
+       "value": true
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

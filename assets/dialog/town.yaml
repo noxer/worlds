@@ -1,0 +1,88 @@
+# Dialogs for Brookhaven. Ids are referenced by the "dialog" property of
+# npc and sign objects in the Tiled maps.
+
+elder:
+  start: hello
+  nodes:
+    hello:
+      speaker: Elder Maren
+      lines:
+        - Welcome to Brookhaven, travellers.
+        - It is rare to see a company as large as yours on our little road.
+      choices:
+        - text: What is this place?
+          next: place
+        - text: Is there work for us?
+          next: work
+        - text: Farewell.
+    place:
+      speaker: Elder Maren
+      lines:
+        - A village of beekeepers and one very stubborn smith.
+        - East of the well road lies Willow Meadow.
+      next: hello_again
+    work:
+      speaker: Elder Maren
+      lines:
+        - Hilde, our smith, has been grumbling about something missing.
+        - Her forge is the red-roofed house to the north-west.
+      next: hello_again
+    hello_again:
+      speaker: Elder Maren
+      lines:
+        - Anything else?
+      choices:
+        - text: What is this place?
+          next: place
+        - text: Is there work for us?
+          next: work
+        - text: Farewell.
+
+guard:
+  start: main
+  nodes:
+    main:
+      speaker: Guard Tobin
+      lines:
+        - The road east leads to Willow Meadow.
+        - Quiet these days. Too quiet, if you ask me.
+
+town_sign:
+  start: main
+  nodes:
+    main:
+      lines:
+        - "BROOKHAVEN  -  East: Willow Meadow"
+
+locked_door:
+  start: main
+  nodes:
+    main:
+      lines:
+        - The door is locked.
+
+smith:
+  start: main
+  nodes:
+    main:
+      speaker: Hilde
+      lines:
+        - Mind the anvil. And the barrels. And my temper.
+        - My good hammer went missing somewhere in the meadow.
+      choices:
+        - text: We will keep an eye out.
+          next: thanks
+        - text: Not our problem.
+    thanks:
+      speaker: Hilde
+      lines:
+        - Hmph. Thank you.
+
+lina:
+  start: main
+  nodes:
+    main:
+      speaker: Lina
+      lines:
+        - Busy day! Square in the morning, Hilde's at noon, the pond after.
+        - Same every day. You could set a clock by me.

@@ -1,0 +1,27 @@
+{
+ "type": "world",
+ "onlyShowAdjacentMaps": false,
+ "maps": [
+  {
+   "fileName": "town.tmj",
+   "x": -256,
+   "y": 3100160,
+   "width": 480,
+   "height": 320
+  },
+  {
+   "fileName": "meadow.tmj",
+   "x": 224,
+   "y": 3100224,
+   "width": 384,
+   "height": 320
+  },
+  {
+   "fileName": "isle.tmj",
+   "x": 800,
+   "y": 3101184,
+   "width": 192,
+   "height": 144
+  }
+ ]
+}
