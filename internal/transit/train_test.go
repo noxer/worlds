@@ -20,7 +20,7 @@ func realLine(t *testing.T) (*content.Content, *transit.Line) {
 	}
 	for _, s := range c.Infra.Near(0, 193770, 140000, infra.City) {
 		for _, e := range c.Infra.Edges(infra.Rail, s) {
-			if l := transit.NewLine(c.Infra, e, c.World.W, c.World.H, c.World.Seed); l != nil {
+			if l := transit.NewTrain(c.Infra, e, c.World.W, c.World.H, c.World.Seed); l != nil {
 				return c, l
 			}
 		}

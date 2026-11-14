@@ -76,7 +76,7 @@ func TestTrainJourney(t *testing.T) {
 		h.tick(input.Frame{})
 		st = r.line.At(float64(h.e.clock.Ticks()))
 	}
-	h.e.leaveTrain(false)
+	h.e.leaveVehicle(false)
 	if h.e.fade != 0 || h.leader().Pos.Map.Template != trainMap {
 		t.Fatal("got off a moving train")
 	}
@@ -100,7 +100,7 @@ func TestTrainJourney(t *testing.T) {
 	}
 
 	// Off at the destination's station door.
-	h.e.leaveTrain(false)
+	h.e.leaveVehicle(false)
 	h.runUntil("getting off", 200, func() bool { return h.e.fade == 0 && h.leader().Pos.Map.IsMain() })
 	if p := h.leader().Pos; !in.InStation(r.to, p.X, p.Y) || h.w.Solid(p) {
 		t.Errorf("got off at %v, not on %s's platforms", p, in.Name(r.to))
@@ -110,7 +110,7 @@ func TestTrainJourney(t *testing.T) {
 	}
 	// The train waits at the platform behind the station.
 	h.tick(input.Frame{})
-	if len(h.e.trainCells) == 0 {
+	if len(h.e.vehicleCells) == 0 {
 		t.Error("no train to be seen at the station")
 	}
 }

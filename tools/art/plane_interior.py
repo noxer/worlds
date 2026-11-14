@@ -1,7 +1,7 @@
 """Writes the cabin of an airliner, assets/maps/detail/plane.tmj:
     python3 tools/art/plane_interior.py assets/maps/detail/plane.tmj
 An ordinary Tiled map afterwards. Conventions as on the train: map property
-"vehicle"; a spawn "aboard"; an object of type "train_exit" on the door at
+"vehicle"; a spawn "aboard"; an object of type "vehicle_exit" on the door at
 the back (bump: plane_exit); seats are signs with dialog "plane_seat" (rest
 until landing); the "train window" tiles along both sides show the view
 (the ground near the airports, the clouds at cruise)."""
@@ -35,7 +35,7 @@ def obj(name, typ, x, y, props=(), gid=None):
         o["gid"] = gid
     objs.append(o)
 obj("aboard", "spawn", 2, 3, [("facing", "string", "right")])
-obj("exit", "train_exit", 0, 2, [("bump", "string", "plane_exit")])
+obj("exit", "vehicle_exit", 0, 2, [("bump", "string", "plane_exit")])
 obj("cockpit", "sign", W - 2, 3, [("dialog", "string", "plane_cockpit")])
 for x, y in seats:
     obj(f"seat_{x}_{y}", "sign", x, y, [("dialog", "string", "plane_seat")])

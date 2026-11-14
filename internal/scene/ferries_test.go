@@ -77,7 +77,7 @@ func TestFerryJourney(t *testing.T) {
 	var boat world.Pos
 	var toBoat world.Dir
 	for _, d := range []world.Dir{world.Up, world.Right, world.Down, world.Left} {
-		if q, _ := h.w.Neighbor(p, d); func() bool { _, ok := h.e.trainAt(q); return ok }() {
+		if q, _ := h.w.Neighbor(p, d); func() bool { _, ok := h.e.vehicleAt(q); return ok }() {
 			boat, toBoat = q, d
 		}
 	}
@@ -93,7 +93,7 @@ func TestFerryJourney(t *testing.T) {
 	for !r.line.At(float64(h.e.clock.Ticks())).Moving {
 		h.tick(input.Frame{})
 	}
-	h.e.leaveTrain(false)
+	h.e.leaveVehicle(false)
 	if h.e.fade != 0 || h.leader().Pos.Map.Template != ferryMap {
 		t.Fatal("got off at sea")
 	}
@@ -121,7 +121,7 @@ func TestFerryJourney(t *testing.T) {
 	}
 
 	// Ashore on the other pier.
-	h.e.leaveTrain(false)
+	h.e.leaveVehicle(false)
 	h.runUntil("going ashore", 200, func() bool { return h.e.fade == 0 && h.leader().Pos.Map.IsMain() })
 	other, _ := in.Harbour(r.to)
 	p = h.leader().Pos
@@ -134,7 +134,7 @@ func TestFerryJourney(t *testing.T) {
 	// The ferry lies alongside.
 	h.e.nearLines = nil
 	h.tick(input.Frame{})
-	if len(h.e.trainCells) == 0 {
+	if len(h.e.vehicleCells) == 0 {
 		t.Error("no ferry to be seen at the pier")
 	}
 }

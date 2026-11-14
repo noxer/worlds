@@ -4,6 +4,8 @@
 // through this package so that seam handling lives in exactly one place.
 package geom
 
+import "math"
+
 // FloorDiv divides rounding towards negative infinity.
 func FloorDiv(a, b int64) int64 {
 	q := a / b
@@ -42,4 +44,38 @@ func Abs(v int64) int64 {
 		return -v
 	}
 	return v
+}
+
+// WrapF wraps a distance d on a ring of size n into [-n/2, n/2): the
+// shortest way round, for fractional positions.
+func WrapF(d, n float64) float64 {
+	d = math.Mod(d, n)
+	if d < -n/2 {
+		d += n
+	} else if d >= n/2 {
+		d -= n
+	}
+	return d
+}
+
+// Isqrt returns the integer square root of v (0 for negative v): the same
+// on every platform, unlike rounding math.Sqrt.
+func Isqrt(v int64) int64 {
+	if v <= 0 {
+		return 0
+	}
+	r := int64(1)
+	for r*r <= v {
+		r <<= 1
+	}
+	lo, hi := r>>1, r
+	for lo < hi-1 {
+		mid := (lo + hi) / 2
+		if mid*mid <= v {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+	return lo
 }

@@ -3,9 +3,10 @@
 // where its timetable says whether or not anyone watches (like NPC
 // schedules, see package sim).
 //
-// Trains: one train shuttles on each rail line between two city stations.
-// It waits at the platform, leaves gently, speeds up to its cruising speed
-// and slows down into the next station the same way.
+// A Line is a route with one vehicle of a Kind (train, ferry, bus, plane)
+// shuttling between its two ends: it waits, leaves gently, speeds up to
+// its cruising speed and slows down into the other end the same way. A
+// taxi's trip is a line made for the occasion.
 package transit
 
 import (
@@ -74,9 +75,9 @@ type Line struct {
 	prof profile
 }
 
-// NewLine makes the line of a rail edge, or returns nil if it has no
+// NewTrain makes the line of a rail edge, or returns nil if it has no
 // route.
-func NewLine(in *infra.Infra, e infra.Edge, worldW, worldH int64, seed uint64) *Line {
+func NewTrain(in *infra.Infra, e infra.Edge, worldW, worldH int64, seed uint64) *Line {
 	way := in.WayOf(e)
 	if way == nil || way.Net != infra.Rail || len(way.Pts) < 2 {
 		return nil
@@ -372,7 +373,7 @@ func (l *Line) CarsAt(st State) []Car {
 		}
 		x, y, d := l.Pos(s)
 		if !st.ToB {
-			d = opposite(d)
+			d = d.Opposite()
 		}
 		out[k] = Car{X: x, Y: y, Facing: d, Loco: k == 0}
 	}
@@ -389,7 +390,7 @@ func (l *Line) rigidAt(st State, out []Car) []Car {
 	}
 	bx, by, _ := l.Pos(s)
 	sx, sy, _ := l.Pos(back)
-	dx, dy := wrapF(bx-sx, float64(l.w)), wrapF(by-sy, float64(l.h))
+	dx, dy := geom.WrapF(bx-sx, float64(l.w)), geom.WrapF(by-sy, float64(l.h))
 	var d world.Dir
 	var ux, uy float64
 	switch {
@@ -407,27 +408,4 @@ func (l *Line) rigidAt(st State, out []Car) []Car {
 		out[k] = Car{X: math.Mod(bx-ux*float64(k)+w, w), Y: math.Mod(by-uy*float64(k)+h, h), Facing: d, Loco: k == 0}
 	}
 	return out
-}
-
-// wrapF returns d the shortest way round a world of size n.
-func wrapF(d, n float64) float64 {
-	switch {
-	case d > n/2:
-		return d - n
-	case d < -n/2:
-		return d + n
-	}
-	return d
-}
-
-func opposite(d world.Dir) world.Dir {
-	switch d {
-	case world.Up:
-		return world.Down
-	case world.Down:
-		return world.Up
-	case world.Left:
-		return world.Right
-	}
-	return world.Left
 }

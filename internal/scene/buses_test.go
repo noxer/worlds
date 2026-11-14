@@ -62,7 +62,7 @@ func TestBusJourney(t *testing.T) {
 	for !r.line.At(float64(h.e.clock.Ticks())).Moving {
 		h.tick(input.Frame{})
 	}
-	h.e.leaveTrain(false)
+	h.e.leaveVehicle(false)
 	if h.e.fade != 0 || h.leader().Pos.Map.Template != busMap {
 		t.Fatal("got off a moving bus")
 	}
@@ -86,7 +86,7 @@ func TestBusJourney(t *testing.T) {
 	}
 
 	// Off at the other stop.
-	h.e.leaveTrain(false)
+	h.e.leaveVehicle(false)
 	h.runUntil("getting off", 200, func() bool { return h.e.fade == 0 && h.leader().Pos.Map.IsMain() })
 	p := h.leader().Pos
 	if h.w.Solid(p) || h.w.Terrain(p) != world.Land {
@@ -97,7 +97,7 @@ func TestBusJourney(t *testing.T) {
 		t.Errorf("off at %v, far from %s's stop %v", p, in.Name(r.to), other)
 	}
 	h.tick(input.Frame{})
-	if len(h.e.trainCells) == 0 {
+	if len(h.e.vehicleCells) == 0 {
 		t.Error("no bus to be seen at the stop")
 	}
 }

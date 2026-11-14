@@ -1,7 +1,7 @@
 """Writes the inside of a taxi, assets/maps/detail/taxi.tmj:
     python3 tools/art/taxi_interior.py assets/maps/detail/taxi.tmj
 An ordinary Tiled map afterwards. Conventions as on the train: map property
-"vehicle"; a spawn "aboard"; objects of type "train_exit" on the doors
+"vehicle"; a spawn "aboard"; objects of type "vehicle_exit" on the doors
 (bump: taxi_exit); the back seat is a sign with dialog "train_seat" (rest
 until there); the "train window" tiles show the way passing by."""
 import json, sys
@@ -30,7 +30,7 @@ def obj(name, typ, x, y, props=(), gid=None):
     objs.append(o)
 obj("aboard", "spawn", 2, 2, [("facing", "string", "up")])
 for x in (2, 5):
-    obj(f"exit_{x}", "train_exit", x, H - 1, [("bump", "string", "taxi_exit")])
+    obj(f"exit_{x}", "vehicle_exit", x, H - 1, [("bump", "string", "taxi_exit")])
 for x, y in seats:
     obj(f"seat_{x}_{y}", "sign", x, y, [("dialog", "string", "train_seat")])
 obj("driver", "npc", 6, 1, [("dialog", "string", "taxi_driver"), ("facing", "string", "right")], DUNGEON + 97)

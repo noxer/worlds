@@ -246,7 +246,7 @@ func (e *Explore) debugTravel() {
 				toRoad = world.Up
 			}
 			if q, ok := e.w.Neighbor(pole, toRoad); ok {
-				dest, facing, found = q, opposite(toRoad), true
+				dest, facing, found = q, toRoad.Opposite(), true
 			}
 		}
 	}

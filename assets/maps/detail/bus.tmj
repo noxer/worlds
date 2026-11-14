@@ -287,7 +287,7 @@
     {
      "id": 2,
      "name": "exit_3",
-     "type": "train_exit",
+     "type": "vehicle_exit",
      "x": 48,
      "y": 64,
      "width": 16,
@@ -305,7 +305,7 @@
     {
      "id": 3,
      "name": "exit_9",
-     "type": "train_exit",
+     "type": "vehicle_exit",
      "x": 144,
      "y": 64,
      "width": 16,

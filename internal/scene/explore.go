@@ -19,7 +19,6 @@ import (
 	"github.com/noxer/worlds/internal/nav"
 	"github.com/noxer/worlds/internal/save"
 	"github.com/noxer/worlds/internal/sim"
-	"github.com/noxer/worlds/internal/transit"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -76,22 +75,15 @@ type Explore struct {
 	clock    sim.Clock
 	home     world.Pos    // where the game started (for debug travel)
 	travel   int          // the next debug travel destination
-	infra    *infra.Infra // for the crowd and trains; nil: neither
+	infra    *infra.Infra // for the crowd and vehicles; nil: neither
 	crowd    crowd
 
-	// Trains (see trains.go).
-	lines         map[infra.Edge]*transit.Line
-	nearLines     []*transit.Line
-	trainCells    map[world.Pos]trainCar
-	trainTiles    map[string]int
-	ranks         map[world.Pos]infra.BusStop   // parked taxis near the party (see taxis.go)
+	vehicleState // trains, ferries, buses, taxis, planes (see vehicles.go)
+
 	visited       map[infra.ID]infra.Settlement // places the party has been to
-	lastTaxi      *transit.Line                 // the taxi just left, until it drives off
-	ride          *ride
-	viewImg       *ebiten.Image
-	pendingNotice string    // shown when the fade is over
-	restoreRiding bool      // ride on after the fade (a loaded game)
-	lastMain      world.Pos // the party's last place outside (for the world map)
+	pendingNotice string                        // shown when the fade is over
+	restoreRiding bool                          // ride on after the fade (a loaded game)
+	lastMain      world.Pos                     // the party's last place outside (for the world map)
 	saves         save.Store
 	fade          int // >0 fading out, <0 fading in
 	warp          *world.Warp
@@ -133,12 +125,10 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		saves:   cfg.Saves,
 		crowd:   newCrowd(),
 
-		lines:      map[infra.Edge]*transit.Line{},
-		trainCells: map[world.Pos]trainCar{},
-		trainTiles: map[string]int{},
-		visited:    map[infra.ID]infra.Settlement{},
-		signs:      map[world.Pos]string{},
-		bumps:      map[world.Pos]string{},
+		vehicleState: newVehicleState(),
+		visited:      map[infra.ID]infra.Settlement{},
+		signs:        map[world.Pos]string{},
+		bumps:        map[world.Pos]string{},
 	}
 	for _, o := range e.w.Objects() {
 		switch o.Type {
@@ -201,7 +191,7 @@ func (e *Explore) npcAt(p world.Pos) *NPC {
 }
 
 func (e *Explore) blocked(p world.Pos) bool {
-	if _, ok := e.trainAt(p); ok {
+	if _, ok := e.vehicleAt(p); ok {
 		return true
 	}
 	if _, ok := e.ranks[p]; ok {
@@ -305,7 +295,7 @@ func (e *Explore) Update(ctx *Context) {
 	arrived := e.party.Update()
 	e.updateNPCs()
 	e.updateCrowd()
-	e.updateTrains()
+	e.updateVehicles()
 	leader := e.party.Leader()
 	if arrived {
 		if wp := e.w.WarpAt(leader.Pos); wp != nil {
@@ -337,7 +327,7 @@ type notice struct {
 
 // bump shows the bump message of the object at p, if it has one.
 func (e *Explore) bump(p world.Pos) {
-	if e.trainBump(p) {
+	if e.vehicleBump(p) {
 		return
 	}
 	id, ok := e.bumps[p]
@@ -578,7 +568,7 @@ func (e *Explore) followPath(ctx *Context) {
 
 // talk starts the conversation with whoever or whatever is at p.
 func (e *Explore) talk(ctx *Context, p world.Pos) {
-	if e.trainTalk(ctx, p) {
+	if e.vehicleTalk(ctx, p) {
 		return
 	}
 	id := ""
@@ -683,20 +673,9 @@ func clampFrac(c float64, size, view int64) float64 {
 func (e *Explore) screenAt(m world.MapRef, px, py, cx, cy float64) (float64, float64) {
 	w, h, wraps := e.w.Size(m)
 	if wraps {
-		return wrapF(px-cx, float64(w*tile)), wrapF(py-cy, float64(h*tile))
+		return geom.WrapF(px-cx, float64(w*tile)), geom.WrapF(py-cy, float64(h*tile))
 	}
 	return px - cx, py - cy
-}
-
-// wrapF wraps d into [-n/2, n/2).
-func wrapF(d, n float64) float64 {
-	d = math.Mod(d, n)
-	if d < -n/2 {
-		d += n
-	} else if d >= n/2 {
-		d -= n
-	}
-	return d
 }
 
 // placement returns where an actor is drawn relative to the exact camera at
@@ -732,12 +711,7 @@ func (e *Explore) DrawWorld(screen *ebiten.Image, scale, offX, offY int, alpha f
 	e.camX, e.camY = int64(ix)-m, int64(iy)-m
 	mp := e.party.Leader().Pos.Map
 	e.groundImg.Fill(gfx.ColorVoid)
-	switch mp.Template {
-	case trainMap, busMap, taxiMap, planeMap:
-		e.drawWindowView(e.groundImg, alpha)
-	case ferryMap:
-		e.drawSeaView(e.groundImg, alpha)
-	}
+	e.drawVehicleView(e.groundImg, mp.Template, alpha)
 	e.drawLayers(e.groundImg, mp, false)
 	e.overImg.Clear()
 	e.drawLayers(e.overImg, mp, true)
@@ -894,7 +868,7 @@ func (e *Explore) drawActors(screen *ebiten.Image, m world.MapRef, s, offX, offY
 		}
 		add(a, len(e.party.Members)-i, vehicle) // leader on top when stacked after a warp
 	}
-	ds = append(ds, e.trainDrawables(m, alpha)...)
+	ds = append(ds, e.vehicleDrawables(m, alpha)...)
 	sort.SliceStable(ds, func(i, j int) bool {
 		if ds[i].y != ds[j].y {
 			return ds[i].y < ds[j].y

@@ -680,7 +680,18 @@ than a fixed tile.
 - Interior and exterior sizes are not consistent on purpose: the backdrop is
   a view, not geometry.
 
-**Trains (implemented: `transit`, `scene/trains.go`).**
+**In the code.** Package `transit` knows where a line's vehicle is at any
+time (`transit/line.go`: a `Line` with a `Kind`). In the scene, what
+differs between the kinds is one table (`vehicles` in
+`scene/vehicles.go`): the interior map, the doors and seats, how a line is
+made from a network edge, where the party is put off, how the vehicle is
+drawn and what the view is; a new kind is a row there, its art and its
+interior. Stations, harbours, bus stops and airports are `stop`s
+(`scene/stops.go`) with one timetable; `scene/vehicledraw.go` draws the
+vehicles, `scene/vehicleview.go` the world passing outside, and the
+scene's vehicle state is the embedded `vehicleState`.
+
+**Trains (implemented: `transit`, `scene/vehicles.go`).**
 - **Lines:** every rail edge between two cities is a line with one train of
   4 cars shuttling between the buffer stops behind the two stations. Where
   it is comes from the clock alone (like NPC schedules): it waits 10 game
@@ -713,7 +724,7 @@ than a fixed tile.
 - Not yet: the `forward` mapping of the scroll direction, tickets, several
   trains per line, buses, taxis and aircraft.
 
-**Ferries (implemented: `transit`, `infra/ferry.go`, `scene/trains.go`).**
+**Ferries (implemented: `transit`, `infra/ferry.go`, `scene/vehicles.go`).**
 - **Routes:** a sea lane between two harbours with piers is a ferry line.
   The lane's coarse route (128-tile grid, allowed through town near its
   ends) would cross land, so the ferry has its own route
@@ -750,7 +761,7 @@ than a fixed tile.
   starboard; past the route's ends, straight on). At a pier the real
   harbour shows, at sea the passing water at a calm pace.
 
-**Buses (implemented: `transit`, `infra/bus.go`, `scene/trains.go`).**
+**Buses (implemented: `transit`, `infra/bus.go`, `scene/vehicles.go`).**
 - **Lines:** every road edge between two towns (or bigger, or hand-made
   places) is a bus line. Inside a town the road gives way to the town's
   streets, so the line ends at a stop where the road leaves the town:
@@ -792,7 +803,7 @@ than a fixed tile.
   well, a town's plaza or, for a hand-made place, the start; the taxi
   stands there until it drives back.
 
-**Aircraft (implemented: `infra/airport.go`, `transit.NewPlane`, `scene/trains.go`).**
+**Aircraft (implemented: `infra/airport.go`, `transit.NewPlane`, `scene/vehicles.go`).**
 - **Airports:** a metropolis with flights gets an airport just outside it
   (round the city, nearest first: the first 60x22 spot that is dry and
   clear of the city and hand-made places): a fence with a way in on the

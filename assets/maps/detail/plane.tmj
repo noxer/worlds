@@ -431,7 +431,7 @@
     {
      "id": 2,
      "name": "exit",
-     "type": "train_exit",
+     "type": "vehicle_exit",
      "x": 0,
      "y": 32,
      "width": 16,

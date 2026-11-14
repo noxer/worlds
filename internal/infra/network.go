@@ -339,7 +339,7 @@ func (in *Infra) route(e Edge, y *yielder) *Route {
 	b, lb := in.endpoint(e.B, e.A, e.Net)
 	if spec.grid == 0 {
 		dx, dy := in.delta(a.X, a.Y, b.X, b.Y)
-		return &Route{Points: []Point{a, b}, Cost: isqrt(dx*dx + dy*dy)}
+		return &Route{Points: []Point{a, b}, Cost: geom.Isqrt(dx*dx + dy*dy)}
 	}
 	g := spec.grid
 	// The search grid starts exactly at its first point, and only gets
@@ -605,24 +605,4 @@ func roundDiv(a, b int64) int64 {
 		return -((-a + b/2) / b)
 	}
 	return (a + b/2) / b
-}
-
-func isqrt(v int64) int64 {
-	if v <= 0 {
-		return 0
-	}
-	r := int64(1)
-	for r*r <= v {
-		r <<= 1
-	}
-	lo, hi := r>>1, r
-	for lo < hi-1 {
-		mid := (lo + hi) / 2
-		if mid*mid <= v {
-			lo = mid
-		} else {
-			hi = mid
-		}
-	}
-	return lo
 }

@@ -48,14 +48,14 @@ func TestFlight(t *testing.T) {
 	h.tick(input.Frame{})
 	g := a.Gate(0)
 	for dx := int64(0); dx < 3; dx++ {
-		if c, ok := h.e.trainAt(world.Pos{Map: world.Main, X: g.X + dx, Y: g.Y}); !ok || c.line != line {
+		if c, ok := h.e.vehicleAt(world.Pos{Map: world.Main, X: g.X + dx, Y: g.Y}); !ok || c.line != line {
 			t.Errorf("gate 0: no plane on %d,%d", g.X+dx, g.Y)
 		}
 	}
 	// Seen from the apron below the gate, the plane is drawn whole.
 	h.e.party.PlaceAll(world.Pos{Map: world.Main, X: g.X + 1, Y: g.Y + 3}, world.Up)
 	h.tick(input.Frame{})
-	if d := h.e.trainDrawables(world.Main, 0); len(d) < 9 {
+	if d := h.e.vehicleDrawables(world.Main, 0); len(d) < 9 {
 		t.Errorf("%d tiles drawn, want the plane's 9 at least", len(d))
 	}
 	h.e.party.PlaceAll(below, world.Up)
@@ -73,7 +73,7 @@ func TestFlight(t *testing.T) {
 	for !r.line.At(float64(h.e.clock.Ticks())).Moving {
 		h.tick(input.Frame{})
 	}
-	h.e.leaveTrain(false)
+	h.e.leaveVehicle(false)
 	if h.e.fade != 0 || h.leader().Pos.Map.Template != planeMap {
 		t.Fatal("got off a moving plane")
 	}
@@ -93,7 +93,7 @@ func TestFlight(t *testing.T) {
 	if !h.e.ride.arrived || h.e.notice == nil || !strings.Contains(h.e.notice.text, in.Name(r.to)) {
 		t.Fatalf("not arrived at %s: %+v, notice %+v", in.Name(r.to), h.e.ride, h.e.notice)
 	}
-	h.e.leaveTrain(false)
+	h.e.leaveVehicle(false)
 	h.runUntil("getting off", 200, func() bool { return h.e.fade == 0 && h.leader().Pos.Map.IsMain() })
 	p := h.leader().Pos
 	if h.w.Solid(p) || h.w.Terrain(p) != world.Land {
@@ -104,7 +104,7 @@ func TestFlight(t *testing.T) {
 		t.Errorf("off at %v, not at %s's airport (%d,%d)", p, in.Name(r.to), other.X, other.Y)
 	}
 	h.tick(input.Frame{})
-	if len(h.e.trainCells) == 0 {
+	if len(h.e.vehicleCells) == 0 {
 		t.Error("no plane to be seen at the gate")
 	}
 }

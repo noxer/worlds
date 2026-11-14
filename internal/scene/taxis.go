@@ -38,7 +38,7 @@ func (e *Explore) updateTaxis() {
 		e.ranks = map[world.Pos]infra.BusStop{}
 	}
 	clear(e.ranks)
-	for _, st := range e.infra.BusStopsIn(l.Pos.X-trainReach, l.Pos.Y-trainReach, 2*trainReach, 2*trainReach) {
+	for _, st := range e.infra.BusStopsIn(l.Pos.X-vehicleReach, l.Pos.Y-vehicleReach, 2*vehicleReach, 2*vehicleReach) {
 		if !st.HasRank {
 			continue
 		}
@@ -135,7 +135,7 @@ func (e *Explore) taxiOffer(ctx *Context, st infra.BusStop) {
 	var choices []dialog.Choice
 	for k, s := range dests {
 		dx, dy, _ := e.w.Delta(front, world.Pos{Map: world.Main, X: s.X, Y: s.Y})
-		km := float64(isqrt(dx*dx+dy*dy)) / 1000
+		km := float64(geom.Isqrt(dx*dx+dy*dy)) / 1000
 		choices = append(choices, dialog.Choice{Text: fmt.Sprintf("%s (%.1f km)", e.infra.Name(s), km),
 			Do: fmt.Sprintf("%s%d", taxiDestPrefix, k)})
 	}
@@ -203,24 +203,4 @@ func (e *Explore) freeNear(p world.Pos) world.Pos {
 		p, _ = e.w.Offset(p, 1, 0)
 	}
 	return p
-}
-
-func isqrt(v int64) int64 {
-	if v <= 0 {
-		return 0
-	}
-	r := int64(1)
-	for r*r <= v {
-		r *= 2
-	}
-	lo, hi := r/2, r
-	for lo < hi-1 {
-		m := (lo + hi) / 2
-		if m*m <= v {
-			lo = m
-		} else {
-			hi = m
-		}
-	}
-	return lo
 }

@@ -1,7 +1,7 @@
 """Writes the ferry's deck, assets/maps/detail/ferry.tmj:
     python3 tools/art/ferry_interior.py assets/maps/detail/ferry.tmj
 An ordinary Tiled map afterwards. Conventions as on the train: map property
-"vehicle"; a spawn "aboard"; objects of type "train_exit" on the gangways
+"vehicle"; a spawn "aboard"; objects of type "vehicle_exit" on the gangways
 (bump: ferry_exit); benches are signs with dialog "ferry_bench". The
 "ferry sea" tiles round the deck, and the sea side of the hull tiles, show
 the sea passing by (the game draws the world under them, and all round the
@@ -56,7 +56,7 @@ def obj(name, typ, x, y, props=(), gid=None):
     objs.append(o)
 obj("aboard", "spawn", 6, 4, [("facing", "string", "down")])
 for x in gangways:
-    obj(f"exit_{x}", "train_exit", x, 7, [("bump", "string", "ferry_exit")])
+    obj(f"exit_{x}", "vehicle_exit", x, 7, [("bump", "string", "ferry_exit")])
 for x, y in benches:
     obj(f"bench_{x}_{y}", "sign", x, y, [("dialog", "string", "ferry_bench")])
 obj("passenger_1", "npc", 9, 2, [("dialog", "string", "ferry_passenger_1"), ("facing", "string", "up")], DUNGEON + 87)

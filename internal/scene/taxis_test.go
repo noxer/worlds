@@ -45,7 +45,7 @@ func TestTaxiRide(t *testing.T) {
 			if q == front || q == back || h.w.Solid(q) || h.w.Terrain(q) != world.Land {
 				continue
 			}
-			if _, bus := h.e.trainAt(q); bus {
+			if _, bus := h.e.vehicleAt(q); bus {
 				continue
 			}
 			to, _ := h.w.DirBetween(q, car)
@@ -83,7 +83,7 @@ func TestTaxiRide(t *testing.T) {
 
 	// Off it goes; the doors stay shut on the way.
 	h.runUntil("leaving", 400, func() bool { return r.line.At(float64(h.e.clock.Ticks())).Moving })
-	h.e.leaveTrain(false)
+	h.e.leaveVehicle(false)
 	if h.e.fade != 0 || h.leader().Pos.Map.Template != taxiMap {
 		t.Fatal("got out of a moving taxi")
 	}
@@ -108,7 +108,7 @@ func TestTaxiRide(t *testing.T) {
 	if !h.e.ride.arrived || h.e.notice == nil || !strings.Contains(h.e.notice.text, in.Name(r.to)) {
 		t.Fatalf("not arrived at %s: %+v, notice %+v", in.Name(r.to), h.e.ride, h.e.notice)
 	}
-	h.e.leaveTrain(false)
+	h.e.leaveVehicle(false)
 	h.runUntil("getting out", 200, func() bool { return h.e.fade == 0 && h.leader().Pos.Map.IsMain() })
 	p := h.leader().Pos
 	want := h.e.arrivalAt(r.to)
@@ -120,7 +120,7 @@ func TestTaxiRide(t *testing.T) {
 	}
 	// The taxi waits there, then drives back.
 	h.tick(input.Frame{})
-	if len(h.e.trainCells) == 0 {
+	if len(h.e.vehicleCells) == 0 {
 		t.Error("the taxi isn't to be seen at the drop-off")
 	}
 }

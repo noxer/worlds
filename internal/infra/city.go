@@ -310,7 +310,7 @@ func (c *CityPlan) newSuperblock(i, j int64) *superblock {
 
 // density is 100 at the centre and 0 at the radius.
 func (c *CityPlan) density(d2 int64) int64 {
-	return 100 - isqrt(d2)*100/max(c.S.Radius, 1)
+	return 100 - geom.Isqrt(d2)*100/max(c.S.Radius, 1)
 }
 
 // radiusTowards is the city's radius in the direction (dx, dy): 78-100% of
