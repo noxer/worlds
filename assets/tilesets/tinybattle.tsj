@@ -1,0 +1,247 @@
+{
+ "type": "tileset",
+ "version": "1.10",
+ "tiledversion": "1.11.0",
+ "name": "tinybattle",
+ "tilewidth": 16,
+ "tileheight": 16,
+ "tilecount": 198,
+ "columns": 18,
+ "image": "../tiles/tinybattle.png",
+ "imagewidth": 288,
+ "imageheight": 176,
+ "margin": 0,
+ "spacing": 0,
+ "tiles": [
+  {
+   "id": 3,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 18,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 19,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 20,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 21,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 22,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 36,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 37,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 38,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 39,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 54,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 55,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 56,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 57,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 72,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 73,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 74,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 75,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 90,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 91,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 92,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  },
+  {
+   "id": 93,
+   "properties": [
+    {
+     "name": "terrain",
+     "type": "string",
+     "value": "shallow"
+    }
+   ]
+  }
+ ]
+}

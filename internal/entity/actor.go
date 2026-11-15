@@ -1,0 +1,200 @@
+// Package entity contains the logic of things that move on the tile grid:
+// actors and the party that follows the leader. Rendering lives elsewhere.
+package entity
+
+import "github.com/noxer/worlds/internal/world"
+
+// StepTicks is the default duration of one tile step in ticks (60 per
+// second): walking. At 16 ticks per 16px tile, walkers move one pixel per
+// tick. Swimming and riding use other durations (see package nav).
+const StepTicks = 16
+
+// Sprite references a frame on a tile sheet by tileset name and index.
+type Sprite struct {
+	Sheet string
+	Index int
+	// Walk, if set, has animation frames by facing (indexed by world.Dir):
+	// the standing frame, then the walking frames, one per step in turn,
+	// each for the first half of its step (the standing frame between).
+	Walk *[4][]int
+	// FacesLeft says the side frames face left (mirrored when facing
+	// right); otherwise sprites face right (mirrored when facing left).
+	FacesLeft bool
+}
+
+// Actor is anything that occupies a tile and can walk: party members, NPCs,
+// later enemies.
+type Actor struct {
+	Name   string
+	Sprite Sprite
+	// Pos is the tile the actor occupies. While stepping, it is already the
+	// destination tile, which reserves it against other actors.
+	Pos    world.Pos
+	Facing world.Dir
+
+	stepping  bool
+	stepDir   world.Dir
+	tick      int
+	stepTicks int
+
+	queue []queuedStep // steps to start later (followers lag behind)
+	steps int          // steps taken, for walk animations
+}
+
+type queuedStep struct {
+	dir   world.Dir
+	to    world.Pos
+	ticks int // duration of the step
+	wait  int // ticks until the step may start
+}
+
+// Moving reports whether the actor is between two tiles.
+func (a *Actor) Moving() bool { return a.stepping }
+
+// Busy reports whether the actor is moving or has queued steps.
+func (a *Actor) Busy() bool { return a.stepping || len(a.queue) > 0 }
+
+// Backlog is the number of queued steps not started yet.
+func (a *Actor) Backlog() int { return len(a.queue) }
+
+// Reserves reports whether the actor stands on p or has a queued step onto
+// it: other movers must keep off such tiles.
+func (a *Actor) Reserves(p world.Pos) bool {
+	if a.Pos == p {
+		return true
+	}
+	for _, q := range a.queue {
+		if q.to == p {
+			return true
+		}
+	}
+	return false
+}
+
+// Dest returns where the actor will stand once its queued steps are done.
+func (a *Actor) Dest() world.Pos {
+	if n := len(a.queue); n > 0 {
+		return a.queue[n-1].to
+	}
+	return a.Pos
+}
+
+// QueueStep schedules a step of the given duration that starts after `wait`
+// ticks, or as soon as the actor has finished the steps before it.
+func (a *Actor) QueueStep(d world.Dir, to world.Pos, ticks, wait int) {
+	a.queue = append(a.queue, queuedStep{dir: d, to: to, ticks: ticks, wait: wait})
+}
+
+// BeginStep starts moving one tile in direction d to the tile `to`, taking
+// `ticks` ticks (StepTicks if not positive).
+func (a *Actor) BeginStep(d world.Dir, to world.Pos, ticks int) {
+	if ticks <= 0 {
+		ticks = StepTicks
+	}
+	a.Facing = d
+	a.Pos = to
+	a.steps++
+	a.stepDir = d
+	a.stepping = true
+	a.tick = 0
+	a.stepTicks = ticks
+}
+
+// Place teleports the actor and cancels any step.
+func (a *Actor) Place(p world.Pos, facing world.Dir) {
+	a.Pos = p
+	a.Facing = facing
+	a.stepping = false
+	a.tick = 0
+	a.queue = a.queue[:0]
+}
+
+// Update advances the step animation. It returns true on the tick the actor
+// arrives on its destination tile.
+func (a *Actor) Update() (arrived bool) {
+	for i := range a.queue {
+		a.queue[i].wait--
+	}
+	if a.stepping {
+		a.tick++
+		if a.tick >= a.stepTicks {
+			a.stepping = false
+			a.tick = 0
+			arrived = true
+		}
+	}
+	// Start the next queued step right away so continuous walking has no
+	// gaps between steps.
+	if !a.stepping && len(a.queue) > 0 && a.queue[0].wait <= 0 {
+		q := a.queue[0]
+		a.queue = a.queue[1:]
+		// A step that starts later than scheduled (the previous one took
+		// longer, e.g. still swimming while the leader is already on land)
+		// is made shorter by the delay, at most down to double speed, so
+		// followers catch up instead of keeping the gap.
+		ticks := q.ticks
+		if late := -q.wait; late > 0 {
+			ticks = max(q.ticks-late, q.ticks/2)
+		}
+		a.BeginStep(q.dir, q.to, ticks)
+	}
+	return arrived
+}
+
+// Offset returns the pixel offset of the actor's drawn position relative to
+// its tile Pos. It is non-zero while stepping.
+func (a *Actor) Offset() (dx, dy int) {
+	if !a.stepping {
+		return 0, 0
+	}
+	remaining := (a.stepTicks - a.tick) * world.TileSize / a.stepTicks
+	ddx, ddy := a.stepDir.Delta()
+	return -int(ddx) * remaining, -int(ddy) * remaining
+}
+
+// OffsetAt is Offset at a fraction alpha (0..1) of the way to the next tick,
+// in fractional pixels: the actor's exact position between two ticks, for
+// drawing. Actors move continuously at any speed this way, also when a step
+// doesn't cover a whole number of pixels per tick (swimming).
+func (a *Actor) OffsetAt(alpha float64) (dx, dy float64) {
+	if !a.stepping {
+		return 0, 0
+	}
+	t := min(float64(a.tick)+min(max(alpha, 0), 1), float64(a.stepTicks))
+	remaining := (float64(a.stepTicks) - t) * world.TileSize / float64(a.stepTicks)
+	ddx, ddy := a.stepDir.Delta()
+	return -float64(ddx) * remaining, -float64(ddy) * remaining
+}
+
+// Frame returns the sprite's tile index to draw now and whether to mirror
+// it.
+func (a *Actor) Frame() (index int, flip bool) {
+	s := a.Sprite
+	if s.Walk == nil {
+		return s.Index, a.Facing == world.Left
+	}
+	frames := s.Walk[a.Facing]
+	index = frames[0]
+	// Walking, the standing frame is part of the cycle: each step shows
+	// its stepping frame for the first half and stands for the second
+	// (stand, left, stand, right with two stepping frames).
+	if a.stepping && len(frames) > 1 && a.tick < (a.stepTicks+1)/2 {
+		index = frames[1+a.steps%(len(frames)-1)]
+	}
+	if s.FacesLeft {
+		return index, a.Facing == world.Right
+	}
+	return index, a.Facing == world.Left
+}
+
+// Hop returns a small vertical bounce used as walk animation for sprites
+// with a single frame (most Kenney characters); animated ones don't hop.
+func (a *Actor) Hop() int {
+	if a.Sprite.Walk != nil {
+		return 0
+	}
+	if a.stepping && a.tick >= a.stepTicks/4 && a.tick < a.stepTicks*3/4 {
+		return -1
+	}
+	return 0
+}

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Worlds</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1b28; }
+    #status { color: #f4e9d2; font: 14px monospace; padding: 16px; }
+  </style>
+</head>
+<body>
+  <div id="status">Loading…</div>
+  <script src="wasm_exec.js"></script>
+  <script>
+    // Keep the browser from acting on keys the game uses (F3: find next).
+    window.addEventListener("keydown", (e) => { if (e.key === "F3") e.preventDefault(); }, true);
+    const go = new Go();
+    WebAssembly.instantiateStreaming(fetch("worlds.wasm"), go.importObject)
+      .then((r) => { document.getElementById("status").remove(); go.run(r.instance); })
+      .catch((e) => { document.getElementById("status").textContent = "Failed to start: " + e; });
+  </script>
+</body>
+</html>
