@@ -64,7 +64,7 @@ func TestFlight(t *testing.T) {
 	if _, ok := h.top().(*DialogBox); !ok {
 		t.Fatalf("no departures (top: %T)", h.top())
 	}
-	h.choose("wait")
+	h.choose("board 0") // the plane at gate 0 is boarding (see above)
 	h.runUntil("boarding", 200, func() bool { return h.e.fade == 0 && h.leader().Pos.Map.Template == planeMap })
 	r := h.e.ride
 	if r == nil || r.line.Kind != transit.Plane || r.from.ID != a.S.ID {

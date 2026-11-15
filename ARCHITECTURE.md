@@ -795,7 +795,7 @@ scene's vehicle state is the embedded `vehicleState`.
   No fares yet (there is no money).
 - **The trip:** a one-off line from the rank to the drop-off, ahead along
   the road's axis and then across (one corner, so the window view stays
-  exact), leaving after 2 minutes at about 1,000 tiles a game minute
+  exact), leaving after 2 real seconds at about 1,000 tiles a game minute
   (60 km/h). It is ridden like the others, in the `taxi` detail map
   (`tools/art/taxi_interior.py`): a back seat (rest until there), the
   driver, windows and a windscreen with the way passing, doors
@@ -855,8 +855,17 @@ scene's vehicle state is the embedded `vehicleState`.
     `sync` for on demand.
   - **Eviction:** distant chunks are evicted (least recently used). Detail
     maps in use are fully loaded.
-- **World clock (implemented):** `sim.Clock` counts ticks; one game minute
-  passes per real second (a day takes 24 real minutes). A new game starts on
+- **World clock (implemented):** `sim.Clock` counts ticks; a game minute
+  lasts 6 real seconds (`sim.TicksPerMinute` = 360), so game time runs 10
+  times as fast as real time and a day takes 2 hours 24 minutes. The party
+  moves in real time (3.75 tiles a second, 1.35 km an hour of game time);
+  vehicles' speeds are per game minute, so they keep their proportion to
+  it: a train at 120 km/h does about 330 tiles a real second, a ferry 100,
+  a bus 140. A 100 km train ride takes 50 game minutes, 5 real ones
+  (resting on a seat skips it); waiting for a vehicle at a stop skips to 5
+  seconds before it leaves. (The clock ran six times faster at first: a
+  train crossed the screen in a blink and a walk between villages took 18
+  hours on the clock; saves from then are converted.) A new game starts on
   day 1 at 08:00. The clock runs with the exploration scene and stands still
   while a dialog or menu is open and during door fades.
 - **Schedules (implemented):** an NPC object with a `schedule` property

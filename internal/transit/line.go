@@ -44,11 +44,12 @@ var specs = [...]spec{
 	Ferry: {cars: 2, vMax: 600.0 / sim.TicksPerMinute, vSlow: 0.3, aSlow: 0.001, aFast: 0.02, dwell: Dwell},
 	// About 50 km/h; five minutes at a stop.
 	Bus: {cars: 2, vMax: 833.0 / sim.TicksPerMinute, vSlow: 0.25, aSlow: 0.004, aFast: 0.05, dwell: 5 * sim.TicksPerMinute},
-	// About 60 km/h; it leaves as soon as the doors are shut.
+	// About 60 km/h; it leaves as soon as the doors are shut (2 real
+	// seconds).
 	// About 800 km/h at cruise; it taxis out at a tile per tick. Boarding
 	// takes a quarter of an hour.
 	Plane: {cars: 3, vMax: 13333.0 / sim.TicksPerMinute, vSlow: 1, aSlow: 1.0 / 120, aFast: 0.4, dwell: 15 * sim.TicksPerMinute},
-	Taxi:  {cars: 2, vMax: 1000.0 / sim.TicksPerMinute, vSlow: 0.3, aSlow: 0.006, aFast: 0.08, dwell: 2 * sim.TicksPerMinute},
+	Taxi:  {cars: 2, vMax: 1000.0 / sim.TicksPerMinute, vSlow: 0.3, aSlow: 0.006, aFast: 0.08, dwell: 120},
 }
 
 // Timing, in ticks (60 per game minute).

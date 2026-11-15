@@ -43,6 +43,18 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
+// TestDecodeConvertsVersion1: a save from before the clock was slowed keeps
+// its game time.
+func TestDecodeConvertsVersion1(t *testing.T) {
+	s, err := save.Decode([]byte(`{"version": 1, "ticks": 600, "place": "Brookhaven"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Version != save.Version || s.Ticks != 3600 || s.Place != "Brookhaven" {
+		t.Errorf("got %+v, want version %d with 3600 ticks", s, save.Version)
+	}
+}
+
 func TestDecodeRefusesOtherVersions(t *testing.T) {
 	if _, err := save.Decode([]byte(`{"version": 99}`)); err == nil {
 		t.Error("a save of another version decoded")

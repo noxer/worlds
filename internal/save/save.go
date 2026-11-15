@@ -11,8 +11,13 @@ import (
 	"time"
 )
 
-// Version is the format of State; Decode refuses others.
-const Version = 1
+// Version is the format of State. Decode converts older versions it knows
+// and refuses the rest.
+//
+//	1: the clock in ticks of a 60-tick game minute
+//	2: the clock in ticks of a 360-tick game minute (the game clock was
+//	   slowed six times)
+const Version = 2
 
 // Slots is the number of save slots.
 const Slots = 3
@@ -49,6 +54,10 @@ func Decode(data []byte) (State, error) {
 	var s State
 	if err := json.Unmarshal(data, &s); err != nil {
 		return State{}, fmt.Errorf("save: %w", err)
+	}
+	if s.Version == 1 {
+		s.Ticks *= 6 // the same game time at the slower clock
+		s.Version = 2
 	}
 	if s.Version != Version {
 		return State{}, fmt.Errorf("save: version %d, want %d", s.Version, Version)

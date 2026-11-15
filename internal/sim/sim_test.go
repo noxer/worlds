@@ -82,12 +82,12 @@ func TestWhere(t *testing.T) {
 	day := int64(sim.MinutesPerDay)
 	at := func(h, m int) world.Pos { return sim.Where(p, w, s, day+int64(h*60+m)) }
 	// At noon she sets off from a towards b (10 steps of 16 ticks = 160
-	// ticks, under 3 game minutes).
+	// ticks, under one game minute of 360).
 	if got := at(12, 0); got != pos("main", 1, 11) {
 		t.Errorf("12:00 at %v, want at a", got)
 	}
-	if got := at(12, 2); got != pos("main", 8, 11) { // 120 ticks: 7 steps
-		t.Errorf("12:02 at %v, want 7 steps along", got)
+	if got := at(12, 1); got != pos("main", 11, 11) {
+		t.Errorf("12:01 at %v, want at b already", got)
 	}
 	if got := at(13, 0); got != pos("main", 11, 11) {
 		t.Errorf("13:00 at %v, want at b", got)

@@ -6,6 +6,7 @@ import (
 	"github.com/noxer/worlds/internal/dialog"
 	"github.com/noxer/worlds/internal/geom"
 	"github.com/noxer/worlds/internal/infra"
+	"github.com/noxer/worlds/internal/sim"
 	"github.com/noxer/worlds/internal/transit"
 	"github.com/noxer/worlds/internal/world"
 )
@@ -204,8 +205,10 @@ func (e *Explore) timetable(ctx *Context, at stop) {
 			line := lines[k]
 			atA := line.Edge.A.ID == s.ID
 			if verb == "wait" {
-				arrive, _ := line.NextStop(e.clock.Ticks(), atA)
-				e.clock.AdvanceTicks(arrive + 1 - e.clock.Ticks())
+				// Until shortly before it leaves (it stands there a
+				// while; no need to sit through all of that).
+				arrive, leave := line.NextStop(e.clock.Ticks(), atA)
+				e.clock.AdvanceTicks(max(arrive+1, leave-boardingTicks) - e.clock.Ticks())
 				e.refreshReach()
 			}
 			e.board(line, atA)
@@ -213,8 +216,12 @@ func (e *Explore) timetable(ctx *Context, at stop) {
 	}))
 }
 
+// boardingTicks is how long before a vehicle leaves the party gets on
+// when it waited for it (5 real seconds).
+const boardingTicks = 300
+
 // clockTime formats clock ticks as the time of day.
 func clockTime(ticks int64) string {
-	m := geom.Mod(ticks/60, 24*60)
+	m := geom.Mod(ticks/sim.TicksPerMinute, sim.MinutesPerDay)
 	return fmt.Sprintf("%02d:%02d", m/60, m%60)
 }

@@ -10,9 +10,13 @@ import "fmt"
 type Clock struct{ ticks int64 }
 
 const (
-	// TicksPerMinute: one game minute per real second at 60 ticks per
-	// second, so a game day lasts 24 real minutes.
-	TicksPerMinute = 60
+	// TicksPerMinute: a game minute lasts 6 real seconds at 60 ticks per
+	// second, so a game day lasts 2 hours 24 minutes: game time runs 10
+	// times as fast as real time. The party walks 3.75 tiles (metres) a
+	// real second, which makes 1.35 km an hour of game time, and vehicles,
+	// whose speeds are per game minute, stay in proportion to it: a train
+	// passes at about 90 times walking pace.
+	TicksPerMinute = 360
 	// MinutesPerDay is the length of a day in game minutes.
 	MinutesPerDay = 24 * 60
 )
