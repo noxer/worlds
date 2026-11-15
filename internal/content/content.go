@@ -3,11 +3,13 @@
 package content
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/noxer/worlds/internal/combat"
 	"github.com/noxer/worlds/internal/dialog"
 	"github.com/noxer/worlds/internal/gen"
 	"github.com/noxer/worlds/internal/infra"
@@ -31,7 +33,8 @@ type WorldFile struct {
 // Content is everything loaded from the assets.
 type Content struct {
 	World   *world.World
-	Infra   *infra.Infra // settlements and networks; nil without a relief generator
+	Infra   *infra.Infra  // settlements and networks; nil without a relief generator
+	Combat  *combat.Rules // the rules of fights; nil if there is no combat.yaml
 	Dialogs dialog.Library
 	Start   world.Spawn
 }
@@ -82,7 +85,16 @@ func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Content{World: w, Infra: in, Dialogs: lib, Start: start}, nil
+	// The rules of fights, if the game has any.
+	var rules *combat.Rules
+	if data, err := fs.ReadFile(fsys, "combat.yaml"); err == nil {
+		if rules, err = combat.LoadRules(data); err != nil {
+			return nil, fmt.Errorf("combat.yaml: %w", err)
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("combat.yaml: %w", err)
+	}
+	return &Content{World: w, Infra: in, Dialogs: lib, Start: start, Combat: rules}, nil
 }
 
 // loadInfra returns the infrastructure of the world's generator, if any.

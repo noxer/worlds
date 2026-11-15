@@ -969,20 +969,47 @@ time) and combat (turn based) share one scene on the same map; a fight swaps
 the real-time controller for a turn controller. Overlays: dialog, menu,
 inventory, quest journal, world map, save/load.
 
-### Combat (planned)
+### Combat (first version implemented: `combat`, `scene/battle.go`)
 
-- **Turns:** initiative order. Each combatant has movement points and action
-  points per turn.
-- **Movement:** reachable tiles come from a cost-limited flood fill in
-  navigation, with the same passability rules as exploration (4 directions).
-- **Abilities are data:** AP cost, range, area shape, line of sight
-  (straight-line ray on the grid), and effects (damage, status, push and
-  pull). Push and pull also work on puzzle objects.
-- **Testable rules:** the `combat` package has no Ebitengine dependency and
-  uses a seeded RNG, so fights are deterministic in tests and replays.
-- **AI:** scores (move target, ability) pairs over the reachable tiles.
-- **Scope:** warps are locked during a fight. Fights also work inside vehicle
-  interiors.
+- **The rules** are package `combat`, without drawing or input: a `Fight`
+  on a `Board` (walkable, opaque, offsets), `Combatant`s with health,
+  movement points, action points and initiative. The same seed and the
+  same actions give the same fight, so fights are tested and can be
+  replayed.
+- **Turns:** initiative order (higher first; ties: the party, then as
+  listed), round after round. A turn has movement points (a tile each, 4
+  directions, never through anyone) and action points for abilities; it
+  ends when the player ends it or nothing more can be done.
+- **Abilities are data** (`assets/combat.yaml`): action points, range in
+  steps, whether a line of sight is needed (a straight line on the grid,
+  blocked by solid tiles), damage, push. So far: Strike (next to the
+  target), Shot (2 to 6 steps, in sight), Shove (moves the target a tile
+  straight away; it only hurts if there is no room). Stats per kind in the
+  same file: the party's members by name, enemies by kind.
+- **AI:** the best ability it can use from where it stands (a kill first),
+  else the nearest tile it can use one from, else closer to the nearest
+  opponent.
+- **In the game:** enemies are NPCs with an `enemy` property, in plain
+  sight on the map; a fight starts when one sees the party (5 steps, with
+  a line of sight) or the party walks into one, with the enemies within 10
+  tiles and every party member. The `Battle` scene goes on top of the
+  exploration scene, on the same map: the camera holds on the middle of
+  the fight, other NPCs are bystanders nobody can stand on. Arrows move a
+  tile cursor, Menu cycles the action (Move, the member's abilities, End),
+  Confirm does it on the cursor's tile; a tap on a tile does the same
+  there, a tap on the action bar picks. With Move picked, confirming on an
+  enemy uses the first ability that reaches it. Reachable tiles and
+  targets are tinted, everyone has a health bar, damage floats up, the
+  last action is written at the top.
+- **After:** a victory removes the enemies (until the game is loaded
+  again: nothing about fights is saved yet) and the party gathers on the
+  leader; a defeat puts the party back at the start with the enemies
+  back. Everyone starts each fight at full health.
+- **To come:** fights inside vehicle interiors and locked warps, push and
+  pull on puzzle objects, status effects, area shapes, fleeing, items,
+  levelling, saving what was defeated.
+- **The first fight** is a placeholder: two slimes and a wisp in the
+  meadow east of Brookhaven.
 
 ## Dialog, quests, scripting, puzzles
 
@@ -1156,6 +1183,18 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
    is always in the top-right corner while exploring; the world map has
    plus, minus and close buttons there; a tap beside the menu goes back
    or closes it (`scene/buttons.go`; a test drives it all with taps).
+8. A first playable quest: one short quest in Brookhaven that uses every
+   pillar once (talk, explore, a puzzle, a fight, a reward), each system
+   built only as far as it needs.
+   1. **done:** combat first (the riskiest for "is this fun"): the rules
+      (package `combat`), the battle on the map, a placeholder fight in the
+      meadow; tests of the rules and of the whole fight played through the
+      battle's controls and by taps;
+   2. story state: flags and items, dialog conditions and effects, saved;
+   3. quests: stages and objectives, a journal in the menu;
+   4. puzzle objects: lever, door, push block, pressure plate, their state
+      saved;
+   5. the quest itself: the cellar, the bandits, the dialog, the reward.
 
 ## Asset delivery
 

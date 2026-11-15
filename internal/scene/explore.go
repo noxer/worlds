@@ -10,6 +10,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
+	"github.com/noxer/worlds/internal/combat"
 	"github.com/noxer/worlds/internal/dialog"
 	"github.com/noxer/worlds/internal/entity"
 	"github.com/noxer/worlds/internal/geom"
@@ -41,6 +42,8 @@ type NPC struct {
 	schedule sim.Schedule // daily routine; empty: stays put
 	active   bool         // in the party's reach (always true without schedule)
 	ambient  bool         // part of the crowd (see crowd.go)
+	enemy    string       // the kind of enemy it is (combat rules); "": no enemy
+	defeated bool         // beaten in a fight: gone
 	path     []nav.Move
 	wait     int
 }
@@ -82,8 +85,11 @@ type Explore struct {
 
 	visited       map[infra.ID]infra.Settlement // places the party has been to
 	pendingNotice string                        // shown when the fade is over
-	restoreRiding bool                          // ride on after the fade (a loaded game)
-	lastMain      world.Pos                     // the party's last place outside (for the world map)
+	combat        *combat.Rules
+	pendingBattle *NPC       // an enemy that starts a fight on the next tick
+	camLock       *world.Pos // the camera stays on this tile (a fight) instead of the leader
+	restoreRiding bool       // ride on after the fade (a loaded game)
+	lastMain      world.Pos  // the party's last place outside (for the world map)
 	saves         save.Store
 	fade          int // >0 fading out, <0 fading in
 	warp          *world.Warp
@@ -107,9 +113,10 @@ type ExploreConfig struct {
 	Dialogs dialog.Library
 	Party   *entity.Party
 	Start   world.Spawn
-	Clock   sim.Clock    // game time at the start
-	Infra   *infra.Infra // settlements, for the crowd (nil: nobody about)
-	Saves   save.Store   // where the menu saves and loads (nil: no saving)
+	Clock   sim.Clock     // game time at the start
+	Infra   *infra.Infra  // settlements, for the crowd (nil: nobody about)
+	Saves   save.Store    // where the menu saves and loads (nil: no saving)
+	Combat  *combat.Rules // the rules of fights (nil: enemies just stand there)
 }
 
 // NewExplore creates the exploration scene and spawns NPCs from all maps.
@@ -123,6 +130,7 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		clock:   cfg.Clock,
 		infra:   cfg.Infra,
 		saves:   cfg.Saves,
+		combat:  cfg.Combat,
 		crowd:   newCrowd(),
 
 		vehicleState: newVehicleState(),
@@ -137,7 +145,7 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 				return nil, fmt.Errorf("%v: npc %q must be a tile object", o.Pos, o.Name)
 			}
 			facing, _ := world.ParseDir(o.Props.String("facing"))
-			n := &NPC{Dialog: o.Props.String("dialog"), active: true}
+			n := &NPC{Dialog: o.Props.String("dialog"), enemy: o.Props.String("enemy"), active: true}
 			n.Name = o.Name
 			n.Sprite = entity.Sprite{Sheet: e.w.Tilesets().Get(o.Tile.Set()).Name, Index: o.Tile.Index()}
 			n.Place(o.Pos, facing)
@@ -272,6 +280,14 @@ func (e *Explore) Update(ctx *Context) {
 		e.updateCamera(ctx)
 		return
 	}
+	if n := e.pendingBattle; n != nil {
+		e.pendingBattle = nil
+		if b := newBattle(e, n); b != nil {
+			e.cancelPath()
+			ctx.Push(b)
+			return
+		}
+	}
 	if in.Pressed(input.Menu) || in.Pressed(input.Cancel) {
 		e.cancelPath()
 		ctx.Push(NewMenu(e, e.saves))
@@ -297,6 +313,9 @@ func (e *Explore) Update(ctx *Context) {
 	e.updateCrowd()
 	e.updateVehicles()
 	leader := e.party.Leader()
+	if arrived || e.clock.Ticks()%20 == 0 {
+		e.lookOut()
+	}
 	if arrived {
 		if wp := e.w.WarpAt(leader.Pos); wp != nil {
 			e.warp = wp
@@ -327,6 +346,10 @@ type notice struct {
 
 // bump shows the bump message of the object at p, if it has one.
 func (e *Explore) bump(p world.Pos) {
+	if n := e.npcAt(p); n != nil && n.enemy != "" && e.combat != nil {
+		e.pendingBattle = n // walking into an enemy attacks it
+		return
+	}
 	if e.vehicleBump(p) {
 		return
 	}
@@ -572,7 +595,10 @@ func (e *Explore) talk(ctx *Context, p world.Pos) {
 		return
 	}
 	id := ""
-	if n := e.npcAt(p); n != nil {
+	if n := e.npcAt(p); n != nil && n.enemy != "" && e.combat != nil {
+		e.pendingBattle = n
+		return
+	} else if n != nil {
 		id = n.Dialog
 		if d, ok := e.w.DirBetween(p, e.party.Leader().Pos); ok {
 			n.Facing = d
@@ -612,6 +638,9 @@ func (e *Explore) updateCamera(ctx *Context) {
 	e.viewW, e.viewH = int64(ctx.W), int64(ctx.H)
 	l := e.party.Leader()
 	x, y := e.pixel(l)
+	if c := e.camLock; c != nil {
+		x, y = c.X*tile, c.Y*tile
+	}
 	e.camX = x + tile/2 - int64(ctx.W)/2
 	e.camY = y + tile/2 - int64(ctx.H)/2
 	if w, h, wraps := e.w.Size(l.Pos.Map); !wraps {
@@ -648,6 +677,9 @@ func (e *Explore) pixelAt(a *entity.Actor, alpha float64, riding bool) (x, y flo
 func (e *Explore) cameraAt(alpha float64) (cx, cy float64) {
 	l := e.party.Leader()
 	x, y, _ := e.pixelAt(l, alpha, true) // the camera ignores the hop
+	if c := e.camLock; c != nil {
+		x, y = float64(c.X*tile), float64(c.Y*tile)
+	}
 	cx = x + tile/2 - float64(e.viewW)/2
 	cy = y + tile/2 - float64(e.viewH)/2
 	if w, h, wraps := e.w.Size(l.Pos.Map); !wraps {
@@ -752,7 +784,9 @@ func (e *Explore) Draw(dst *ebiten.Image) {
 	if e.debug {
 		e.drawDebug(dst)
 	}
-	drawButton(dst, cornerButton(dst.Bounds().Dx(), 0), iconMenu)
+	if e.camLock == nil { // not in a fight, where there is no menu
+		drawButton(dst, cornerButton(dst.Bounds().Dx(), 0), iconMenu)
+	}
 	if e.fade != 0 {
 		a := float64(fadeTicks-abs(e.fade)) / fadeTicks
 		if e.fade < 0 {
