@@ -74,7 +74,7 @@ func New(fsys fs.FS) (*Game, error) {
 	}
 	explore, err := scene.NewExplore(scene.ExploreConfig{
 		World: c.World, Sheets: sheets, Dialogs: c.Dialogs, Party: party, Start: c.Start,
-		Clock: sim.NewClock(1, 8, 0), Infra: c.Infra, Saves: saves, Combat: c.Combat,
+		Clock: sim.NewClock(1, 8, 0), Infra: c.Infra, Saves: saves, Combat: c.Combat, Items: c.Items,
 	})
 	if err != nil {
 		return nil, err

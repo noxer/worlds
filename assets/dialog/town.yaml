@@ -3,12 +3,15 @@
 
 elder:
   start: hello
+  starts:
+    - {if: [flag met_elder], node: back}
   nodes:
     hello:
       speaker: Elder Maren
       lines:
         - Welcome to Brookhaven, travellers.
         - It is rare to see a company as large as yours on our little road.
+      effects: [set met_elder]
       choices:
         - text: What is this place?
           next: place
@@ -26,6 +29,11 @@ elder:
       lines:
         - Hilde, our smith, has been grumbling about something missing.
         - Her forge is the red-roofed house to the north-west.
+      next: hello_again
+    back:
+      speaker: Elder Maren
+      lines:
+        - Back again, travellers? Brookhaven must be growing on you.
       next: hello_again
     hello_again:
       speaker: Elder Maren

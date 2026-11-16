@@ -31,7 +31,7 @@ func newBattleHarness(t *testing.T) *harness {
 		}
 	}
 	e, err := NewExplore(ExploreConfig{World: c.World, Sheets: gfx.NewSheets(assets.FS), Dialogs: c.Dialogs,
-		Party: party, Start: c.Start, Infra: c.Infra, Combat: c.Combat})
+		Party: party, Start: c.Start, Infra: c.Infra, Combat: c.Combat, Items: c.Items})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,6 +168,9 @@ func TestMeadowFight(t *testing.T) {
 	for _, n := range foes {
 		if n.active || !n.defeated {
 			t.Errorf("%s is still there", n.Name)
+		}
+		if !h.e.story.Flag(defeatedFlag(n)) {
+			t.Errorf("%s's defeat isn't in the story (so not in a save)", n.Name)
 		}
 	}
 	if h.e.camLock != nil {

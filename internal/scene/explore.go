@@ -20,6 +20,7 @@ import (
 	"github.com/noxer/worlds/internal/nav"
 	"github.com/noxer/worlds/internal/save"
 	"github.com/noxer/worlds/internal/sim"
+	"github.com/noxer/worlds/internal/story"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -85,6 +86,8 @@ type Explore struct {
 
 	visited       map[infra.ID]infra.Settlement // places the party has been to
 	pendingNotice string                        // shown when the fade is over
+	story         *story.State                  // flags and items (see storystate.go)
+	items         map[string]story.Item         // the kinds of items, by id
 	combat        *combat.Rules
 	pendingBattle *NPC       // an enemy that starts a fight on the next tick
 	camLock       *world.Pos // the camera stays on this tile (a fight) instead of the leader
@@ -113,10 +116,11 @@ type ExploreConfig struct {
 	Dialogs dialog.Library
 	Party   *entity.Party
 	Start   world.Spawn
-	Clock   sim.Clock     // game time at the start
-	Infra   *infra.Infra  // settlements, for the crowd (nil: nobody about)
-	Saves   save.Store    // where the menu saves and loads (nil: no saving)
-	Combat  *combat.Rules // the rules of fights (nil: enemies just stand there)
+	Clock   sim.Clock             // game time at the start
+	Infra   *infra.Infra          // settlements, for the crowd (nil: nobody about)
+	Saves   save.Store            // where the menu saves and loads (nil: no saving)
+	Combat  *combat.Rules         // the rules of fights (nil: enemies just stand there)
+	Items   map[string]story.Item // the kinds of items, by id
 }
 
 // NewExplore creates the exploration scene and spawns NPCs from all maps.
@@ -131,6 +135,8 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		infra:   cfg.Infra,
 		saves:   cfg.Saves,
 		combat:  cfg.Combat,
+		story:   story.New(),
+		items:   cfg.Items,
 		crowd:   newCrowd(),
 
 		vehicleState: newVehicleState(),
@@ -155,6 +161,14 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 					return nil, fmt.Errorf("%v: npc %q: %w", o.Pos, o.Name, err)
 				}
 				n.schedule, n.active = sch, false // placed when in reach
+			}
+			if n.enemy != "" {
+				// An enemy beaten is remembered by its name.
+				for _, m := range e.npcs {
+					if m.enemy != "" && m.Name == n.Name {
+						return nil, fmt.Errorf("%v: two enemies are called %q", o.Pos, o.Name)
+					}
+				}
 			}
 			e.npcs = append(e.npcs, n)
 		case "sign":
@@ -613,7 +627,7 @@ func (e *Explore) talk(ctx *Context, p world.Pos) {
 		return
 	}
 	e.notice = nil
-	ctx.Push(NewDialogBox(dialog.NewRunner(d), nil))
+	e.converse(ctx, d)
 }
 
 // pixel returns the top-left pixel of an actor in its map's coordinates

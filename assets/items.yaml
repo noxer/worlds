@@ -1,0 +1,5 @@
+# The items of the game, by id (what "give", "take" and "item" in dialogs
+# and quests refer to): the name shown, and a line about it.
+honey_cake:
+  name: Honey cake
+  text: Sticky, sweet, baked in Brookhaven.

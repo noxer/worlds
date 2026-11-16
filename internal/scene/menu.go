@@ -14,7 +14,8 @@ import (
 )
 
 // Menu is the pause menu, opened with Menu (or Cancel) while exploring:
-// Resume, Map (the world map), Party, Save, Load and, on desktop, Quit. The world stands still while
+// Resume, Map (the world map), Party, Items, Save, Load and, on desktop,
+// Quit. The world stands still while
 // it is open. Save and Load list the slots with where and when.
 type Menu struct {
 	e      *Explore
@@ -32,6 +33,7 @@ const (
 	menuMain menuPage = iota
 	menuSave
 	menuLoad
+	menuItems
 )
 
 type menuItem struct {
@@ -45,6 +47,19 @@ func NewMenu(e *Explore, store save.Store) *Menu { return &Menu{e: e, store: sto
 
 func (m *Menu) items() []menuItem {
 	switch m.page {
+	case menuItems:
+		var out []menuItem
+		for _, it := range m.e.itemList() {
+			text, about := it.name, it.text
+			if it.n > 1 {
+				text = fmt.Sprintf("%s x%d", it.name, it.n)
+			}
+			out = append(out, menuItem{text: text, do: func(m *Menu, ctx *Context) { m.msg = about }})
+		}
+		if len(out) == 0 {
+			out = append(out, menuItem{text: "- nothing -", off: true})
+		}
+		return append(out, menuItem{text: "Back", do: func(m *Menu, ctx *Context) { m.open(menuMain) }})
 	case menuSave, menuLoad:
 		var out []menuItem
 		for k, s := range m.slots {
@@ -65,6 +80,7 @@ func (m *Menu) items() []menuItem {
 		{text: "Resume", do: func(m *Menu, ctx *Context) { ctx.Pop() }},
 		{text: "Map", do: func(m *Menu, ctx *Context) { ctx.Pop(); ctx.Push(NewWorldMap(m.e)) }},
 		{text: "Party", do: func(m *Menu, ctx *Context) { ctx.Pop(); ctx.Push(NewPartyScreen(m.e)) }},
+		{text: "Items", do: func(m *Menu, ctx *Context) { m.open(menuItems) }},
 		{text: "Save", off: m.store == nil, do: func(m *Menu, ctx *Context) { m.open(menuSave) }},
 		{text: "Load", off: m.store == nil, do: func(m *Menu, ctx *Context) { m.open(menuLoad) }},
 	}
@@ -77,6 +93,12 @@ func (m *Menu) items() []menuItem {
 // open switches to a page.
 func (m *Menu) open(p menuPage) {
 	m.page, m.cursor, m.msg = p, 0, ""
+	if p == menuItems {
+		if its := m.items(); its[0].off {
+			m.cursor = 1 // nothing carried: on Back
+		}
+		return
+	}
 	if p != menuMain {
 		m.slots = save.List(m.store)
 		if p == menuLoad {
@@ -199,7 +221,7 @@ func (m *Menu) Update(ctx *Context) {
 func (m *Menu) Draw(dst *ebiten.Image) {
 	box, rows := m.rects()
 	gfx.Box(dst, box)
-	title := map[menuPage]string{menuMain: "Menu", menuSave: "Save to", menuLoad: "Load from"}[m.page]
+	title := map[menuPage]string{menuMain: "Menu", menuSave: "Save to", menuLoad: "Load from", menuItems: "Items"}[m.page]
 	gfx.Text(dst, title, box.Min.X+boxPad, box.Min.Y+boxPad-1, gfx.ColorAccent)
 	for i, it := range m.items() {
 		r := rows[i]

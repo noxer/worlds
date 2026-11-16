@@ -7,12 +7,20 @@ meadow_sign:
 
 wanderer:
   start: main
+  starts:
+    - {if: [flag wanderer_cake], node: later}
   nodes:
     main:
       speaker: Old Wanderer
       lines:
         - The paths through the grove twist about.
         - Some say the trees move when nobody is looking.
+        - You look hungry. Here, I baked too many.
+      effects: [give honey_cake, set wanderer_cake]
+    later:
+      speaker: Old Wanderer
+      lines:
+        - Mind the slimes in the east field. They don't share my taste in cake.
 
 isle_sign:
   start: main

@@ -14,7 +14,23 @@
 //	    work:
 //	      lines: ["Talk to the smith."]   # no choices and no next: ends
 //
-// Conditions and effects (flags, quests, skill checks) hook in here later.
+// Dialogs can read and change the story (flags and items; the wording of
+// conditions and effects is package story's):
+//
+//	smith:
+//	  start: hello                      # unless one of the starts applies
+//	  starts:
+//	    - {if: [flag crate_back], node: thanks}
+//	    - {if: [item crate], node: handover}
+//	  nodes:
+//	    hello:
+//	      lines: ["My delivery never came."]
+//	      effects: [set smith_asked]    # when the node is reached
+//	      choices:
+//	        - {text: "We'll look.", effects: [set looking]}
+//	        - {text: "About the cellar...", if: [flag found_cellar], next: cellar}
+//
+// A choice with conditions is only offered while they all hold.
 package dialog
 
 import (
@@ -31,9 +47,11 @@ import (
 // it is chosen (dialogs built by the game, such as a station's timetable,
 // use it; the game decides what the names mean).
 type Choice struct {
-	Text string `yaml:"text"`
-	Next string `yaml:"next"`
-	Do   string `yaml:"do"`
+	Text    string   `yaml:"text"`
+	Next    string   `yaml:"next"`
+	Do      string   `yaml:"do"`
+	If      []string `yaml:"if"`      // conditions: offered only while all hold
+	Effects []string `yaml:"effects"` // carried out when it is chosen
 }
 
 // Node is one step of a conversation.
@@ -42,13 +60,65 @@ type Node struct {
 	Lines   []string `yaml:"lines"`
 	Choices []Choice `yaml:"choices"`
 	Next    string   `yaml:"next"`
+	Effects []string `yaml:"effects"` // carried out when the node is reached
+}
+
+// Start is a conditional first node.
+type Start struct {
+	If   []string `yaml:"if"`
+	Node string   `yaml:"node"`
+}
+
+// State is the story a dialog reads and changes (package story's State
+// does; so can a wrapper that takes note of what changes).
+type State interface {
+	All(conditions []string) bool
+	Apply(effect string)
 }
 
 // Dialog is a conversation tree.
 type Dialog struct {
-	ID    string           `yaml:"-"`
-	Start string           `yaml:"start"`
-	Nodes map[string]*Node `yaml:"nodes"`
+	ID     string           `yaml:"-"`
+	Start  string           `yaml:"start"`
+	Starts []Start          `yaml:"starts"` // the first whose conditions hold, else Start
+	Nodes  map[string]*Node `yaml:"nodes"`
+}
+
+// Conditions returns every condition the dialog uses, and Effects every
+// effect, for checking their wording.
+func (d *Dialog) Conditions() []string {
+	var out []string
+	for _, s := range d.Starts {
+		out = append(out, s.If...)
+	}
+	for _, id := range d.nodeIDs() {
+		for _, c := range d.Nodes[id].Choices {
+			out = append(out, c.If...)
+		}
+	}
+	return out
+}
+
+// Effects returns every effect the dialog uses.
+func (d *Dialog) Effects() []string {
+	var out []string
+	for _, id := range d.nodeIDs() {
+		n := d.Nodes[id]
+		out = append(out, n.Effects...)
+		for _, c := range n.Choices {
+			out = append(out, c.Effects...)
+		}
+	}
+	return out
+}
+
+func (d *Dialog) nodeIDs() []string {
+	ids := make([]string, 0, len(d.Nodes))
+	for id := range d.Nodes {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 // Library holds all dialogs by id.
@@ -94,13 +164,16 @@ func (d *Dialog) validate() error {
 	if d.Nodes[d.Start] == nil {
 		return fmt.Errorf("dialog %q: start node %q does not exist", d.ID, d.Start)
 	}
-	ids := make([]string, 0, len(d.Nodes))
-	for id := range d.Nodes {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
 	var errs []error
-	for _, id := range ids {
+	for _, st := range d.Starts {
+		if d.Nodes[st.Node] == nil {
+			errs = append(errs, fmt.Errorf("dialog %q: starts refer to unknown node %q", d.ID, st.Node))
+		}
+		if len(st.If) == 0 {
+			errs = append(errs, fmt.Errorf("dialog %q: the start at node %q has no conditions", d.ID, st.Node))
+		}
+	}
+	for _, id := range d.nodeIDs() {
 		n := d.Nodes[id]
 		if len(n.Lines) == 0 {
 			errs = append(errs, fmt.Errorf("dialog %q: node %q has no lines", d.ID, id))
@@ -123,17 +196,36 @@ func (d *Dialog) validate() error {
 
 // Runner walks through a dialog one line at a time.
 type Runner struct {
-	d    *Dialog
-	node *Node
-	line int
-	do   []string // actions of the choices made
+	d     *Dialog
+	state State // nil: no story (conditions never hold, effects do nothing)
+	node  *Node
+	line  int
+	do    []string // actions of the choices made
 }
 
 // Actions returns the actions of the choices made so far, in order.
 func (r *Runner) Actions() []string { return r.do }
 
-// NewRunner starts a dialog at its start node.
-func NewRunner(d *Dialog) *Runner { return &Runner{d: d, node: d.Nodes[d.Start]} }
+// NewRunner starts a dialog at its start node, without a story: choices
+// with conditions aren't offered, effects do nothing.
+func NewRunner(d *Dialog) *Runner { return NewRunnerWith(d, nil) }
+
+// NewRunnerWith starts a dialog that reads and changes the story st: at
+// the first of its starts whose conditions hold, else at its start node.
+func NewRunnerWith(d *Dialog, st State) *Runner {
+	r := &Runner{d: d, state: st}
+	start := d.Start
+	if st != nil {
+		for _, s := range d.Starts {
+			if st.All(s.If) {
+				start = s.Node
+				break
+			}
+		}
+	}
+	r.goTo(start)
+	return r
+}
 
 // Done reports whether the conversation is over.
 func (r *Runner) Done() bool { return r.node == nil }
@@ -147,10 +239,16 @@ func (r *Runner) Line() string { return r.node.Lines[r.line] }
 // Choices returns the choices to show with the current line. They are only
 // offered on the last line of a node.
 func (r *Runner) Choices() []Choice {
-	if r.line == len(r.node.Lines)-1 {
-		return r.node.Choices
+	if r.line != len(r.node.Lines)-1 {
+		return nil
 	}
-	return nil
+	var out []Choice
+	for _, c := range r.node.Choices {
+		if len(c.If) == 0 || (r.state != nil && r.state.All(c.If)) {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // Advance moves to the next line. It must not be called while choices are
@@ -175,6 +273,7 @@ func (r *Runner) Choose(i int) {
 	if cs[i].Do != "" {
 		r.do = append(r.do, cs[i].Do)
 	}
+	r.apply(cs[i].Effects)
 	r.goTo(cs[i].Next)
 }
 
@@ -185,4 +284,14 @@ func (r *Runner) goTo(id string) {
 		return
 	}
 	r.node = r.d.Nodes[id]
+	r.apply(r.node.Effects)
+}
+
+func (r *Runner) apply(effects []string) {
+	if r.state == nil {
+		return
+	}
+	for _, e := range effects {
+		r.state.Apply(e)
+	}
 }

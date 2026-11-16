@@ -1001,21 +1001,32 @@ inventory, quest journal, world map, save/load.
   enemy uses the first ability that reaches it. Reachable tiles and
   targets are tinted, everyone has a health bar, damage floats up, the
   last action is written at the top.
-- **After:** a victory removes the enemies (until the game is loaded
-  again: nothing about fights is saved yet) and the party gathers on the
-  leader; a defeat puts the party back at the start with the enemies
+- **After:** a victory removes the enemies for good (a story flag each,
+  saved) and the party gathers on the leader; a defeat puts the party back at the start with the enemies
   back. Everyone starts each fight at full health.
 - **To come:** fights inside vehicle interiors and locked warps, push and
   pull on puzzle objects, status effects, area shapes, fleeing, items,
-  levelling, saving what was defeated.
+  levelling.
 - **The first fight** is a placeholder: two slimes and a wisp in the
   meadow east of Brookhaven.
 
 ## Dialog, quests, scripting, puzzles
 
 - **Dialog trees (implemented):** nodes have a speaker, lines, and choices or
-  `next`, and are validated at load. Planned: conditions (flags, quest stage,
-  items, party members, skill checks with dice) and effects.
+  `next`, and are validated at load.
+- **Story state (implemented, package `story`):** named flags (things that
+  have happened) and the party's items. Content reads and changes it with
+  short strings: conditions `flag met_elder`, `!flag met_elder`, `item
+  crate`, `item coin 3`; effects `set`, `clear`, `give`, `take`. In
+  dialogs: `starts` (the first whose conditions hold is where the dialog
+  begins), `if` on a choice (offered only while it holds), `effects` on a
+  node (when it is reached) and on a choice (when it is chosen). The
+  wording, and that the items exist (`assets/items.yaml`: name and a line
+  of text), is checked when the content loads. After a dialog the party is
+  told what it received or handed over; the menu's Items page lists what
+  it carries. An enemy beaten sets the flag `defeated.<its name>` and stays
+  gone. Flags and items are in the save. Planned: quest stages, party
+  members and skill checks with dice as conditions.
 - **Scripting:** a command runner (`Say`, `Move`, `Face`, `Wait`, `SetFlag`,
   `GiveItem`, `Warp`, `StartQuest`, …) that runs over several ticks. Story
   state is a set of named flags. Game events go through an event bus.
@@ -1190,7 +1201,13 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       (package `combat`), the battle on the map, a placeholder fight in the
       meadow; tests of the rules and of the whole fight played through the
       battle's controls and by taps;
-   2. story state: flags and items, dialog conditions and effects, saved;
+   2. **done:** story state (package `story`): flags and items; dialogs
+      choose their start by condition, offer choices by condition, and
+      carry out effects (set, clear, give, take); `items.yaml`; the party
+      is told what it received; an Items page in the menu; flags, items
+      and the enemies beaten are saved; the elder remembers the party, the
+      wanderer gives a honey cake once; tests of the story, the dialogs,
+      and of talking, the menu and saving in the game;
    3. quests: stages and objectives, a journal in the menu;
    4. puzzle objects: lever, door, push block, pressure plate, their state
       saved;

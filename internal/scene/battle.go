@@ -480,6 +480,11 @@ func (b *Battle) finish(ctx *Context, o combat.Outcome) {
 	ctx.Pop()
 	l := e.party.Leader()
 	if o == combat.Victory {
+		for _, n := range b.foes {
+			if n != nil {
+				e.story.SetFlag(defeatedFlag(n), true) // they stay gone
+			}
+		}
 		e.party.PlaceAll(l.Pos, l.Facing)
 		e.say("The fight is won.")
 		return
