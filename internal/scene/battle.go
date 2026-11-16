@@ -487,6 +487,7 @@ func (b *Battle) finish(ctx *Context, o combat.Outcome) {
 		}
 		e.party.PlaceAll(l.Pos, l.Facing)
 		e.say("The fight is won.")
+		e.updateQuests()
 		return
 	}
 	for _, n := range b.foes {

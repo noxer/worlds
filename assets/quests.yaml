@@ -1,0 +1,16 @@
+# The quests (package quest): each begins when its start conditions hold
+# and moves on stage by stage as the stages' conditions come to hold. The
+# conditions and effects are those of dialogs (package story). Progress is
+# kept as flags: quest.<id>, quest.<id>.<stage>, quest.<id>.done.
+
+- id: meadow_slimes
+  name: Slimes in the meadow
+  start: [flag slime_job]
+  stages:
+    - id: clear
+      text: Clear the slimes and the wisp out of the east field of Willow Meadow.
+      done: [flag defeated.slime_1, flag defeated.slime_2, flag defeated.wisp_1]
+    - id: report
+      text: Tell Elder Maren the field is clear.
+      done: [flag slime_job_done]
+  effects: [give coin 10]

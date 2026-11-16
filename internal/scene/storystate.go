@@ -36,6 +36,7 @@ func (e *Explore) converse(ctx *Context, d *dialog.Dialog) {
 		if text := e.changesText(note.changes); text != "" {
 			e.say(text)
 		}
+		e.updateQuests() // what was said may start or move on a quest
 	}))
 }
 

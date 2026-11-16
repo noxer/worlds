@@ -1030,10 +1030,20 @@ inventory, quest journal, world map, save/load.
 - **Scripting:** a command runner (`Say`, `Move`, `Face`, `Wait`, `SetFlag`,
   `GiveItem`, `Warp`, `StartQuest`, …) that runs over several ticks. Story
   state is a set of named flags. Game events go through an event bus.
-- **Quests:** YAML stages and objectives, completed by events (`ItemAcquired`,
-  `TalkedTo`, `EnteredArea`, `EnemyDefeated`, `FlagSet`). A journal and quest
-  markers, with direction from navigation even across maps and the wrap
-  seam.
+- **Quests (implemented, package `quest`):** `assets/quests.yaml` lists
+  them: a name, start conditions, stages (an objective's text and the
+  conditions that complete it, with optional effects) and effects at the
+  end, all in the story's wording. The book is moved on whenever the story
+  may have changed (after a dialog, after a fight, twice a second while
+  exploring). Progress is story flags: `quest.<id>` once started,
+  `quest.<id>.<stage>` per stage done, `quest.<id>.done`; so it is saved,
+  dialogs can ask about it, and a stage done stays done even if its
+  condition stops holding (an item handed over). News (started, a new
+  objective, completed, with what was received) shows as a banner at the
+  top for 4 seconds, whatever the party does; the menu's Quests page is
+  the journal: quests under way with their objective, then those done.
+  Things that happen become flags (an enemy beaten already does), so there
+  is no separate event bus. Planned: quest markers with directions.
 - **Puzzles:** objects such as levers, plates, push blocks, doors and keys,
   wired in Tiled (`target=door_3`). State lives in chunk or instance deltas
   and drives the dynamic blockers.
@@ -1208,7 +1218,12 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       and the enemies beaten are saved; the elder remembers the party, the
       wanderer gives a honey cake once; tests of the story, the dialogs,
       and of talking, the menu and saving in the game;
-   3. quests: stages and objectives, a journal in the menu;
+   3. **done:** quests (package `quest`, `assets/quests.yaml`): stages
+      with conditions, progress as story flags (so saved, and dialogs can
+      ask), effects at stages and at the end; banners for quest news; the
+      journal as the menu's Quests page; a first quest from the elder
+      (clear the slimes, report, 10 coins); tests of the rules and of the
+      whole quest in the game, with saving;
    4. puzzle objects: lever, door, push block, pressure plate, their state
       saved;
    5. the quest itself: the cellar, the bandits, the dialog, the reward.

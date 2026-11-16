@@ -18,6 +18,7 @@ import (
 	"github.com/noxer/worlds/internal/infra"
 	"github.com/noxer/worlds/internal/input"
 	"github.com/noxer/worlds/internal/nav"
+	"github.com/noxer/worlds/internal/quest"
 	"github.com/noxer/worlds/internal/save"
 	"github.com/noxer/worlds/internal/sim"
 	"github.com/noxer/worlds/internal/story"
@@ -88,6 +89,9 @@ type Explore struct {
 	pendingNotice string                        // shown when the fade is over
 	story         *story.State                  // flags and items (see storystate.go)
 	items         map[string]story.Item         // the kinds of items, by id
+	quests        quest.Book                    // the quests (see questlog.go)
+	toasts        []toast                       // banners waiting to be shown; the first is on show
+	toastAge      int                           // ticks the first banner has been shown
 	combat        *combat.Rules
 	pendingBattle *NPC       // an enemy that starts a fight on the next tick
 	camLock       *world.Pos // the camera stays on this tile (a fight) instead of the leader
@@ -121,6 +125,7 @@ type ExploreConfig struct {
 	Saves   save.Store            // where the menu saves and loads (nil: no saving)
 	Combat  *combat.Rules         // the rules of fights (nil: enemies just stand there)
 	Items   map[string]story.Item // the kinds of items, by id
+	Quests  quest.Book            // the quests
 }
 
 // NewExplore creates the exploration scene and spawns NPCs from all maps.
@@ -137,6 +142,7 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		combat:  cfg.Combat,
 		story:   story.New(),
 		items:   cfg.Items,
+		quests:  cfg.Quests,
 		crowd:   newCrowd(),
 
 		vehicleState: newVehicleState(),
@@ -330,6 +336,10 @@ func (e *Explore) Update(ctx *Context) {
 	if arrived || e.clock.Ticks()%20 == 0 {
 		e.lookOut()
 	}
+	if e.clock.Ticks()%questsEvery == 0 {
+		e.updateQuests()
+	}
+	e.tickToasts()
 	if arrived {
 		if wp := e.w.WarpAt(leader.Pos); wp != nil {
 			e.warp = wp
@@ -798,6 +808,7 @@ func (e *Explore) Draw(dst *ebiten.Image) {
 	if e.debug {
 		e.drawDebug(dst)
 	}
+	e.drawToast(dst)
 	if e.camLock == nil { // not in a fight, where there is no menu
 		drawButton(dst, cornerButton(dst.Bounds().Dx(), 0), iconMenu)
 	}

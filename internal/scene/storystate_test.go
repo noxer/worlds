@@ -70,9 +70,8 @@ func TestStoryInDialogs(t *testing.T) {
 	if its := m.items(); len(its) != 2 || its[0].text != "Honey cake" {
 		t.Fatalf("the items page lists %v", its)
 	}
-	h.press(input.Confirm) // on the cake: what it is
-	if !strings.Contains(m.msg, "Brookhaven") {
-		t.Errorf("about the cake: %q", m.msg)
+	if its := m.items(); !strings.Contains(its[m.cursor].about, "Brookhaven") {
+		t.Errorf("about the cake: %q", its[m.cursor].about)
 	}
 	h.press(input.Cancel)
 	// Save, forget everything, load.

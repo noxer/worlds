@@ -14,6 +14,7 @@ import (
 	"github.com/noxer/worlds/internal/dialog"
 	"github.com/noxer/worlds/internal/gen"
 	"github.com/noxer/worlds/internal/infra"
+	"github.com/noxer/worlds/internal/quest"
 	"github.com/noxer/worlds/internal/story"
 	"github.com/noxer/worlds/internal/world"
 )
@@ -38,6 +39,7 @@ type Content struct {
 	Infra   *infra.Infra          // settlements and networks; nil without a relief generator
 	Combat  *combat.Rules         // the rules of fights; nil if there is no combat.yaml
 	Items   map[string]story.Item // the kinds of items, by id
+	Quests  quest.Book            // the quests
 	Dialogs dialog.Library
 	Start   world.Spawn
 }
@@ -105,6 +107,16 @@ func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 	if err := checkStory(lib, items); err != nil {
 		return nil, err
 	}
+	// The quests.
+	var quests quest.Book
+	if data, err := fs.ReadFile(fsys, "quests.yaml"); err == nil {
+		known := func(item string) bool { _, ok := items[item]; return ok }
+		if quests, err = quest.Load(data, known); err != nil {
+			return nil, fmt.Errorf("quests.yaml: %w", err)
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("quests.yaml: %w", err)
+	}
 	// The rules of fights, if the game has any.
 	var rules *combat.Rules
 	if data, err := fs.ReadFile(fsys, "combat.yaml"); err == nil {
@@ -114,7 +126,7 @@ func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("combat.yaml: %w", err)
 	}
-	return &Content{World: w, Infra: in, Dialogs: lib, Start: start, Combat: rules, Items: items}, nil
+	return &Content{World: w, Infra: in, Dialogs: lib, Start: start, Combat: rules, Items: items, Quests: quests}, nil
 }
 
 // checkStory checks the wording of the dialogs' conditions and effects,

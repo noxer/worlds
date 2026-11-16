@@ -4,6 +4,7 @@
 elder:
   start: hello
   starts:
+    - {if: [flag quest.meadow_slimes.clear, "!flag slime_job_done"], node: reward}
     - {if: [flag met_elder], node: back}
   nodes:
     hello:
@@ -29,6 +30,16 @@ elder:
       lines:
         - Hilde, our smith, has been grumbling about something missing.
         - Her forge is the red-roofed house to the north-west.
+        - And slimes have taken over the east field of Willow Meadow. Nobody dares mow it.
+        - Clear them out and the village will see you right.
+      effects: [set slime_job]
+      next: hello_again
+    reward:
+      speaker: Elder Maren
+      lines:
+        - The east field is clear? And the wisp gone too?
+        - Well done. Here, from the village purse.
+      effects: [set slime_job_done]
       next: hello_again
     back:
       speaker: Elder Maren
