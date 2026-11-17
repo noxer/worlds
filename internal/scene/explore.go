@@ -353,6 +353,11 @@ func (e *Explore) Update(ctx *Context) {
 	e.tickToasts()
 	if arrived {
 		if wp := e.w.WarpAt(leader.Pos); wp != nil {
+			if e.hasGoal && leader.Pos == e.goal {
+				// The door was where the party was going: through it, the
+				// walk is over (going on would lead back out to it).
+				e.cancelPath()
+			}
 			e.warp = wp
 			e.fade = fadeTicks
 			return
