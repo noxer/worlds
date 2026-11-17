@@ -11,7 +11,7 @@
  "tilewidth": 16,
  "tileheight": 16,
  "nextlayerid": 5,
- "nextobjectid": 7,
+ "nextobjectid": 9,
  "layers": [
   {
    "id": 1,
@@ -568,7 +568,7 @@
     17,
     0,
     0,
-    0,
+    776,
     0,
     0,
     0,
@@ -1640,6 +1640,47 @@
        "value": "down"
       }
      ]
+    },
+    {
+     "id": 7,
+     "name": "to_cellar",
+     "type": "warp",
+     "x": 48,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "to_map",
+       "type": "string",
+       "value": "cellar"
+      },
+      {
+       "name": "to_spawn",
+       "type": "string",
+       "value": "entrance"
+      }
+     ]
+    },
+    {
+     "id": 8,
+     "name": "cellar_door",
+     "type": "spawn",
+     "x": 48,
+     "y": 48,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "down"
+      }
+     ]
     }
    ]
   }
@@ -1660,6 +1701,10 @@
   {
    "firstgid": 463,
    "source": "../../tilesets/water.tsj"
+  },
+  {
+   "firstgid": 607,
+   "source": "../../tilesets/worlds.tsj"
   }
  ],
  "properties": [

@@ -1044,9 +1044,19 @@ inventory, quest journal, world map, save/load.
   the journal: quests under way with their objective, then those done.
   Things that happen become flags (an enemy beaten already does), so there
   is no separate event bus. Planned: quest markers with directions.
-- **Puzzles:** objects such as levers, plates, push blocks, doors and keys,
-  wired in Tiled (`target=door_3`). State lives in chunk or instance deltas
-  and drives the dynamic blockers.
+- **Puzzles (first pieces implemented, `scene/puzzle.go`):** objects in
+  Tiled, by type: `lever` (confirm while facing it to pull it, on or off),
+  `plate` (pressed while a crate or a party member stands on it), `block`
+  (a crate, pushed a tile by walking into it if the tile beyond is free
+  floor) and `door` (shut until every lever and plate wired to it is on,
+  or any one with `mode: any`; it doesn't shut on anyone standing in it).
+  A lever or plate names its doors in `target` (comma-separated, same
+  map). Levers, crates and shut doors are dynamic blockers
+  (`World.SetBlocked`), so walking, navigation and fights respect them.
+  A lever's position is the story flag `lever.<map>/<name>`; crates moved
+  are in the save (`Blocks`). A crate pushed into a corner can't come out,
+  so when the party leaves a map, its crates not resting on a plate go
+  back to where they started. Planned: keys, shoving crates in a fight.
 
 ## Packages (target)
 
@@ -1224,8 +1234,12 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       journal as the menu's Quests page; a first quest from the elder
       (clear the slimes, report, 10 coins); tests of the rules and of the
       whole quest in the game, with saving;
-   4. puzzle objects: lever, door, push block, pressure plate, their state
-      saved;
+   4. **done:** puzzle pieces (`scene/puzzle.go`): levers, pressure
+      plates, crates to push and doors, wired by name in Tiled; levers are
+      story flags, crates moved are in the save, crates not on a plate go
+      back when the party leaves the map; the old cellar (a hatch in the
+      meadow; `tools/art/cellar.py`) with a lever door and a crate-on-plate
+      door; tests that solve it with the controls, save and load;
    5. the quest itself: the cellar, the bandits, the dialog, the reward.
 
 ## Asset delivery

@@ -39,6 +39,10 @@ Rows 8-10 (128-161): the airliner seen from above, 3x3 tiles each way
 "plane e" mirrored, columns swapped), the "departures" board (post, solid,
 and the board above it), "runway", "runway mark" (the centre line),
 "runway edge n", "runway edge s" (with lights) and "apron".
+Row 10 (162-169): puzzle pieces, drawn over a floor: "lever off", "lever
+on", "plate" (a pressure plate), "plate down", "block" (a crate to push),
+"door closed", "door open" (an empty doorway), and "hatch" (a cellar's
+trapdoor in the grass).
 Deep water lives in water.png."""
 import json, math, sys
 from PIL import Image, ImageDraw
@@ -591,6 +595,72 @@ da = ImageDraw.Draw(apron)
 da.line((0, 15, 15, 15), fill=(150, 150, 146, 255)); da.line((15, 0, 15, 15), fill=(150, 150, 146, 255))
 for k, img in enumerate((post, board, runway, mark, edge_n, edge_s, apron)):
     sheet.alpha_composite(img, at_tile(155 + k))
+# --- puzzle pieces -------------------------------------------------------------
+WOOD, WOOD_HI, WOOD_SH = (150, 98, 56, 255), (186, 128, 76, 255), (108, 68, 40, 255)
+STONE, STONE_HI, STONE_SH = (128, 128, 140, 255), (166, 166, 178, 255), (92, 92, 104, 255)
+def lever(on):
+    t = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(t)
+    d.rectangle((3, 9, 12, 14), fill=INK)           # the base
+    d.rectangle((4, 10, 11, 13), fill=STONE)
+    d.line((4, 10, 11, 10), fill=STONE_HI)
+    x1 = 12 if on else 3                              # the handle, leaning
+    d.line((7, 10, x1, 3), fill=INK, width=3)
+    d.line((7, 10, x1, 3), fill=WOOD_HI if on else WOOD)
+    d.ellipse((x1 - 2, 1, x1 + 2, 5), fill=INK)
+    d.ellipse((x1 - 1, 2, x1 + 1, 4), fill=(220, 70, 50, 255) if on else (140, 60, 50, 255))
+    return t
+def plate(down):
+    t = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(t)
+    d.rectangle((2, 3, 13, 13), fill=INK)
+    d.rectangle((3, 4, 12, 12), fill=STONE_SH if down else STONE)
+    if not down:
+        d.line((3, 4, 12, 4), fill=STONE_HI)
+        d.line((3, 12, 12, 12), fill=STONE_SH)
+    d.rectangle((6, 7, 9, 9), fill=(80, 80, 92, 255) if down else STONE_HI)
+    return t
+def block():
+    t = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(t)
+    d.rectangle((1, 1, 14, 14), fill=INK)
+    d.rectangle((2, 2, 13, 13), fill=WOOD)
+    for y in (5, 9):
+        d.line((2, y, 13, y), fill=WOOD_SH)
+    d.line((2, 2, 13, 2), fill=WOOD_HI)
+    d.line((2, 2, 13, 13), fill=WOOD_SH)               # the brace
+    d.line((2, 13, 13, 2), fill=WOOD_SH)
+    for x, y in ((3, 3), (12, 3), (3, 12), (12, 12)):  # nails
+        d.point((x, y), fill=INK)
+    return t
+def door(open_):
+    t = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(t)
+    d.rectangle((0, 0, 15, 15), fill=INK)
+    if open_:
+        d.rectangle((2, 1, 13, 15), fill=(34, 28, 36, 255))   # the dark doorway
+        d.rectangle((0, 0, 1, 15), fill=STONE_SH)
+        d.rectangle((14, 0, 15, 15), fill=STONE_SH)
+        return t
+    d.rectangle((1, 1, 14, 15), fill=WOOD)
+    for x in (5, 10):
+        d.line((x, 1, x, 15), fill=WOOD_SH)
+    for y in (4, 11):                                 # iron bands
+        d.rectangle((1, y, 14, y + 1), fill=STONE_SH)
+    d.rectangle((11, 7, 12, 8), fill=(230, 200, 90, 255))  # the ring
+    return t
+def hatch():
+    t = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(t)
+    d.rectangle((1, 2, 14, 14), fill=INK)
+    d.rectangle((2, 3, 13, 13), fill=WOOD)
+    for x in (5, 9):
+        d.line((x, 3, x, 13), fill=WOOD_SH)
+    d.line((2, 3, 13, 3), fill=WOOD_HI)
+    d.rectangle((6, 7, 9, 8), fill=STONE_SH)           # the handle
+    return t
+for k, img in enumerate((lever(False), lever(True), plate(False), plate(True), block(), door(False), door(True), hatch())):
+    sheet.alpha_composite(img, at_tile(162 + k))
 # --- railway fence and ballast ---------------------------------------------
 POST, BAR, BAR_HI = (86, 84, 98, 255), (128, 128, 144, 255), (176, 178, 194, 255)
 def fence(mask):
@@ -658,6 +728,8 @@ for k, name in enumerate(["plane e", "plane s", "plane n"]):
 tiles.append({"id": 155, "properties": [prop("name", "string", "departures"), prop("solid", "bool", True), prop("above", "int", 156)]})
 for k, name in enumerate(["runway", "runway mark", "runway edge n", "runway edge s", "apron"]):
     tiles.append({"id": 157 + k, "properties": [prop("name", "string", name)]})
+for k, name in enumerate(["lever off", "lever on", "plate", "plate down", "block", "door closed", "door open", "hatch"]):
+    tiles.append({"id": 162 + k, "properties": [prop("name", "string", name)]})
 tiles += [{"id": 64 + m, "properties": [prop("name", "string", f"fence {m}"), prop("solid", "bool", True)]} for m in range(16)]
 tiles.append({"id": 80, "properties": [prop("name", "string", "ballast"), prop("solid", "bool", True)]})  # no walking on the line in towns
 ts = {"type": "tileset", "version": "1.10", "tiledversion": "1.11.0", "name": "worlds",

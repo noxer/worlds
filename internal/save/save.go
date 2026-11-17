@@ -46,6 +46,9 @@ type State struct {
 	// the items carried.
 	Flags []string       `json:"flags,omitempty"`
 	Items map[string]int `json:"items,omitempty"`
+
+	// Puzzle blocks moved from where they started: "<map>/<name>" to x, y.
+	Blocks map[string][2]int64 `json:"blocks,omitempty"`
 }
 
 // Encode returns s as JSON.

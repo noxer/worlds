@@ -88,6 +88,7 @@ type Explore struct {
 	visited       map[infra.ID]infra.Settlement // places the party has been to
 	pendingNotice string                        // shown when the fade is over
 	story         *story.State                  // flags and items (see storystate.go)
+	puzzle        puzzles                       // levers, plates, blocks, doors (see puzzle.go)
 	items         map[string]story.Item         // the kinds of items, by id
 	quests        quest.Book                    // the quests (see questlog.go)
 	toasts        []toast                       // banners waiting to be shown; the first is on show
@@ -151,6 +152,12 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		bumps:        map[world.Pos]string{},
 	}
 	for _, o := range e.w.Objects() {
+		if ok, err := e.addPiece(o); ok {
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
 		switch o.Type {
 		case "npc":
 			if o.Tile.Empty() {
@@ -192,6 +199,9 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 				}
 			}
 		}
+	}
+	if err := e.wirePuzzles(); err != nil {
+		return nil, err
 	}
 	for _, pf := range e.w.Prefabs() {
 		for _, o := range pf.Objects {
@@ -329,6 +339,7 @@ func (e *Explore) Update(ctx *Context) {
 		e.lastMain = l.Pos
 	}
 	arrived := e.party.Update()
+	e.updatePuzzles()
 	e.updateNPCs()
 	e.updateCrowd()
 	e.updateVehicles()
@@ -370,6 +381,9 @@ type notice struct {
 
 // bump shows the bump message of the object at p, if it has one.
 func (e *Explore) bump(p world.Pos) {
+	if e.puzzleBump(p) {
+		return
+	}
 	if n := e.npcAt(p); n != nil && n.enemy != "" && e.combat != nil {
 		e.pendingBattle = n // walking into an enemy attacks it
 		return
@@ -399,6 +413,9 @@ func (e *Explore) updateFade() {
 			facing := e.party.Leader().Facing
 			if e.warp.HasFacing {
 				facing = e.warp.Facing
+			}
+			if from := e.party.Leader().Pos.Map; from != e.warp.To.Map {
+				e.resetBlocks(from)
 			}
 			e.party.PlaceAll(e.warp.To, facing)
 			e.refreshReach()           // while the screen is black
@@ -450,6 +467,10 @@ func (e *Explore) tryStep(d world.Dir) bool {
 	leader := e.party.Leader()
 	leader.Facing = d
 	to, ok := e.w.Neighbor(leader.Pos, d)
+	if b := e.pieceAt(to, pzBlock); ok && b != nil && !e.riding && e.pushBlock(b, d) {
+		e.party.Step(e.w, d, to, e.ticksFor) // after the crate
+		return true
+	}
 	if !ok || !e.walkable(to) {
 		if ok && !e.w.Solid(to) && !e.blocked(to) {
 			switch t := e.w.Terrain(to); {
@@ -529,6 +550,9 @@ func (e *Explore) canArrive(p world.Pos) bool {
 func (e *Explore) tryGoTo(target world.Pos) bool {
 	leader := e.party.Leader()
 	_, isSign := e.signs[target]
+	if e.pieceAt(target, pzLever) != nil {
+		isSign = true // tapping a lever walks up to it and pulls it
+	}
 	if _, ok := e.w.Bump(target); ok {
 		isSign = true // tapping a generated door walks up to it
 	}
@@ -615,6 +639,10 @@ func (e *Explore) followPath(ctx *Context) {
 
 // talk starts the conversation with whoever or whatever is at p.
 func (e *Explore) talk(ctx *Context, p world.Pos) {
+	if l := e.pieceAt(p, pzLever); l != nil {
+		e.pullLever(l)
+		return
+	}
 	if e.vehicleTalk(ctx, p) {
 		return
 	}
@@ -928,6 +956,7 @@ func (e *Explore) drawActors(screen *ebiten.Image, m world.MapRef, s, offX, offY
 		add(a, len(e.party.Members)-i, vehicle) // leader on top when stacked after a warp
 	}
 	ds = append(ds, e.vehicleDrawables(m, alpha)...)
+	ds = append(ds, e.puzzleDrawables(m, alpha)...)
 	sort.SliceStable(ds, func(i, j int) bool {
 		if ds[i].y != ds[j].y {
 			return ds[i].y < ds[j].y
