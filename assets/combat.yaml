@@ -20,5 +20,7 @@ combatants:
   Dagny: {hp: 16, move: 3, ap: 3, init: 3, abilities: [strike, shove]}
   slime: {hp: 8, move: 3, ap: 2, init: 2, abilities: [strike]}
   wisp:  {hp: 6, move: 4, ap: 2, init: 8, abilities: [shot]}
+  bandit:        {hp: 10, move: 4, ap: 3, init: 4, abilities: [strike, shove]}
+  bandit_archer: {hp: 7, move: 4, ap: 3, init: 6, abilities: [shot]}
 
 default: {hp: 10, move: 4, ap: 3, init: 4, abilities: [strike, shove]}

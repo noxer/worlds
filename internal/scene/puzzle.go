@@ -209,6 +209,8 @@ func (e *Explore) puzzleBump(p world.Pos) bool {
 		e.say("It won't budge that way.")
 	case e.pieceAt(p, pzDoor) != nil:
 		e.say("The door is shut fast. There's no keyhole.")
+	case e.pickupAt(p) != nil:
+		e.say("Press to take a look.")
 	default:
 		return false
 	}

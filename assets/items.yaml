@@ -6,3 +6,6 @@ honey_cake:
 coin:
   name: Coin
   text: Brookhaven silver. Good anywhere a road leads.
+crate:
+  name: Hilde's crate
+  text: Iron bars and a new hammer head, stamped with Hilde's mark.

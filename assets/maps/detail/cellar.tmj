@@ -11,7 +11,7 @@
  "tilewidth": 16,
  "tileheight": 16,
  "nextlayerid": 5,
- "nextobjectid": 8,
+ "nextobjectid": 12,
  "tilesets": [
   {
    "firstgid": 1,
@@ -657,6 +657,54 @@
    "objects": [
     {
      "id": 1,
+     "name": "hilde_crate",
+     "type": "pickup",
+     "x": 32,
+     "y": 48,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "item",
+       "type": "string",
+       "value": "crate"
+      },
+      {
+       "name": "text",
+       "type": "string",
+       "value": "A chest, its lid forced. Inside: a crate stamped with Hilde's mark."
+      }
+     ],
+     "gid": 90
+    },
+    {
+     "id": 2,
+     "name": "bandit_1",
+     "type": "npc",
+     "x": 96,
+     "y": 48,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "enemy",
+       "type": "string",
+       "value": "bandit_archer"
+      },
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "right"
+      }
+     ],
+     "gid": 87
+    },
+    {
+     "id": 3,
      "name": "crate_1",
      "type": "block",
      "x": 160,
@@ -669,7 +717,31 @@
      "gid": 299
     },
     {
-     "id": 2,
+     "id": 4,
+     "name": "bandit_2",
+     "type": "npc",
+     "x": 64,
+     "y": 80,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "enemy",
+       "type": "string",
+       "value": "bandit"
+      },
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "right"
+      }
+     ],
+     "gid": 112
+    },
+    {
+     "id": 5,
      "name": "door_2",
      "type": "door",
      "x": 112,
@@ -682,7 +754,31 @@
      "gid": 300
     },
     {
-     "id": 3,
+     "id": 6,
+     "name": "bandit_3",
+     "type": "npc",
+     "x": 48,
+     "y": 96,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "enemy",
+       "type": "string",
+       "value": "bandit"
+      },
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "right"
+      }
+     ],
+     "gid": 112
+    },
+    {
+     "id": 7,
      "name": "plate_1",
      "type": "plate",
      "x": 192,
@@ -701,7 +797,7 @@
      "gid": 297
     },
     {
-     "id": 4,
+     "id": 8,
      "name": "door_1",
      "type": "door",
      "x": 128,
@@ -714,7 +810,7 @@
      "gid": 300
     },
     {
-     "id": 5,
+     "id": 9,
      "name": "lever_1",
      "type": "lever",
      "x": 48,
@@ -733,7 +829,7 @@
      "gid": 295
     },
     {
-     "id": 6,
+     "id": 10,
      "name": "entrance",
      "type": "spawn",
      "x": 112,
@@ -751,7 +847,7 @@
      ]
     },
     {
-     "id": 7,
+     "id": 11,
      "name": "exit",
      "type": "warp",
      "x": 112,

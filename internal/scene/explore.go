@@ -89,6 +89,7 @@ type Explore struct {
 	pendingNotice string                        // shown when the fade is over
 	story         *story.State                  // flags and items (see storystate.go)
 	puzzle        puzzles                       // levers, plates, blocks, doors (see puzzle.go)
+	pickups       []*pickup                     // things to take (see pickup.go)
 	items         map[string]story.Item         // the kinds of items, by id
 	quests        quest.Book                    // the quests (see questlog.go)
 	toasts        []toast                       // banners waiting to be shown; the first is on show
@@ -186,6 +187,10 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 			e.npcs = append(e.npcs, n)
 		case "sign":
 			e.signs[o.Pos] = o.Props.String("dialog")
+		case "pickup":
+			if err := e.addPickup(o); err != nil {
+				return nil, err
+			}
 		}
 		if id := o.Props.String("bump"); id != "" {
 			if e.dialogs[id] == nil {
@@ -555,8 +560,8 @@ func (e *Explore) canArrive(p world.Pos) bool {
 func (e *Explore) tryGoTo(target world.Pos) bool {
 	leader := e.party.Leader()
 	_, isSign := e.signs[target]
-	if e.pieceAt(target, pzLever) != nil {
-		isSign = true // tapping a lever walks up to it and pulls it
+	if e.pieceAt(target, pzLever) != nil || e.pickupAt(target) != nil {
+		isSign = true // tapping a lever or a pickup walks up to it and uses it
 	}
 	if _, ok := e.w.Bump(target); ok {
 		isSign = true // tapping a generated door walks up to it
@@ -646,6 +651,10 @@ func (e *Explore) followPath(ctx *Context) {
 func (e *Explore) talk(ctx *Context, p world.Pos) {
 	if l := e.pieceAt(p, pzLever); l != nil {
 		e.pullLever(l)
+		return
+	}
+	if pk := e.pickupAt(p); pk != nil {
+		e.take(pk)
 		return
 	}
 	if e.vehicleTalk(ctx, p) {
@@ -962,6 +971,7 @@ func (e *Explore) drawActors(screen *ebiten.Image, m world.MapRef, s, offX, offY
 	}
 	ds = append(ds, e.vehicleDrawables(m, alpha)...)
 	ds = append(ds, e.puzzleDrawables(m, alpha)...)
+	ds = append(ds, e.pickupDrawables(m, alpha)...)
 	sort.SliceStable(ds, func(i, j int) bool {
 		if ds[i].y != ds[j].y {
 			return ds[i].y < ds[j].y

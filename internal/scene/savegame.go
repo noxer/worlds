@@ -101,6 +101,7 @@ func (e *Explore) Restore(st save.State) error {
 	e.story.Restore(st.Flags, st.Items)
 	e.applyDefeated()
 	e.restorePuzzles(st.Blocks)
+	e.restorePickups()
 	e.ride, e.lastTaxi, e.notice, e.pendingNotice = nil, nil, nil, ""
 	e.nearLines, e.ranks = nil, nil
 	e.path = nil

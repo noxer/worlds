@@ -14,3 +14,18 @@
       text: Tell Elder Maren the field is clear.
       done: [flag slime_job_done]
   effects: [give coin 10]
+
+- id: hilde_delivery
+  name: Hilde's delivery
+  start: [flag hilde_job]
+  stages:
+    - id: bandits
+      text: Search the old cellar under Willow Meadow (the hatch in its north-west corner) for whoever took Hilde's crate.
+      done: [flag defeated.bandit_1, flag defeated.bandit_2, flag defeated.bandit_3]
+    - id: crate
+      text: The bandits are beaten. Find Hilde's crate in the cellar's back room.
+      done: [item crate]
+    - id: back
+      text: Bring the crate back to Hilde at her forge.
+      done: [flag crate_back]
+  effects: [give coin 20]

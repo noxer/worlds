@@ -3,7 +3,7 @@
 An ordinary Tiled map afterwards. Three rooms: the entry (south) with a
 lever that opens the first door; a store room (north-east) with a crate to
 push onto a pressure plate, which opens the second door; and the back room
-(north-west). Puzzle objects (see internal/scene/puzzle.go): "lever" and
+(north-west), where three bandits keep Hilde's crate in a chest. Puzzle objects (see internal/scene/puzzle.go): "lever" and
 "plate" name the doors they work in "target"; "block" is pushed by walking
 into it; "door" opens when every lever and plate wired to it is on."""
 import json, sys
@@ -15,10 +15,10 @@ LEVER, PLATE, BLOCK, DOOR = 162, 164, 166, 167        # worlds tiles
 plan = [
     "################",
     "#ffffff#fffffff#",
-    "#ffffff#fffffff#",
+    "#fCfffa#fffffff#",
     "#ffffff#ffBffff#",
-    "#ffffffDfffffff#",
-    "#ffffff#fffffff#",
+    "#fffbffDfffffff#",
+    "#ffbfff#fffffff#",
     "#ffffff#ffffPff#",
     "########D#######",
     "#ffLfffffffffff#",
@@ -55,6 +55,14 @@ for y, row in enumerate(plan):
         elif c == "D":
             n = "door_1" if y == 7 else "door_2"
             obj(n, "door", x, y, (), WORLDS + DOOR)
+        elif c in "ab":
+            n = sum(1 for o in objs if o["type"] == "npc") + 1
+            kind = "bandit_archer" if c == "a" else "bandit"
+            obj(f"bandit_{n}", "npc", x, y, [("enemy", "string", kind), ("facing", "string", "right")],
+                DUNGEON + (86 if c == "a" else 111))
+        elif c == "C":
+            obj("hilde_crate", "pickup", x, y, [("item", "string", "crate"), ("text", "string", "A chest, its lid forced. Inside: a crate stamped with Hilde's mark.")],
+                DUNGEON + 89)
         elif c == "S":
             obj("entrance", "spawn", x, y, [("facing", "string", "up")])
         elif c == "E":

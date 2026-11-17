@@ -42,10 +42,11 @@ func newBattleHarness(t *testing.T) *harness {
 	return h
 }
 
+// enemies returns the enemies on the main map (the meadow's).
 func (h *harness) enemies() []*NPC {
 	var out []*NPC
 	for _, n := range h.e.npcs {
-		if n.enemy != "" {
+		if n.enemy != "" && n.Pos.Map.IsMain() {
 			out = append(out, n)
 		}
 	}

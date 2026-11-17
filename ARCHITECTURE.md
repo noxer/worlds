@@ -1240,7 +1240,16 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       back when the party leaves the map; the old cellar (a hatch in the
       meadow; `tools/art/cellar.py`) with a lever door and a crate-on-plate
       door; tests that solve it with the controls, save and load;
-   5. the quest itself: the cellar, the bandits, the dialog, the reward.
+   5. **done:** Hilde's delivery: Hilde (in her smithy) asks after her
+      stolen crate; the cellar's two puzzles lead to the back room, where
+      three bandits (two with blades, an archer) fight the party; their
+      chest holds the crate (a pickup: `scene/pickup.go`, gone for good
+      once taken, saved as the flag `taken.<map>/<name>`); Hilde pays 20
+      coins. A test plays it all, the fight through the battle's controls,
+      and loads a save from halfway.
+
+   Step 8 is done: a first quest uses talk, exploring, puzzles, a fight
+   and a reward. Next is to judge how it plays and widen what is thin.
 
 ## Asset delivery
 
