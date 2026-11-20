@@ -108,6 +108,9 @@ func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 		if u := it.Use; u != nil && (u.Heal < 0 || (u.Heal == 0 && !u.Revive)) {
 			return nil, fmt.Errorf("items.yaml: using %q does nothing", id)
 		}
+		if q := it.Equip; q != nil && q.Slot != story.SlotWeapon && q.Slot != story.SlotArmour {
+			return nil, fmt.Errorf("items.yaml: %q is worn in slot %q, not %s or %s", id, q.Slot, story.SlotWeapon, story.SlotArmour)
+		}
 	}
 	if err := checkStory(lib, items); err != nil {
 		return nil, err

@@ -54,6 +54,8 @@ type State struct {
 	Wounds map[string]int `json:"wounds,omitempty"`
 	// XP is each member's experience, by name.
 	XP map[string]int `json:"xp,omitempty"`
+	// Gear is what each member wears: member -> slot -> item.
+	Gear map[string]map[string]string `json:"gear,omitempty"`
 }
 
 // Encode returns s as JSON.

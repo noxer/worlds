@@ -8,6 +8,11 @@
 # heal: hit points back; revive: in a fight, gets someone who is down back
 # on their feet (with heal hit points). Items are used from the menu's
 # Items page, or in a fight on oneself or a friend next to one (1 AP).
+#
+# equip: something a party member wears (the menu's Gear): slot (weapon or
+# armour; one of each), power (damage on every hit), guard (damage taken
+# off every hit, which still does at least 1), hp (more hit points), who
+# (the members it fits; anyone if left out).
 honey_cake:
   name: Honey cake
   text: Sticky, sweet, baked in Brookhaven. Gives back 5 HP.
@@ -23,6 +28,31 @@ smelling_salts:
   text: One sniff and the fallen are back on their feet, with 4 HP. Only in a fight.
   use: {heal: 4, revive: true}
   price: 15
+iron_sword:
+  name: Iron sword
+  text: Hilde's work, balanced and keen. For Ari or Dagny.
+  equip: {slot: weapon, power: 1, who: [Ari, Dagny]}
+  price: 24
+yew_bow:
+  name: Yew bow
+  text: A longbow with a strong draw. For Bryn.
+  equip: {slot: weapon, power: 1, who: [Bryn]}
+  price: 24
+ash_spear:
+  name: Ash spear
+  text: A long ash shaft with an iron head. For Cato.
+  equip: {slot: weapon, power: 1, who: [Cato]}
+  price: 24
+leather_vest:
+  name: Leather vest
+  text: Boiled leather, studded. Anyone can wear it.
+  equip: {slot: armour, guard: 1}
+  price: 18
+mail_shirt:
+  name: Mail shirt
+  text: Riveted rings, heavy on the shoulders. Too heavy for Bryn.
+  equip: {slot: armour, guard: 1, hp: 4, who: [Ari, Cato, Dagny]}
+  price: 36
 coin:
   name: Coin
   text: Brookhaven silver. Good anywhere a road leads.

@@ -51,6 +51,7 @@ type Combatant struct {
 	Init      int // initiative: higher goes first
 	Abilities []AbilityID
 	Power     int // added to the damage of every hit
+	Guard     int // taken off the damage of every hit on it (which still does 1)
 
 	MP, APLeft int  // left this turn
 	Down       bool // out of the fight
@@ -394,6 +395,9 @@ func (f *Fight) Use(id AbilityID, target world.Pos) (Result, error) {
 		if res.Pushed {
 			dmg = 0
 		}
+	}
+	if dmg > 0 {
+		dmg = max(dmg-t.Guard, 1)
 	}
 	res.Damage = min(dmg, t.HP)
 	t.HP -= res.Damage

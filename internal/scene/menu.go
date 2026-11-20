@@ -12,10 +12,11 @@ import (
 	"github.com/noxer/worlds/internal/input"
 	"github.com/noxer/worlds/internal/save"
 	"github.com/noxer/worlds/internal/sim"
+	"github.com/noxer/worlds/internal/story"
 )
 
 // Menu is the pause menu, opened with Menu (or Cancel) while exploring:
-// Resume, Map (the world map), Party, Quests (the journal), Items, Camp, Save,
+// Resume, Map (the world map), Party, Gear, Quests (the journal), Items, Camp, Save,
 // Load and, on desktop, Quit. The world stands still while
 // it is open. Save and Load list the slots with where and when.
 type Menu struct {
@@ -25,6 +26,8 @@ type Menu struct {
 	page   menuPage
 	slots  []*save.State // the slot list, read when a slot page opens
 	using  string        // menuUse: the id of the item
+	who    string        // menuGearSlot, menuGearPick: the member
+	slot   string        // menuGearPick: the slot
 	msg    string        // a message under the menu (an error)
 	w, h   int
 }
@@ -37,7 +40,10 @@ const (
 	menuLoad
 	menuItems
 	menuQuests
-	menuUse // an item from the Items page: on whom
+	menuUse      // an item from the Items page: on whom
+	menuGear     // whose equipment
+	menuGearSlot // a member's slots
+	menuGearPick // what to wear in a slot
 )
 
 type menuItem struct {
@@ -74,6 +80,9 @@ func (m *Menu) items() []menuItem {
 			if it.n > 1 {
 				text = fmt.Sprintf("%s x%d", it.name, it.n)
 			}
+			if q := m.e.items[it.id].Equip; q != nil {
+				about += " (" + equipText(q) + "; worn through Gear)"
+			}
 			mi := menuItem{text: text, about: about}
 			if u := m.e.items[it.id].Use; u != nil {
 				id := it.id
@@ -106,6 +115,39 @@ func (m *Menu) items() []menuItem {
 			}})
 		}
 		return append(out, menuItem{text: "Back", do: func(m *Menu, ctx *Context) { m.open(menuItems) }})
+	case menuGear:
+		var out []menuItem
+		for _, mem := range m.e.party.Members {
+			name := mem.Name
+			c := m.e.member(name)
+			out = append(out, menuItem{text: name, about: fmt.Sprintf("Power %d, guard %d, max HP %d.", c.Power, c.Guard, c.MaxHP),
+				do: func(m *Menu, ctx *Context) { m.open(menuGearSlot); m.who = name }})
+		}
+		return append(out, menuItem{text: "Back", do: func(m *Menu, ctx *Context) { m.open(menuMain) }})
+	case menuGearSlot:
+		var out []menuItem
+		for _, slot := range story.Slots {
+			text, about := capitalize(slot)+": -", "Nothing."
+			if id := m.e.worn(m.who, slot); id != "" {
+				it := m.e.items[id]
+				text, about = capitalize(slot)+": "+it.Name, it.Text
+			}
+			out = append(out, menuItem{text: text, about: about, do: func(m *Menu, ctx *Context) {
+				who := m.who
+				m.open(menuGearPick)
+				m.who, m.slot = who, slot
+			}})
+		}
+		return append(out, menuItem{text: "Back", do: func(m *Menu, ctx *Context) { m.open(menuGear) }})
+	case menuGearPick:
+		out := []menuItem{{text: "(nothing)", about: "Take it off.", do: func(m *Menu, ctx *Context) { m.pickGear("") }}}
+		for _, it := range m.e.wardrobe(m.who, m.slot) {
+			id := it.id
+			q := m.e.items[id].Equip
+			out = append(out, menuItem{text: it.name, about: it.text + " (" + equipText(q) + ")",
+				do: func(m *Menu, ctx *Context) { m.pickGear(id) }})
+		}
+		return append(out, menuItem{text: "Back", do: func(m *Menu, ctx *Context) { m.backToSlots() }})
 	case menuSave, menuLoad:
 		var out []menuItem
 		for k, s := range m.slots {
@@ -126,6 +168,7 @@ func (m *Menu) items() []menuItem {
 		{text: "Resume", do: func(m *Menu, ctx *Context) { ctx.Pop() }},
 		{text: "Map", do: func(m *Menu, ctx *Context) { ctx.Pop(); ctx.Push(NewWorldMap(m.e)) }},
 		{text: "Party", do: func(m *Menu, ctx *Context) { ctx.Pop(); ctx.Push(NewPartyScreen(m.e)) }},
+		{text: "Gear", off: m.e.combat == nil, about: "What everyone wields and wears.", do: func(m *Menu, ctx *Context) { m.open(menuGear) }},
 		{text: "Quests", do: func(m *Menu, ctx *Context) { m.open(menuQuests) }},
 		{text: "Items", do: func(m *Menu, ctx *Context) { m.open(menuItems) }},
 		{text: "Camp", about: fmt.Sprintf("Rest for %d hours: everyone gets back to at least half their hit points.", campHours),
@@ -149,7 +192,7 @@ func (m *Menu) items() []menuItem {
 // open switches to a page.
 func (m *Menu) open(p menuPage) {
 	m.page, m.cursor, m.msg = p, 0, ""
-	if p == menuUse {
+	if p == menuUse || p == menuGear || p == menuGearSlot || p == menuGearPick {
 		return
 	}
 	if p == menuItems || p == menuQuests {
@@ -168,6 +211,21 @@ func (m *Menu) open(p menuPage) {
 			}
 		}
 	}
+}
+
+// pickGear puts an item on (or "" off) and goes back to the member's
+// slots.
+func (m *Menu) pickGear(id string) {
+	m.e.wear(m.who, m.slot, id)
+	m.backToSlots()
+	c := m.e.member(m.who)
+	m.msg = fmt.Sprintf("%s: power %d, guard %d, max HP %d.", m.who, c.Power, c.Guard, c.MaxHP)
+}
+
+func (m *Menu) backToSlots() {
+	who := m.who
+	m.open(menuGearSlot)
+	m.who = who
 }
 
 func (m *Menu) saveTo(ctx *Context, slot int) {
@@ -209,10 +267,17 @@ func capitalize(s string) string {
 	return string(s[0]-'a'+'A') + s[1:]
 }
 
+// title is the heading of the page.
+func (m *Menu) title() string {
+	return map[menuPage]string{menuMain: "Menu", menuSave: "Save to", menuLoad: "Load from", menuItems: "Items", menuQuests: "Quests",
+		menuUse: "Use " + m.e.itemName(m.using) + " on", menuGear: "Gear", menuGearSlot: m.who + "'s gear",
+		menuGearPick: capitalize(m.slot) + " for " + m.who}[m.page]
+}
+
 // rects returns the menu's box and its rows.
 func (m *Menu) rects() (box image.Rectangle, rows []image.Rectangle) {
 	its := m.items()
-	w := gfx.TextWidth("Menu")
+	w := gfx.TextWidth(m.title())
 	for _, it := range its {
 		w = max(w, gfx.TextWidth(it.text))
 	}
@@ -237,6 +302,10 @@ func (m *Menu) Update(ctx *Context) {
 			ctx.Pop()
 		case menuUse:
 			m.open(menuItems)
+		case menuGearSlot:
+			m.open(menuGear)
+		case menuGearPick:
+			m.backToSlots()
 		default:
 			m.open(menuMain)
 		}
@@ -285,8 +354,7 @@ func (m *Menu) Update(ctx *Context) {
 func (m *Menu) Draw(dst *ebiten.Image) {
 	box, rows := m.rects()
 	gfx.Box(dst, box)
-	title := map[menuPage]string{menuMain: "Menu", menuSave: "Save to", menuLoad: "Load from", menuItems: "Items", menuQuests: "Quests",
-		menuUse: "Use " + m.e.itemName(m.using) + " on"}[m.page]
+	title := m.title()
 	gfx.Text(dst, title, box.Min.X+boxPad, box.Min.Y+boxPad-1, gfx.ColorAccent)
 	for i, it := range m.items() {
 		r := rows[i]

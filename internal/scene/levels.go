@@ -24,7 +24,7 @@ func (e *Explore) level(name string) int { return combat.LevelAt(e.xp[name]) }
 // level (and, see equipment.go, what it wears) applied.
 func (e *Explore) member(name string) combat.Combatant {
 	c := e.combat.Combatant(name, name, combat.Party)
-	return e.combat.AtLevel(c, e.level(name))
+	return e.applyGear(name, e.combat.AtLevel(c, e.level(name)))
 }
 
 // reward gives the party what beating enemies of the given kinds is worth;

@@ -217,9 +217,45 @@ type Item struct {
 	Name string `yaml:"name"`
 	Text string `yaml:"text"` // a line of description
 	Use  *Use   `yaml:"use"`  // what using it does; nil if it can't be used
+	// Equip makes it something a party member can wear or wield; nil if
+	// it isn't.
+	Equip *Equip `yaml:"equip"`
 	// Price is what a shop asks for it; it buys it back for half. 0: it
 	// can't be bought or sold.
 	Price int `yaml:"price"`
+}
+
+// Equipment slots: a member wears one item in each.
+const (
+	SlotWeapon = "weapon"
+	SlotArmour = "armour"
+)
+
+// Slots are the equipment slots, in order.
+var Slots = []string{SlotWeapon, SlotArmour}
+
+// Equip is what an item does worn: power (damage on every hit), guard
+// (damage taken off every hit, which still does at least 1), more hit
+// points. Who lists the members who can use it (anyone if empty).
+type Equip struct {
+	Slot  string   `yaml:"slot"`
+	Power int      `yaml:"power"`
+	Guard int      `yaml:"guard"`
+	HP    int      `yaml:"hp"`
+	Who   []string `yaml:"who"`
+}
+
+// Fits reports whether a member can use it.
+func (q *Equip) Fits(member string) bool {
+	if len(q.Who) == 0 {
+		return true
+	}
+	for _, w := range q.Who {
+		if w == member {
+			return true
+		}
+	}
+	return false
 }
 
 // SellPrice is what a shop pays for an item: half its price, at least 1;

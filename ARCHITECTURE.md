@@ -945,7 +945,9 @@ When riding, the whole party rides.
 
 The world comes from the seed, and nothing in it can be changed yet, so a
 save is small: the clock, the party (members by name, leader first; where
-the leader stands, facing, riding) and the places visited. NPCs, trains,
+the leader stands, facing, riding) and the places visited; and the story
+(flags, items), crates moved, and each member's missing hit points,
+experience and gear. NPCs, trains,
 the crowd and the light follow from the clock. A save names the world's
 seed; one from another world is refused. Saves are versioned JSON
 (`save.Version`); a save of another version is refused rather than
@@ -1284,7 +1286,15 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       10, 30, 60, 100, ... XP; a level adds the member's `growth` in HP,
       and power (+1 damage per hit) every second level; only XP is saved;
       banners for levels gained, levels on the party screen;
-   5. equipment: a weapon and an armour per member.
+   5. **done:** equipment (`scene/equipment.go`; `equip` in `items.yaml`):
+      a weapon (power) and an armour (guard: damage off every hit taken,
+      at least 1 still lands; some add HP) per member, some fitting only
+      some members; worn items leave the bag; the menu's Gear page;
+      Hilde's Forge (a shop) after her quest; saved.
+
+   Step 9 is done: fights pay XP and coins, which buy healing and gear,
+   and the party grows. Decisions made along the way are in
+   `docs/decisions/step-9.md`.
 
 ## Asset delivery
 

@@ -41,6 +41,9 @@ func (s *Shop) rows() []shopRow {
 		for _, id := range s.shop.Sells {
 			it := s.e.items[id]
 			about := it.Text
+			if it.Equip != nil {
+				about += " (" + equipText(it.Equip) + ")"
+			}
 			if n := s.e.story.Count(id); n > 0 {
 				about += fmt.Sprintf(" You have %d.", n)
 			}

@@ -183,3 +183,51 @@ the top of `internal/scene/health.go`).
   - a banner per level gained ("Ari reaches level 2 / Max HP +2, power
     +1.");
   - the party screen shows "Lv 2  HP 16/16".
+
+## 9.5: equipment, and Hilde's forge
+
+- **Two slots per member:** a weapon and an armour.
+  - **Weapons give power:** +1 damage on every hit.
+  - **Armour gives guard:** 1 off every hit taken, though a hit still does
+    at least 1. Some armour also adds max HP.
+  - Guard is new to the combat rules. Without it, armour could only add
+    HP, which feels like healing rather than protection.
+- **Who can use what:**
+  - The weapons are personal: a sword for Ari and Dagny, a bow for Bryn, a
+    spear for Cato. This keeps the roles from 9.0.
+  - The leather vest fits anyone. The mail shirt is too heavy for Bryn.
+  - Items list this in `who:`.
+- **Worn items leave the bag.** They can't be sold or worn twice, and they
+  return to the bag when taken off.
+- **Hit points when changing gear:** the HP a member is missing stays
+  missing, so putting on mail doesn't heal.
+- **The menu's new Gear page:**
+  1. Choose a member (their power, guard and max HP are shown).
+  2. Choose a slot.
+  3. Choose an item that fits, or "(nothing)".
+- **Hilde's Forge** opens once her quest is done, through a new choice in
+  her "done" dialog:
+
+  | Item | Effect | Price |
+  |---|---|---|
+  | iron sword, yew bow, ash spear | power +1 | 24 each |
+  | leather vest | guard +1 | 18 |
+  | mail shirt | guard +1, max HP +4 | 36 |
+
+  The game pays about 45 coins by the end of her quest (30 from quests,
+  15 from fights), so a first purchase is a real choice.
+- **Saved:** what each member wears (`gear` in the save).
+- **Fixed on the way:** a menu box was narrower than its title ("Weapon
+  for Ari" spilled out).
+
+## Things I noticed but left alone
+
+- **The two new buildings copy existing houses:** the inn is the blue
+  house, the store is the red house. Their signs tell them apart, but
+  their own art would be nicer.
+- **The enemies don't grow.** After the meadow and the cellar the party
+  outclasses anything left. That is fine while those are the only
+  enemies, but the next content wants tougher ones.
+- **Bryn's role:** the only bow user has the lowest HP growth (+1) and
+  can't wear mail. That is intended (a fragile archer), but worth a look
+  after playing.

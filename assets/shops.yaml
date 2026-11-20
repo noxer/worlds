@@ -4,3 +4,6 @@
 store:
   name: Brookhaven Stores
   sells: [honey_cake, herb_tonic, smelling_salts]
+forge:
+  name: Hilde's Forge
+  sells: [iron_sword, yew_bow, ash_spear, leather_vest, mail_shirt]

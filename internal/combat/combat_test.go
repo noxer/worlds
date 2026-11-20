@@ -366,3 +366,15 @@ func TestLevels(t *testing.T) {
 		t.Errorf("a strike with power 2: %+v, %v", res, err)
 	}
 }
+
+func TestGuard(t *testing.T) {
+	r := rules(t)
+	g := grid{".."}
+	hero, slime := place(r, "hero", combat.Party, 0, 0), place(r, "slime", combat.Enemy, 1, 0)
+	slime.Guard = 10
+	f := combat.New(r, g, 1, []combat.Combatant{hero, slime})
+	res, err := f.Use("strike", at(1, 0))
+	if err != nil || res.Damage != 1 {
+		t.Errorf("a strike on guard 10: %+v, %v (want 1 damage)", res, err)
+	}
+}

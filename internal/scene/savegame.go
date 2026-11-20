@@ -40,6 +40,7 @@ func (e *Explore) Snapshot() (save.State, error) {
 	st.Blocks = e.puzzleBlocks()
 	st.Wounds = maps.Clone(e.wounds)
 	st.XP = maps.Clone(e.xp)
+	st.Gear = cloneGear(e.gear)
 	ids := make([]infra.ID, 0, len(e.visited))
 	for id := range e.visited {
 		ids = append(ids, id)
@@ -106,6 +107,7 @@ func (e *Explore) Restore(st save.State) error {
 	e.restorePuzzles(st.Blocks)
 	e.wounds = maps.Clone(st.Wounds)
 	e.xp = maps.Clone(st.XP)
+	e.gear = cloneGear(st.Gear)
 	e.restorePickups()
 	e.ride, e.lastTaxi, e.notice, e.pendingNotice = nil, nil, nil, ""
 	e.nearLines, e.ranks = nil, nil
@@ -148,4 +150,15 @@ func (e *Explore) placeName() string {
 		}
 	}
 	return "the world"
+}
+
+func cloneGear(g map[string]map[string]string) map[string]map[string]string {
+	if g == nil {
+		return nil
+	}
+	out := make(map[string]map[string]string, len(g))
+	for k, v := range g {
+		out[k] = maps.Clone(v)
+	}
+	return out
 }
