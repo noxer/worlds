@@ -159,3 +159,23 @@ func (e *Explore) dialogActions(run *dialog.Runner) {
 		}
 	}
 }
+
+// useItem uses an item on a member of the party outside a fight; it
+// returns what happened, and whether the item was used up.
+func (e *Explore) useItem(id, member string) (string, bool) {
+	it, ok := e.items[id]
+	switch {
+	case !ok || it.Use == nil || e.story.Count(id) == 0:
+		return "That can't be used.", false
+	case it.Use.Revive:
+		return "Only in a fight.", false
+	}
+	cur, mx := e.hp(member)
+	if cur >= mx {
+		return member + " is in full health already.", false
+	}
+	e.setHP(member, cur+it.Use.Heal)
+	e.story.Take(id, 1)
+	now, _ := e.hp(member)
+	return fmt.Sprintf("%s: %s, %d HP back.", member, it.Name, now-cur), true
+}

@@ -194,3 +194,80 @@ func TestTicksTo(t *testing.T) {
 		}
 	}
 }
+
+// TestItemsInAFight: the bar's Items opens the items; a honey cake heals
+// the one whose turn it is, smelling salts get a fallen friend up.
+func TestItemsInAFight(t *testing.T) {
+	h := newBattleHarness(t)
+	h.e.story.Give("honey_cake", 1)
+	h.e.story.Give("smelling_salts", 1)
+	b := h.meadowBattle()
+	h.settle(b)
+	c := b.f.Active()
+	if c.Team != combat.Party {
+		t.Fatalf("%s's turn", c.Name)
+	}
+	var friend *combat.Combatant
+	for _, o := range b.f.Combatants() {
+		if o.Team == combat.Party && o != c && b.f.Distance(o.Pos, c.Pos) == 1 {
+			friend = o
+		}
+	}
+	if friend == nil {
+		t.Fatal("nobody next to the one whose turn it is")
+	}
+	c.HP = 3
+	friend.HP, friend.Down = 0, true
+	open := func() {
+		for k := 0; k < 10 && !b.actions()[b.action].bag; k++ {
+			h.press(input.Menu)
+		}
+		h.press(input.Confirm)
+		if !b.items {
+			t.Fatal("the items didn't open")
+		}
+	}
+	open()
+	if a := b.actions()[b.action]; a.item != "honey_cake" {
+		t.Fatalf("first item %+v", a)
+	}
+	b.cursor = c.Pos
+	h.press(input.Confirm)
+	if c.HP != 8 || h.e.story.Count("honey_cake") != 0 || b.items {
+		t.Fatalf("after the cake: %d HP, %d cakes, items open %v (log %q)", c.HP, h.e.story.Count("honey_cake"), b.items, b.log)
+	}
+	h.settle(b)
+	open()
+	b.cursor = friend.Pos
+	h.press(input.Confirm)
+	if friend.Down || friend.HP != 4 || h.e.story.Count("smelling_salts") != 0 {
+		t.Fatalf("after the salts: down %v, %d HP (log %q)", friend.Down, friend.HP, b.log)
+	}
+	h.settle(b)
+	for _, a := range b.actions() {
+		if a.bag {
+			t.Error("Items still on the bar with nothing left")
+		}
+	}
+}
+
+// TestItemsFromTheMenu: the Items page uses a honey cake on a member.
+func TestItemsFromTheMenu(t *testing.T) {
+	h := newBattleHarness(t)
+	h.e.story.Give("honey_cake", 2)
+	h.e.setHP("Cato", 4)
+	h.press(input.Menu)
+	h.menuTo("Items")
+	h.menuTo("Honey cake")
+	h.menuTo("Ari") // fit: nothing happens
+	if h.e.story.Count("honey_cake") != 2 {
+		t.Fatal("a cake used on someone in full health")
+	}
+	h.menuTo("Cato")
+	if cur, _ := h.e.hp("Cato"); cur != 9 || h.e.story.Count("honey_cake") != 1 {
+		t.Fatalf("Cato has %d HP, %d cakes left", cur, h.e.story.Count("honey_cake"))
+	}
+	if m := h.top().(*Menu); m.msg != "Cato: Honey cake, 5 HP back." {
+		t.Errorf("message %q", m.msg)
+	}
+}

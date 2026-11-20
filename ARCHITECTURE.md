@@ -1270,7 +1270,10 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       (8 hours, at least half health, outdoors and with no enemy near); a
       defeat wakes the party at the inn, a quarter of its coins gone; HP
       on the party screen. Decisions: `docs/decisions/step-9.md`;
-   2. usable items (healing, reviving), from the menu and in a fight;
+   2. **done:** usable items: `use: {heal, revive}` in `items.yaml` (honey
+      cake, herb tonic, smelling salts); the menu's Items page uses one on
+      a member; in a fight the bar's Items (1 AP, oneself or a friend
+      next to one; `combat.Treatment`); the bar wraps on narrow screens;
    3. shops: buy and sell; a general store in Brookhaven, Hilde's forge
       after her quest;
    4. experience and levels, the stats rising by themselves;

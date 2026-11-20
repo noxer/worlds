@@ -216,4 +216,13 @@ func (s *State) Apply(effect string) Change {
 type Item struct {
 	Name string `yaml:"name"`
 	Text string `yaml:"text"` // a line of description
+	Use  *Use   `yaml:"use"`  // what using it does; nil if it can't be used
+}
+
+// Use is what an item does to the party member it is used on (and it is
+// used up): hit points back, or, in a fight, getting someone who is down
+// back on their feet (with Heal hit points).
+type Use struct {
+	Heal   int  `yaml:"heal"`
+	Revive bool `yaml:"revive"`
 }

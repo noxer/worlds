@@ -72,6 +72,9 @@ type Result struct {
 	Pushed        bool      // the target was moved
 	From, To      world.Pos // of the push
 	Downed        bool      // the target went down
+	Item          string    // the name of the item used, for a treatment
+	Healed        int       // hit points the target got back
+	Revived       bool      // the target got up again
 }
 
 // Fight is a fight in progress.
@@ -94,6 +97,9 @@ var (
 	ErrNoTarget     = errors.New("nobody to hit there")
 	ErrUnknown      = errors.New("doesn't know that ability")
 	ErrOver         = errors.New("the fight is over")
+	ErrFit          = errors.New("already in full health")
+	ErrStanding     = errors.New("still on their feet")
+	ErrNotDown      = errors.New("nobody down there")
 )
 
 // New starts a fight. Combatants get their IDs (their index), full
@@ -393,6 +399,102 @@ func (f *Fight) Use(id AbilityID, target world.Pos) (Result, error) {
 	return res, nil
 }
 
+// Treatment is what an item does to the friend it is used on: hit points
+// back, or getting someone who is down back on their feet (with Heal hit
+// points, at least 1). Using an item costs ItemAP and reaches ItemRange
+// steps: the user or someone next to them.
+type Treatment struct {
+	Name   string // the item's name, for the log
+	Heal   int
+	Revive bool
+}
+
+const (
+	ItemAP    = 1
+	ItemRange = 1
+)
+
+// downAt returns a fallen combatant of the team on p, if any (and nobody
+// stands on it).
+func (f *Fight) downAt(team Team, p world.Pos) *Combatant {
+	if f.At(p) != nil {
+		return nil
+	}
+	for _, c := range f.cs {
+		if c.Down && c.Team == team && c.Pos == p {
+			return c
+		}
+	}
+	return nil
+}
+
+// CanTreat reports why the active combatant can't use an item on the tile
+// target (nil if it can).
+func (f *Fight) CanTreat(t Treatment, target world.Pos) error {
+	_, err := f.patient(t, target)
+	return err
+}
+
+func (f *Fight) patient(t Treatment, target world.Pos) (*Combatant, error) {
+	if f.Outcome() != Ongoing {
+		return nil, ErrOver
+	}
+	c := f.Active()
+	if c.APLeft < ItemAP {
+		return nil, ErrNoAP
+	}
+	if f.Distance(c.Pos, target) > ItemRange {
+		return nil, ErrRange
+	}
+	if t.Revive {
+		p := f.downAt(c.Team, target)
+		if p == nil {
+			if s := f.At(target); s != nil && s.Team == c.Team {
+				return nil, ErrStanding
+			}
+			return nil, ErrNotDown
+		}
+		return p, nil
+	}
+	p := f.At(target)
+	switch {
+	case p == nil || p.Team != c.Team:
+		return nil, ErrNoTarget
+	case p.HP >= p.MaxHP:
+		return nil, ErrFit
+	}
+	return p, nil
+}
+
+// Patients returns the tiles the active combatant can use an item on.
+func (f *Fight) Patients(t Treatment) []world.Pos {
+	var out []world.Pos
+	for _, c := range f.cs {
+		if c.Team == f.Active().Team && f.CanTreat(t, c.Pos) == nil {
+			out = append(out, c.Pos)
+		}
+	}
+	return out
+}
+
+// Treat has the active combatant use an item on the friend at target.
+func (f *Fight) Treat(t Treatment, target world.Pos) (Result, error) {
+	p, err := f.patient(t, target)
+	if err != nil {
+		return Result{}, err
+	}
+	c := f.Active()
+	c.APLeft -= ItemAP
+	res := Result{Actor: c.ID, Target: p.ID, Item: t.Name}
+	if p.Down {
+		p.Down, p.HP, res.Revived = false, 0, true
+	}
+	before := p.HP
+	p.HP = min(p.MaxHP, max(p.HP+t.Heal, 1))
+	res.Healed = p.HP - before
+	return res, nil
+}
+
 func sign(v int64) int64 {
 	switch {
 	case v > 0:
@@ -406,6 +508,19 @@ func sign(v int64) int64 {
 // String describes a result in words.
 func (f *Fight) String(r Result) string {
 	a, t, ab := f.cs[r.Actor], f.cs[r.Target], f.rules.Abilities[r.Ability]
+	if r.Item != "" {
+		s := fmt.Sprintf("%s: %s for %s", a.Name, r.Item, t.Name)
+		if a == t {
+			s = fmt.Sprintf("%s: %s", a.Name, r.Item)
+		}
+		if r.Revived {
+			s += ", back on their feet"
+		}
+		if r.Healed > 0 {
+			s += fmt.Sprintf(", %d HP back", r.Healed)
+		}
+		return s + "."
+	}
 	s := fmt.Sprintf("%s: %s on %s", a.Name, ab.Name, t.Name)
 	switch {
 	case r.Pushed:

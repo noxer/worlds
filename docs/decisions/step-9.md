@@ -78,3 +78,35 @@ only one member could attack from a distance.
 Easy to change: the price (`innkeeper` in `assets/dialog/town.yaml`), the
 morning hour, the camping hours and the share of coins lost (constants at
 the top of `internal/scene/health.go`).
+
+## 9.2: usable items
+
+- **Items say what they do** in `assets/items.yaml` (`use: {heal, revive}`),
+  so new items need no code. There are three so far:
+  - **Honey cake** gives back 5 HP (the wanderer's gift).
+  - **Herb tonic** gives back 12 HP.
+  - **Smelling salts** revive a fallen member with 4 HP, and only in a
+    fight.
+
+  Outside a fight nobody stays down, because the fallen get up after a
+  win, so there is nothing to revive there.
+- **From the menu:**
+  1. Choose an item on the Items page.
+  2. Then choose a member, whose HP is listed.
+
+  Using one on someone at full health does nothing and costs nothing.
+- **In a fight:**
+  - An **Items** entry on the action bar (shown only when there is
+    something to use) swaps the abilities for the items.
+  - Using one costs **1 AP** and reaches the user or a friend next to
+    them.
+  - I picked the reach so that a healer has to step close, which counts
+    for something on the grid. The cost of 1 AP leaves room to move and
+    strike in the same turn.
+  - Allies that can be helped are highlighted in green, and a green "+N"
+    rises over them.
+- **Who uses items:** the AI doesn't use items for the enemies. Nothing
+  they carry would make sense yet.
+- **The action bar wraps** onto a second row on narrow screens. On a phone
+  in portrait it was already too wide for Ari before items, and that is
+  fixed too.

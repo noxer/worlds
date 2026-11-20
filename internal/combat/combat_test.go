@@ -289,3 +289,54 @@ func TestAIClosesInAndStrikes(t *testing.T) {
 		t.Fatalf("next to the hero it does %+v, want a strike", a)
 	}
 }
+
+func TestItems(t *testing.T) {
+	r := rules(t)
+	g := grid{"......"}
+	cs := []combat.Combatant{
+		place(r, "archer", combat.Party, 0, 0), place(r, "hero", combat.Party, 1, 0),
+		place(r, "hero", combat.Party, 3, 0), place(r, "slime", combat.Enemy, 5, 0),
+	}
+	cs[1].HP = 4
+	cs[2].HP, cs[2].Down = 0, true
+	f := combat.New(r, g, 3, cs)
+	if f.Active().Kind != "archer" {
+		t.Fatalf("%s first", f.Active().Name)
+	}
+	cake := combat.Treatment{Name: "Cake", Heal: 5}
+	salts := combat.Treatment{Name: "Salts", Heal: 3, Revive: true}
+	if got := f.Patients(cake); len(got) != 1 || got[0] != at(1, 0) {
+		t.Errorf("cake patients %v, want the hurt hero next to the archer", got)
+	}
+	if err := f.CanTreat(cake, at(0, 0)); !errors.Is(err, combat.ErrFit) {
+		t.Errorf("cake for the archer at full health: %v", err)
+	}
+	if err := f.CanTreat(salts, at(1, 0)); !errors.Is(err, combat.ErrStanding) {
+		t.Errorf("salts for someone standing: %v", err)
+	}
+	if err := f.CanTreat(cake, at(5, 0)); !errors.Is(err, combat.ErrRange) {
+		t.Errorf("cake for the slime: %v", err)
+	}
+	res, err := f.Treat(cake, at(1, 0))
+	if err != nil || res.Healed != 5 || f.At(at(1, 0)).HP != 9 || f.Active().APLeft != 2 {
+		t.Fatalf("cake: %+v, %v", res, err)
+	}
+	if s := f.String(res); s != "archer: Cake for hero, 5 HP back." {
+		t.Errorf("log %q", s)
+	}
+	// The fallen hero is two steps away: walk up, then revive.
+	if err := f.CanTreat(salts, at(3, 0)); !errors.Is(err, combat.ErrRange) {
+		t.Errorf("salts from afar: %v", err)
+	}
+	f.EndTurn() // the healed hero: walks up and revives the other
+	if _, err := f.Move(at(2, 0)); err != nil {
+		t.Fatal(err)
+	}
+	res, err = f.Treat(salts, at(3, 0))
+	if err != nil || !res.Revived || res.Healed != 3 || f.At(at(3, 0)) == nil || f.At(at(3, 0)).HP != 3 {
+		t.Fatalf("salts: %+v, %v", res, err)
+	}
+	if s := f.String(res); s != "hero: Salts for hero, back on their feet, 3 HP back." {
+		t.Errorf("log %q", s)
+	}
+}

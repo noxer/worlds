@@ -103,6 +103,9 @@ func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 		if it.Name == "" {
 			return nil, fmt.Errorf("items.yaml: item %q has no name", id)
 		}
+		if u := it.Use; u != nil && (u.Heal < 0 || (u.Heal == 0 && !u.Revive)) {
+			return nil, fmt.Errorf("items.yaml: using %q does nothing", id)
+		}
 	}
 	if err := checkStory(lib, items); err != nil {
 		return nil, err

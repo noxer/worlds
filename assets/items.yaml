@@ -1,8 +1,22 @@
 # The items of the game, by id (what "give", "take" and "item" in dialogs
 # and quests refer to): the name shown, and a line about it.
+#
+# use: what using the item does to a member of the party (it is used up):
+# heal: hit points back; revive: in a fight, gets someone who is down back
+# on their feet (with heal hit points). Items are used from the menu's
+# Items page, or in a fight on oneself or a friend next to one (1 AP).
 honey_cake:
   name: Honey cake
-  text: Sticky, sweet, baked in Brookhaven.
+  text: Sticky, sweet, baked in Brookhaven. Gives back 5 HP.
+  use: {heal: 5}
+herb_tonic:
+  name: Herb tonic
+  text: Bitter, green, and it works. Gives back 12 HP.
+  use: {heal: 12}
+smelling_salts:
+  name: Smelling salts
+  text: One sniff and the fallen are back on their feet, with 4 HP. Only in a fight.
+  use: {heal: 4, revive: true}
 coin:
   name: Coin
   text: Brookhaven silver. Good anywhere a road leads.

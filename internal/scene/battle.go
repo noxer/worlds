@@ -94,8 +94,9 @@ type Battle struct {
 	foes   []*NPC          // by combatant ID; nil for the party's members
 
 	cursor world.Pos
-	action int // index into actions(): what Confirm does
-	hold   int // ticks a direction has been held, for the cursor's repeat
+	action int  // index into actions(): what Confirm does
+	items  bool // the bar shows the items to use instead of the abilities
+	hold   int  // ticks a direction has been held, for the cursor's repeat
 
 	walker *entity.Actor // someone walking a path
 	path   []world.Pos
@@ -118,6 +119,9 @@ type battleAction struct {
 	label   string
 	ability combat.AbilityID // "" for move and end
 	end     bool
+	item    string // the id of an item to use
+	bag     bool   // opens the items
+	back    bool   // closes them
 }
 
 // newBattle starts a fight with the enemy n and its neighbours; nil if
@@ -251,18 +255,53 @@ func (b *Battle) freeNear(board battleBoard, taken map[world.Pos]bool, p world.P
 
 // actions are the entries of the action bar for the active combatant.
 func (b *Battle) actions() []battleAction {
+	if b.items {
+		out := []battleAction{{label: "Back", back: true}}
+		for _, it := range b.usable() {
+			out = append(out, battleAction{label: fmt.Sprintf("%s x%d", it.name, it.n), item: it.id})
+		}
+		return out
+	}
 	out := []battleAction{{label: "Move"}}
 	for _, id := range b.f.Active().Abilities {
 		ab := b.rules.Abilities[id]
 		out = append(out, battleAction{label: fmt.Sprintf("%s %d", ab.Name, ab.AP), ability: id})
 	}
+	if len(b.usable()) > 0 {
+		out = append(out, battleAction{label: fmt.Sprintf("Items %d", combat.ItemAP), bag: true})
+	}
 	return append(out, battleAction{label: "End", end: true})
+}
+
+// usable returns the party's items that can be used in a fight.
+func (b *Battle) usable() []itemEntry {
+	var out []itemEntry
+	for _, it := range b.e.itemList() {
+		if b.e.items[it.id].Use != nil {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+// treatment is what using an item does, for the fight.
+func (b *Battle) treatment(id string) combat.Treatment {
+	it := b.e.items[id]
+	return combat.Treatment{Name: it.Name, Heal: it.Use.Heal, Revive: it.Use.Revive}
+}
+
+// openItems shows the items on the bar, or the abilities again.
+func (b *Battle) openItems(on bool) {
+	b.items, b.action = on, 0
+	if on {
+		b.action = 1
+	}
 }
 
 // startTurn sets the cursor for whoever's turn it is.
 func (b *Battle) startTurn() {
 	c := b.f.Active()
-	b.action = 0
+	b.action, b.items = 0, false
 	if c.Team == combat.Party {
 		b.cursor = c.Pos
 	}
@@ -301,6 +340,8 @@ func (b *Battle) show(r combat.Result) {
 	}
 	b.log = b.f.String(r)
 	switch {
+	case r.Healed > 0:
+		b.popups = append(b.popups, battlePopup{fmt.Sprintf("+%d", r.Healed), t.Pos, popupTicks, battleHPOwn})
 	case r.Pushed:
 		b.walk(target, []world.Pos{r.To})
 		b.popups = append(b.popups, battlePopup{"pushed", r.To, popupTicks, gfx.ColorPaper})
@@ -340,6 +381,19 @@ func (b *Battle) act(p world.Pos) {
 	switch {
 	case a.end:
 		b.endTurn()
+	case a.bag:
+		b.openItems(true)
+	case a.back:
+		b.openItems(false)
+	case a.item != "":
+		r, err := b.f.Treat(b.treatment(a.item), p)
+		if err != nil {
+			b.log = capitalize(err.Error()) + "."
+			return
+		}
+		b.e.story.Take(a.item, 1)
+		b.openItems(false)
+		b.show(r)
 	case a.ability != "":
 		b.use(a.ability, p)
 	default:
@@ -380,14 +434,23 @@ func (b *Battle) endTurn() {
 	b.startTurn()
 }
 
-// barRects returns the action bar's panel and its buttons.
+// barRects returns the action bar's panel and its buttons: a line of
+// text, then the buttons in as many rows as the screen's width needs.
 func (b *Battle) barRects() (bar image.Rectangle, buttons []image.Rectangle) {
-	bar = image.Rect(0, b.h-battleBarH, b.w, b.h)
-	x := boxMargin
+	const rowH = gfx.LineHeight + 5
+	x, row := boxMargin, 0
 	for _, a := range b.actions() {
 		w := gfx.TextWidth(a.label) + 2*battleButtonW
-		buttons = append(buttons, image.Rect(x, bar.Max.Y-gfx.LineHeight-5, x+w, bar.Max.Y-2))
+		if x > boxMargin && x+w > b.w-boxMargin {
+			x, row = boxMargin, row+1
+		}
+		buttons = append(buttons, image.Rect(x, row*rowH, x+w, row*rowH+gfx.LineHeight+3))
 		x += w + 3
+	}
+	h := battleBarH + row*rowH
+	bar = image.Rect(0, b.h-h, b.w, b.h)
+	for i := range buttons {
+		buttons[i] = buttons[i].Add(image.Pt(0, bar.Min.Y+gfx.LineHeight+3))
 	}
 	return bar, buttons
 }
@@ -480,7 +543,7 @@ func (b *Battle) playerInput(in *input.State) {
 		b.action = (b.action + 1) % len(acts)
 	}
 	if in.Pressed(input.Cancel) {
-		b.action = 0
+		b.openItems(false)
 	}
 	if d, ok := in.Dir(); ok {
 		if in.DirPressed() || b.hold >= cursorRepeat {
@@ -498,13 +561,18 @@ func (b *Battle) playerInput(in *input.State) {
 		for i, r := range buttons {
 			if p.In(r) {
 				b.action = i
-				if acts[i].end {
+				switch {
+				case acts[i].end:
 					b.endTurn()
+				case acts[i].bag:
+					b.openItems(true)
+				case acts[i].back:
+					b.openItems(false)
 				}
 				return
 			}
 		}
-		if p.Y < b.h-battleBarH {
+		if bar, _ := b.barRects(); p.Y < bar.Min.Y {
 			if t, ok := b.tileAt(p); ok {
 				b.cursor = t
 				b.act(t)
@@ -520,7 +588,8 @@ func (b *Battle) playerInput(in *input.State) {
 // onScreen reports whether a tile is in view (the cursor stays there).
 func (b *Battle) onScreen(p world.Pos) bool {
 	x, y := b.e.screen(p.Map, p.X*tile, p.Y*tile)
-	return x >= 0 && y >= 0 && x+tile <= b.w && y+tile <= b.h-battleBarH
+	bar, _ := b.barRects()
+	return x >= 0 && y >= 0 && x+tile <= b.w && y+tile <= bar.Min.Y
 }
 
 // finish ends the fight: after a victory the party gathers and walks on;
@@ -558,6 +627,7 @@ func (b *Battle) finish(ctx *Context, o combat.Outcome) {
 var (
 	battleReach  = color.NRGBA{0x60, 0xa0, 0xff, 0x48}
 	battleTarget = color.NRGBA{0xff, 0x50, 0x40, 0x60}
+	battleHeal   = color.NRGBA{0x58, 0xd0, 0x58, 0x60}
 	battleHPBack = color.NRGBA{0x2b, 0x1d, 0x23, 0xff}
 	battleHPFoe  = color.NRGBA{0xd0, 0x48, 0x40, 0xff}
 	battleHPOwn  = color.NRGBA{0x58, 0xb0, 0x58, 0xff}
@@ -580,6 +650,11 @@ func (b *Battle) Draw(dst *ebiten.Image) {
 			for _, p := range b.f.Targets(a.ability) {
 				gfx.FillRect(dst, tileRect(p), battleTarget)
 			}
+		case a.item != "":
+			for _, p := range b.f.Patients(b.treatment(a.item)) {
+				gfx.FillRect(dst, tileRect(p), battleHeal)
+			}
+		case a.bag || a.back:
 		case !a.end:
 			for _, r := range b.f.Reachable() {
 				gfx.FillRect(dst, tileRect(r.Pos).Inset(1), battleReach)

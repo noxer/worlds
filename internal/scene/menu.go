@@ -24,6 +24,7 @@ type Menu struct {
 	cursor int
 	page   menuPage
 	slots  []*save.State // the slot list, read when a slot page opens
+	using  string        // menuUse: the id of the item
 	msg    string        // a message under the menu (an error)
 	w, h   int
 }
@@ -36,6 +37,7 @@ const (
 	menuLoad
 	menuItems
 	menuQuests
+	menuUse // an item from the Items page: on whom
 )
 
 type menuItem struct {
@@ -72,12 +74,38 @@ func (m *Menu) items() []menuItem {
 			if it.n > 1 {
 				text = fmt.Sprintf("%s x%d", it.name, it.n)
 			}
-			out = append(out, menuItem{text: text, about: about})
+			mi := menuItem{text: text, about: about}
+			if u := m.e.items[it.id].Use; u != nil {
+				id := it.id
+				mi.do = func(m *Menu, ctx *Context) {
+					if u.Revive {
+						m.msg = "Only in a fight."
+						return
+					}
+					m.open(menuUse)
+					m.using = id
+				}
+			}
+			out = append(out, mi)
 		}
 		if len(out) == 0 {
 			out = append(out, menuItem{text: "- nothing -", off: true})
 		}
 		return append(out, menuItem{text: "Back", do: func(m *Menu, ctx *Context) { m.open(menuMain) }})
+	case menuUse:
+		var out []menuItem
+		for _, mem := range m.e.party.Members {
+			name := mem.Name
+			cur, mx := m.e.hp(name)
+			out = append(out, menuItem{text: fmt.Sprintf("%-6s HP %d/%d", name, cur, mx), do: func(m *Menu, ctx *Context) {
+				msg, used := m.e.useItem(m.using, name)
+				if used && m.e.story.Count(m.using) == 0 {
+					m.open(menuItems) // none left
+				}
+				m.msg = msg
+			}})
+		}
+		return append(out, menuItem{text: "Back", do: func(m *Menu, ctx *Context) { m.open(menuItems) }})
 	case menuSave, menuLoad:
 		var out []menuItem
 		for k, s := range m.slots {
@@ -121,6 +149,9 @@ func (m *Menu) items() []menuItem {
 // open switches to a page.
 func (m *Menu) open(p menuPage) {
 	m.page, m.cursor, m.msg = p, 0, ""
+	if p == menuUse {
+		return
+	}
 	if p == menuItems || p == menuQuests {
 		if its := m.items(); its[0].off {
 			m.cursor = 1 // nothing to list: on Back
@@ -201,10 +232,13 @@ func (m *Menu) Update(ctx *Context) {
 	m.w, m.h = ctx.W, ctx.H
 	its := m.items()
 	if in.Pressed(input.Cancel) || in.Pressed(input.Menu) {
-		if m.page != menuMain {
-			m.open(menuMain)
-		} else {
+		switch m.page {
+		case menuMain:
 			ctx.Pop()
+		case menuUse:
+			m.open(menuItems)
+		default:
+			m.open(menuMain)
 		}
 		return
 	}
@@ -251,7 +285,8 @@ func (m *Menu) Update(ctx *Context) {
 func (m *Menu) Draw(dst *ebiten.Image) {
 	box, rows := m.rects()
 	gfx.Box(dst, box)
-	title := map[menuPage]string{menuMain: "Menu", menuSave: "Save to", menuLoad: "Load from", menuItems: "Items", menuQuests: "Quests"}[m.page]
+	title := map[menuPage]string{menuMain: "Menu", menuSave: "Save to", menuLoad: "Load from", menuItems: "Items", menuQuests: "Quests",
+		menuUse: "Use " + m.e.itemName(m.using) + " on"}[m.page]
 	gfx.Text(dst, title, box.Min.X+boxPad, box.Min.Y+boxPad-1, gfx.ColorAccent)
 	for i, it := range m.items() {
 		r := rows[i]
