@@ -14,19 +14,22 @@ abilities:
   throw:  {name: Throw, ap: 2, range: [2, 4], sight: true, damage: [2, 3]}
 
 # hp: health; move: tiles per turn; ap: action points per turn; init:
-# initiative (higher goes first).
+# initiative (higher goes first). Party members: growth: what each level
+# past the first adds (hp; power, a point of damage on every hit, comes
+# every second level by itself). Enemies: xp and coins: what beating one is
+# worth (every member gets the whole XP of a fight won).
 #
 # The party has a role each: Ari holds the line (strike, shove, throw),
 # Bryn shoots from afar, Cato reaches over a friend with a spear (thrust),
 # Dagny is the sturdiest and throws when she can't get close.
 combatants:
-  Ari:   {hp: 14, move: 5, ap: 3, init: 6, abilities: [strike, throw, shove]}
-  Bryn:  {hp: 10, move: 5, ap: 3, init: 7, abilities: [shot, shove]}
-  Cato:  {hp: 12, move: 5, ap: 3, init: 5, abilities: [thrust, shove]}
-  Dagny: {hp: 16, move: 4, ap: 3, init: 3, abilities: [strike, throw, shove]}
-  slime: {hp: 8, move: 3, ap: 2, init: 2, abilities: [strike]}
-  wisp:  {hp: 6, move: 4, ap: 2, init: 8, abilities: [shot]}
-  bandit:        {hp: 10, move: 4, ap: 3, init: 4, abilities: [strike, shove]}
-  bandit_archer: {hp: 7, move: 4, ap: 3, init: 6, abilities: [shot]}
+  Ari:   {hp: 14, move: 5, ap: 3, init: 6, abilities: [strike, throw, shove], growth: {hp: 2}}
+  Bryn:  {hp: 10, move: 5, ap: 3, init: 7, abilities: [shot, shove], growth: {hp: 1}}
+  Cato:  {hp: 12, move: 5, ap: 3, init: 5, abilities: [thrust, shove], growth: {hp: 2}}
+  Dagny: {hp: 16, move: 4, ap: 3, init: 3, abilities: [strike, throw, shove], growth: {hp: 3}}
+  slime: {hp: 8, move: 3, ap: 2, init: 2, abilities: [strike], xp: 3, coins: 1}
+  wisp:  {hp: 6, move: 4, ap: 2, init: 8, abilities: [shot], xp: 4, coins: 2}
+  bandit:        {hp: 10, move: 4, ap: 3, init: 4, abilities: [strike, shove], xp: 6, coins: 4}
+  bandit_archer: {hp: 7, move: 4, ap: 3, init: 6, abilities: [shot], xp: 5, coins: 3}
 
 default: {hp: 10, move: 4, ap: 3, init: 4, abilities: [strike, shove]}

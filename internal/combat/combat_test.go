@@ -340,3 +340,29 @@ func TestItems(t *testing.T) {
 		t.Errorf("log %q", s)
 	}
 }
+
+func TestLevels(t *testing.T) {
+	for _, c := range []struct{ xp, level int }{{0, 1}, {9, 1}, {10, 2}, {29, 2}, {30, 3}, {60, 4}, {100, 5}} {
+		if got := combat.LevelAt(c.xp); got != c.level {
+			t.Errorf("%d XP: level %d, want %d", c.xp, got, c.level)
+		}
+	}
+	r, err := combat.LoadRules([]byte(rulesYAML + "\n" + `
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Combatants["hero"] = func() combat.Stats { s := r.Combatants["hero"]; s.Growth.HP = 3; return s }()
+	c := r.AtLevel(r.Combatant("hero", "hero", combat.Party), 4)
+	if c.MaxHP != 12+9 || c.HP != c.MaxHP || c.Power != 2 {
+		t.Errorf("hero at level 4: %d/%d HP, power %d", c.HP, c.MaxHP, c.Power)
+	}
+	// Power adds to every hit.
+	g := grid{".."}
+	c.Pos = at(0, 0)
+	f := combat.New(r, g, 1, []combat.Combatant{c, place(r, "slime", combat.Enemy, 1, 0)})
+	res, err := f.Use("strike", at(1, 0))
+	if err != nil || res.Damage < 5 || res.Damage > 7 {
+		t.Errorf("a strike with power 2: %+v, %v", res, err)
+	}
+}

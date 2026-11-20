@@ -41,7 +41,7 @@ func (e *Explore) maxHP(name string) int {
 	if e.combat == nil {
 		return 0
 	}
-	return e.combat.Combatant(name, name, 0).MaxHP
+	return e.member(name).MaxHP
 }
 
 // hp returns a member's hit points and maximum.

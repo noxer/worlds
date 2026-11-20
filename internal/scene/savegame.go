@@ -39,6 +39,7 @@ func (e *Explore) Snapshot() (save.State, error) {
 	st.Flags, st.Items = e.story.Flags(), e.story.Items()
 	st.Blocks = e.puzzleBlocks()
 	st.Wounds = maps.Clone(e.wounds)
+	st.XP = maps.Clone(e.xp)
 	ids := make([]infra.ID, 0, len(e.visited))
 	for id := range e.visited {
 		ids = append(ids, id)
@@ -104,6 +105,7 @@ func (e *Explore) Restore(st save.State) error {
 	e.applyDefeated()
 	e.restorePuzzles(st.Blocks)
 	e.wounds = maps.Clone(st.Wounds)
+	e.xp = maps.Clone(st.XP)
 	e.restorePickups()
 	e.ride, e.lastTaxi, e.notice, e.pendingNotice = nil, nil, nil, ""
 	e.nearLines, e.ranks = nil, nil

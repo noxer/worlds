@@ -142,3 +142,44 @@ the top of `internal/scene/health.go`).
   door. The inn's sign was invisible in 9.1, and that is fixed.
 - **Not done:** shops don't run out of stock, and prices don't vary by
   town. Both are easy to add later if wanted.
+
+## 9.4: experience and levels
+
+- **Enemies are worth XP and coins** (`xp:` and `coins:` in
+  `combat.yaml`):
+
+  | Enemy | XP | Coins |
+  |---|---|---|
+  | slime | 3 | 1 |
+  | wisp | 4 | 2 |
+  | bandit | 6 | 4 |
+  | bandit archer | 5 | 3 |
+
+  Enemies stay beaten, so this can't be farmed. Coins from fights matter
+  now that there are shops: the meadow pays 4 and the cellar 11.
+- **The whole party gets the whole XP** of a fight won, including those
+  who went down. The four always fight together, and splitting XP or
+  leaving the fallen out would only produce a member who lags behind.
+- **The curve:**
+
+  | Level | 2 | 3 | 4 | 5 | each further level |
+  |---|---|---|---|---|---|
+  | Total XP | 10 | 30 | 60 | 100 | 10 more than the step before |
+
+  The meadow (10 XP) gives level 2 at once, and the cellar (17 XP) nearly
+  reaches level 3.
+- **What a level gives:**
+  - **Max HP** by the member's growth: Ari +2, Bryn +1, Cato +2,
+    Dagny +3.
+  - **Power** +1 every second level, which adds a point of damage to every
+    hit.
+  - I kept it to these two so the gain is easy to read. Move, AP and
+    initiative are what make roles different, so they stay fixed.
+- **Only the XP is saved.** Levels and stats follow from it, so tuning the
+  curve or the growth later changes old saves too. A level gained heals by
+  the HP it adds, because the save keeps what is missing.
+- **Shown:**
+  - after a fight: "The fight is won: 10 XP, 4 coins.";
+  - a banner per level gained ("Ari reaches level 2 / Max HP +2, power
+    +1.");
+  - the party screen shows "Lv 2  HP 16/16".

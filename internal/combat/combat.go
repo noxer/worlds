@@ -50,6 +50,7 @@ type Combatant struct {
 	Move, AP  int // movement and action points per turn
 	Init      int // initiative: higher goes first
 	Abilities []AbilityID
+	Power     int // added to the damage of every hit
 
 	MP, APLeft int  // left this turn
 	Down       bool // out of the fight
@@ -367,6 +368,9 @@ func (f *Fight) Use(id AbilityID, target world.Pos) (Result, error) {
 	dmg := ab.Damage[0]
 	if ab.Damage[1] > ab.Damage[0] {
 		dmg += f.rng.IntN(ab.Damage[1] - ab.Damage[0] + 1)
+	}
+	if dmg > 0 {
+		dmg += c.Power
 	}
 	if ab.Push > 0 {
 		// A shove moves the target straight away from the shover, as far

@@ -90,6 +90,7 @@ type Explore struct {
 	story         *story.State                  // flags and items (see storystate.go)
 	puzzle        puzzles                       // levers, plates, blocks, doors (see puzzle.go)
 	wounds        map[string]int                // hit points missing, by member (see health.go)
+	xp            map[string]int                // experience, by member (see levels.go)
 	pickups       []*pickup                     // things to take (see pickup.go)
 	items         map[string]story.Item         // the kinds of items, by id
 	shops         map[string]story.Shop         // the shops, by id

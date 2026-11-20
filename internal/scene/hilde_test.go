@@ -129,6 +129,13 @@ func TestHildesDelivery(t *testing.T) {
 	if stage() != "crate" {
 		t.Fatalf("after the fight: stage %q", stage())
 	}
+	loot := h.e.story.Count("coin") // the bandits' purses: 4 + 4 + 3
+	if loot != 11 {
+		t.Errorf("%d coins from the bandits, want 11", loot)
+	}
+	if lv := h.e.level("Ari"); lv != 2 {
+		t.Errorf("Ari is level %d after the fight, want 2 (17 XP)", lv)
+	}
 
 	// The chest in the back room (2,2): from below, facing up.
 	chest := cell(2, 2)
@@ -153,11 +160,11 @@ func TestHildesDelivery(t *testing.T) {
 	h.menuTo("1")
 
 	h.speakWith("smith")
-	if stage() != "done" || h.e.story.Count("crate") != 0 || h.e.story.Count("coin") != 20 {
+	if stage() != "done" || h.e.story.Count("crate") != 0 || h.e.story.Count("coin") != loot+20 {
 		t.Fatalf("after handing over: stage %q, %d crates, %d coins", stage(), h.e.story.Count("crate"), h.e.story.Count("coin"))
 	}
 	h.speakWith("smith")
-	if h.e.story.Count("coin") != 20 {
+	if h.e.story.Count("coin") != loot+20 {
 		t.Fatal("Hilde paid twice")
 	}
 	// The save from before: crate in hand, the chest still empty.
@@ -172,5 +179,8 @@ func TestHildesDelivery(t *testing.T) {
 		if n.enemy != "" && !n.Pos.Map.IsMain() && n.active {
 			t.Errorf("%s is back after loading", n.Name)
 		}
+	}
+	if lv := h.e.level("Dagny"); lv != 2 || h.e.xp["Dagny"] != 17 {
+		t.Errorf("Dagny is level %d with %d XP after loading, want 2 and 17", lv, h.e.xp["Dagny"])
 	}
 }

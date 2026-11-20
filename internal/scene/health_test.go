@@ -54,8 +54,10 @@ func TestWoundsCarryOver(t *testing.T) {
 	if o := h.playBattle(b); o != combat.Victory {
 		t.Fatalf("the meadow fight: %v", o)
 	}
-	if cur, _ := h.e.hp("Bryn"); cur != 1 {
-		t.Errorf("Bryn went down and has %d hit points after the win, want 1", cur)
+	// Up with 1 hit point; the level gained in the fight (10 XP) adds its
+	// growth on top.
+	if cur, mx := h.e.hp("Bryn"); cur != 1+(mx-10) || h.e.level("Bryn") != 2 {
+		t.Errorf("Bryn went down and has %d/%d hit points after the win at level %d, want 1 and the growth", cur, mx, h.e.level("Bryn"))
 	}
 	for _, m := range h.e.party.Members {
 		if cur, mx := h.e.hp(m.Name); cur < 1 || cur > mx {

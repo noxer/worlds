@@ -52,6 +52,8 @@ type State struct {
 	// Wounds is the hit points each member of the party is missing, by
 	// name (members at full health are left out).
 	Wounds map[string]int `json:"wounds,omitempty"`
+	// XP is each member's experience, by name.
+	XP map[string]int `json:"xp,omitempty"`
 }
 
 // Encode returns s as JSON.

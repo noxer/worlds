@@ -1278,7 +1278,12 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       dialog action `shop <id>`): buy at an item's `price`, sell anything
       priced for half; Brookhaven Stores (Oskar; `tools/art/store.py`).
       Hilde's forge comes with equipment (5);
-   4. experience and levels, the stats rising by themselves;
+   4. **done:** experience and levels (`scene/levels.go`,
+      `combat.LevelAt`, `Rules.AtLevel`): enemies are worth `xp` and
+      `coins`; every member gets the whole XP of a fight won; levels at
+      10, 30, 60, 100, ... XP; a level adds the member's `growth` in HP,
+      and power (+1 damage per hit) every second level; only XP is saved;
+      banners for levels gained, levels on the party screen;
    5. equipment: a weapon and an armour per member.
 
 ## Asset delivery

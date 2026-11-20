@@ -164,7 +164,7 @@ func newBattle(e *Explore, n *NPC) *Battle {
 		p := spots[i]
 		taken[p] = true
 		m.Place(p, m.Facing)
-		c := e.combat.Combatant(m.Name, m.Name, combat.Party)
+		c := e.member(m.Name)
 		c.Pos = p
 		c.HP, _ = e.hp(m.Name) // wounds carry over
 		cs = append(cs, c)
@@ -611,8 +611,18 @@ func (b *Battle) finish(ctx *Context, o combat.Outcome) {
 				e.setHP(c.Name, c.HP) // the fallen get up with 1 hit point
 			}
 		}
+		var kinds []string
+		for i, n := range b.foes {
+			if n != nil {
+				kinds = append(kinds, b.f.Combatants()[i].Kind)
+			}
+		}
 		e.party.PlaceAll(l.Pos, l.Facing)
-		e.say("The fight is won.")
+		if got := e.reward(kinds); got != "" {
+			e.say("The fight is won: " + got + ".")
+		} else {
+			e.say("The fight is won.")
+		}
 		e.updateQuests()
 		return
 	}

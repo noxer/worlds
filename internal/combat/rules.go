@@ -28,6 +28,40 @@ type Stats struct {
 	AP        int         `yaml:"ap"`
 	Init      int         `yaml:"init"`
 	Abilities []AbilityID `yaml:"abilities"`
+	// What beating it is worth (enemies): experience, and coins found.
+	XP    int `yaml:"xp"`
+	Coins int `yaml:"coins"`
+	// Growth is what a level more adds (party members): hit points.
+	Growth struct {
+		HP int `yaml:"hp"`
+	} `yaml:"growth"`
+}
+
+// XPFor returns the experience a level takes in all: none for level 1,
+// then 10, 30, 60, 100, ... (each level 10 more than the one before).
+func XPFor(level int) int { return 5 * level * (level - 1) }
+
+// LevelAt returns the level that an amount of experience reaches.
+func LevelAt(xp int) int {
+	l := 1
+	for XPFor(l+1) <= xp {
+		l++
+	}
+	return l
+}
+
+// AtLevel returns a combatant of a kind grown to a level: its growth in
+// hit points for each level past the first, and 1 power (damage on every
+// hit) for every two levels.
+func (r *Rules) AtLevel(c Combatant, level int) Combatant {
+	s, ok := r.Combatants[c.Kind]
+	if !ok {
+		s = r.Default
+	}
+	c.MaxHP += (level - 1) * s.Growth.HP
+	c.HP = c.MaxHP
+	c.Power += level / 2
+	return c
 }
 
 // Rules are the abilities and the stats of everyone who can fight, by kind
@@ -57,6 +91,9 @@ func LoadRules(data []byte) (*Rules, error) {
 		}
 	}
 	check := func(name string, s Stats) error {
+		if s.XP < 0 || s.Coins < 0 || s.Growth.HP < 0 {
+			return fmt.Errorf("combat rules: %s has xp %d, coins %d, growth %d", name, s.XP, s.Coins, s.Growth.HP)
+		}
 		if s.HP < 1 || s.Move < 0 || s.AP < 1 {
 			return fmt.Errorf("combat rules: %s has hp %d, move %d, ap %d", name, s.HP, s.Move, s.AP)
 		}
