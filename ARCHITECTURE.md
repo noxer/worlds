@@ -983,8 +983,11 @@ inventory, quest journal, world map, save/load.
 - **Abilities are data** (`assets/combat.yaml`): action points, range in
   steps, whether a line of sight is needed (a straight line on the grid,
   blocked by solid tiles), damage, push. So far: Strike (next to the
-  target), Shot (2 to 6 steps, in sight), Shove (moves the target a tile
-  straight away; it only hurts if there is no room). Stats per kind in the
+  target), Thrust (1 to 2 steps, in sight: a spear over a friend's
+  shoulder), Throw (2 to 4, in sight), Shot (2 to 6, in sight), Shove
+  (moves the target a tile straight away; it only hurts if there is no
+  room). Each party member has a role: Ari strikes and throws, Bryn
+  shoots, Cato thrusts, Dagny is the sturdiest and throws. Stats per kind in the
   same file: the party's members by name, enemies by kind.
 - **AI:** the best ability it can use from where it stands (a kill first),
   else the nearest tile it can use one from, else closer to the nearest
@@ -992,7 +995,8 @@ inventory, quest journal, world map, save/load.
 - **In the game:** enemies are NPCs with an `enemy` property, in plain
   sight on the map; a fight starts when one sees the party (5 steps, with
   a line of sight) or the party walks into one, with the enemies within 10
-  tiles and every party member. The `Battle` scene goes on top of the
+  tiles and every party member, who gather round the leader (the free tiles
+  nearest it, those towards the enemy first). The `Battle` scene goes on top of the
   exploration scene, on the same map: the camera holds on the middle of
   the fight, other NPCs are bystanders nobody can stand on. Arrows move a
   tile cursor, Menu cycles the action (Move, the member's abilities, End),
@@ -1250,6 +1254,23 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
 
    Step 8 is done: a first quest uses talk, exploring, puzzles, a fight
    and a reward. Next is to judge how it plays and widen what is thin.
+9. Rewards that matter: what the party earns is worth something, and it
+   grows.
+   0. **done:** the fight's feel, after playing the first quest (hard to
+      reach the enemies): a role each in the party (Cato's spear reaches 2
+      tiles, Ari and Dagny can throw), a step more movement, a three-tile
+      opening into the cellar's back room, and the party gathering round
+      its leader when a fight starts instead of staying strung out in its
+      marching line. The cellar fight now takes about 3 rounds instead of
+      6, with more health left;
+   1. health that carries over between fights; rest at an inn (for coins)
+      or by sleeping; a defeat wakes the party at the inn, some coins
+      lighter;
+   2. usable items (healing, reviving), from the menu and in a fight;
+   3. shops: buy and sell; a general store in Brookhaven, Hilde's forge
+      after her quest;
+   4. experience and levels, the stats rising by themselves;
+   5. equipment: a weapon and an armour per member.
 
 ## Asset delivery
 

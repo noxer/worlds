@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"sort"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -147,14 +148,16 @@ func newBattle(e *Explore, n *NPC) *Battle {
 		cs = append(cs, c)
 		b.actors, b.foes = append(b.actors, &m.Actor), append(b.foes, m)
 	}
-	// The party: each member where it stands, or on the nearest free tile
-	// if that one is taken (after a door they all stand on one).
+	// The party gathers round its leader (rather than staying strung out
+	// in its marching line): the leader where it stands, the others on the
+	// free tiles nearest to it, those towards the enemy first.
 	e.riding = false
-	for _, m := range e.party.Members {
-		p, ok := b.freeNear(board, taken, m.Pos)
-		if !ok {
-			return nil
-		}
+	spots, ok := b.deploy(board, taken, e.party.Leader().Pos, n.Pos, len(e.party.Members))
+	if !ok {
+		return nil
+	}
+	for i, m := range e.party.Members {
+		p := spots[i]
 		taken[p] = true
 		m.Place(p, m.Facing)
 		c := e.combat.Combatant(m.Name, m.Name, combat.Party)
@@ -176,6 +179,54 @@ func newBattle(e *Explore, n *NPC) *Battle {
 	b.log = "A fight!"
 	b.startTurn()
 	return b
+}
+
+// deploy returns n tiles for the party round its leader at p: the nearest
+// free tile to p first, then the free tiles nearest to it (by steps over
+// open ground), the ones nearer the enemy at foe first among those as
+// near. False if there aren't n within reach.
+func (b *Battle) deploy(board battleBoard, taken map[world.Pos]bool, p, foe world.Pos, n int) ([]world.Pos, bool) {
+	start, ok := b.freeNear(board, taken, p)
+	if !ok {
+		return nil, false
+	}
+	type spot struct {
+		pos          world.Pos
+		steps, toFoe int64
+	}
+	queue := []spot{{start, 0, 0}}
+	seen := map[world.Pos]bool{start: true}
+	var free []spot
+	for i := 0; i < len(queue) && i < 400; i++ {
+		s := queue[i]
+		if !taken[s.pos] && board.Walkable(s.pos) {
+			dx, dy, _ := b.e.w.Delta(s.pos, foe)
+			s.toFoe = geom.Abs(dx) + geom.Abs(dy)
+			free = append(free, s)
+		}
+		for _, d := range world.Dirs {
+			if q, ok := b.e.w.Neighbor(s.pos, d); ok && !seen[q] && board.Walkable(q) && !taken[q] {
+				seen[q] = true
+				queue = append(queue, spot{q, s.steps + 1, 0})
+			}
+		}
+	}
+	if len(free) < n {
+		return nil, false
+	}
+	// The leader's tile stays first; the rest by steps, then nearer the foe.
+	rest := free[1:]
+	sort.SliceStable(rest, func(i, j int) bool {
+		if rest[i].steps != rest[j].steps {
+			return rest[i].steps < rest[j].steps
+		}
+		return rest[i].toFoe < rest[j].toFoe
+	})
+	out := make([]world.Pos, n)
+	for i := range out {
+		out[i] = free[i].pos
+	}
+	return out, true
 }
 
 // freeNear returns p, or the nearest tile to it someone can stand on that

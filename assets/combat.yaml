@@ -10,14 +10,20 @@ abilities:
   strike: {name: Strike, ap: 2, range: [1, 1], damage: [3, 5]}
   shot:   {name: Shot, ap: 2, range: [2, 6], sight: true, damage: [2, 4]}
   shove:  {name: Shove, ap: 1, range: [1, 1], push: 1, damage: [2, 2]}
+  thrust: {name: Thrust, ap: 2, range: [1, 2], sight: true, damage: [3, 4]}
+  throw:  {name: Throw, ap: 2, range: [2, 4], sight: true, damage: [2, 3]}
 
 # hp: health; move: tiles per turn; ap: action points per turn; init:
 # initiative (higher goes first).
+#
+# The party has a role each: Ari holds the line (strike, shove, throw),
+# Bryn shoots from afar, Cato reaches over a friend with a spear (thrust),
+# Dagny is the sturdiest and throws when she can't get close.
 combatants:
-  Ari:   {hp: 14, move: 4, ap: 3, init: 6, abilities: [strike, shove]}
-  Bryn:  {hp: 10, move: 4, ap: 3, init: 7, abilities: [shot, shove]}
-  Cato:  {hp: 12, move: 5, ap: 3, init: 5, abilities: [strike, shove]}
-  Dagny: {hp: 16, move: 3, ap: 3, init: 3, abilities: [strike, shove]}
+  Ari:   {hp: 14, move: 5, ap: 3, init: 6, abilities: [strike, throw, shove]}
+  Bryn:  {hp: 10, move: 5, ap: 3, init: 7, abilities: [shot, shove]}
+  Cato:  {hp: 12, move: 5, ap: 3, init: 5, abilities: [thrust, shove]}
+  Dagny: {hp: 16, move: 4, ap: 3, init: 3, abilities: [strike, throw, shove]}
   slime: {hp: 8, move: 3, ap: 2, init: 2, abilities: [strike]}
   wisp:  {hp: 6, move: 4, ap: 2, init: 8, abilities: [shot]}
   bandit:        {hp: 10, move: 4, ap: 3, init: 4, abilities: [strike, shove]}

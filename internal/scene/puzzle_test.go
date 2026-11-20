@@ -46,7 +46,7 @@ func TestCellarPuzzle(t *testing.T) {
 	h := newBattleHarness(t)
 	store := save.Memory{}
 	h.e.saves = store
-	door1, door2 := h.e.puzzle.byKey["cellar/door_1"], h.e.puzzle.byKey["cellar/door_2"]
+	door1, door2 := h.e.puzzle.byKey["cellar/door_1"], h.e.puzzle.byKey["cellar/door_2b"]
 	lever, crate := h.e.puzzle.byKey["cellar/lever_1"], h.e.puzzle.byKey["cellar/crate_1"]
 	if door1 == nil || door2 == nil || lever == nil || crate == nil {
 		t.Fatal("the cellar's pieces aren't all there")
@@ -118,8 +118,10 @@ func TestCellarPuzzle(t *testing.T) {
 	if crate.pos != cell(12, 6) {
 		t.Fatalf("crate at %v, want on the plate 12,6", crate.pos)
 	}
-	if !door2.on || h.w.Solid(door2.pos) {
-		t.Fatal("the crate on the plate didn't open the second door")
+	for _, k := range []string{"cellar/door_2a", "cellar/door_2b", "cellar/door_2c"} {
+		if d := h.e.puzzle.byKey[k]; !d.on || h.w.Solid(d.pos) {
+			t.Fatalf("the crate on the plate didn't open %s", k)
+		}
 	}
 	// Against the wall it won't go.
 	h.walkTo(input.Down)
@@ -152,7 +154,7 @@ func TestCellarPuzzle(t *testing.T) {
 // lets it up.
 func TestPlateUnderTheParty(t *testing.T) {
 	h := newBattleHarness(t)
-	plate, door2 := h.e.puzzle.byKey["cellar/plate_1"], h.e.puzzle.byKey["cellar/door_2"]
+	plate, door2 := h.e.puzzle.byKey["cellar/plate_1"], h.e.puzzle.byKey["cellar/door_2b"]
 	h.e.party.PlaceAll(plate.pos, world.Up)
 	h.tick(input.Frame{})
 	if !plate.on || !door2.on {

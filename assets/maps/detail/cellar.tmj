@@ -11,7 +11,7 @@
  "tilewidth": 16,
  "tileheight": 16,
  "nextlayerid": 5,
- "nextobjectid": 12,
+ "nextobjectid": 14,
  "tilesets": [
   {
    "firstgid": 1,
@@ -73,22 +73,6 @@
     49,
     49,
     49,
-    1,
-    49,
-    49,
-    49,
-    49,
-    49,
-    49,
-    49,
-    1,
-    1,
-    49,
-    49,
-    49,
-    49,
-    49,
-    49,
     41,
     49,
     49,
@@ -121,7 +105,23 @@
     49,
     49,
     49,
+    49,
+    49,
+    49,
+    49,
+    49,
+    49,
+    49,
+    49,
     1,
+    1,
+    49,
+    49,
+    49,
+    49,
+    49,
+    49,
+    49,
     49,
     49,
     49,
@@ -683,7 +683,7 @@
      "id": 2,
      "name": "bandit_1",
      "type": "npc",
-     "x": 96,
+     "x": 48,
      "y": 48,
      "width": 16,
      "height": 16,
@@ -705,6 +705,19 @@
     },
     {
      "id": 3,
+     "name": "door_2a",
+     "type": "door",
+     "x": 112,
+     "y": 64,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [],
+     "gid": 300
+    },
+    {
+     "id": 4,
      "name": "crate_1",
      "type": "block",
      "x": 160,
@@ -717,10 +730,10 @@
      "gid": 299
     },
     {
-     "id": 4,
+     "id": 5,
      "name": "bandit_2",
      "type": "npc",
-     "x": 64,
+     "x": 48,
      "y": 80,
      "width": 16,
      "height": 16,
@@ -741,8 +754,8 @@
      "gid": 112
     },
     {
-     "id": 5,
-     "name": "door_2",
+     "id": 6,
+     "name": "door_2b",
      "type": "door",
      "x": 112,
      "y": 80,
@@ -754,10 +767,10 @@
      "gid": 300
     },
     {
-     "id": 6,
+     "id": 7,
      "name": "bandit_3",
      "type": "npc",
-     "x": 48,
+     "x": 80,
      "y": 96,
      "width": 16,
      "height": 16,
@@ -778,7 +791,20 @@
      "gid": 112
     },
     {
-     "id": 7,
+     "id": 8,
+     "name": "door_2c",
+     "type": "door",
+     "x": 112,
+     "y": 96,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [],
+     "gid": 300
+    },
+    {
+     "id": 9,
      "name": "plate_1",
      "type": "plate",
      "x": 192,
@@ -791,13 +817,13 @@
       {
        "name": "target",
        "type": "string",
-       "value": "door_2"
+       "value": "door_2a,door_2b,door_2c"
       }
      ],
      "gid": 297
     },
     {
-     "id": 8,
+     "id": 10,
      "name": "door_1",
      "type": "door",
      "x": 128,
@@ -810,7 +836,7 @@
      "gid": 300
     },
     {
-     "id": 9,
+     "id": 11,
      "name": "lever_1",
      "type": "lever",
      "x": 48,
@@ -829,7 +855,7 @@
      "gid": 295
     },
     {
-     "id": 10,
+     "id": 12,
      "name": "entrance",
      "type": "spawn",
      "x": 112,
@@ -847,7 +873,7 @@
      ]
     },
     {
-     "id": 11,
+     "id": 13,
      "name": "exit",
      "type": "warp",
      "x": 112,

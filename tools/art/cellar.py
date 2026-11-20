@@ -3,7 +3,9 @@
 An ordinary Tiled map afterwards. Three rooms: the entry (south) with a
 lever that opens the first door; a store room (north-east) with a crate to
 push onto a pressure plate, which opens the second door; and the back room
-(north-west), where three bandits keep Hilde's crate in a chest. Puzzle objects (see internal/scene/puzzle.go): "lever" and
+(north-west), where three bandits keep Hilde's crate in a chest. The
+crate on the plate opens all three doors into the back room at once, so
+the party can come in side by side. Puzzle objects (see internal/scene/puzzle.go): "lever" and
 "plate" name the doors they work in "target"; "block" is pushed by walking
 into it; "door" opens when every lever and plate wired to it is on."""
 import json, sys
@@ -15,10 +17,10 @@ LEVER, PLATE, BLOCK, DOOR = 162, 164, 166, 167        # worlds tiles
 plan = [
     "################",
     "#ffffff#fffffff#",
-    "#fCfffa#fffffff#",
-    "#ffffff#ffBffff#",
-    "#fffbffDfffffff#",
-    "#ffbfff#fffffff#",
+    "#fCafff#fffffff#",
+    "#ffffffDffBffff#",
+    "#ffbfffDfffffff#",
+    "#ffffbfDfffffff#",
     "#ffffff#ffffPff#",
     "########D#######",
     "#ffLfffffffffff#",
@@ -49,11 +51,11 @@ for y, row in enumerate(plan):
         if c == "L":
             obj("lever_1", "lever", x, y, [("target", "string", "door_1")], WORLDS + LEVER)
         elif c == "P":
-            obj("plate_1", "plate", x, y, [("target", "string", "door_2")], WORLDS + PLATE)
+            obj("plate_1", "plate", x, y, [("target", "string", "door_2a,door_2b,door_2c")], WORLDS + PLATE)
         elif c == "B":
             obj("crate_1", "block", x, y, (), WORLDS + BLOCK)
         elif c == "D":
-            n = "door_1" if y == 7 else "door_2"
+            n = "door_1" if y == 7 else "door_2" + "abc"[y - 3]
             obj(n, "door", x, y, (), WORLDS + DOOR)
         elif c in "ab":
             n = sum(1 for o in objs if o["type"] == "npc") + 1

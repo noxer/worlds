@@ -96,7 +96,7 @@ func TestHildesDelivery(t *testing.T) {
 	h.e.pullLever(lever)
 	h.e.moveBlock(crate, cell(12, 6))
 	h.e.updatePuzzles()
-	if !h.e.puzzle.byKey["cellar/door_2"].on {
+	if !h.e.puzzle.byKey["cellar/door_2b"].on {
 		t.Fatal("the door to the back room is shut")
 	}
 	// Into the doorway of the back room: the bandits see the party.
@@ -110,6 +110,18 @@ func TestHildesDelivery(t *testing.T) {
 	}
 	if n := len(b.f.Combatants()); n != 7 {
 		t.Fatalf("%d in the fight, want 3 bandits and 4 of the party", n)
+	}
+	// The party gathers round its leader, not strung out in a line.
+	var leader world.Pos
+	for _, c := range b.f.Combatants() {
+		if c.Name == h.leader().Name {
+			leader = c.Pos
+		}
+	}
+	for _, c := range b.f.Combatants() {
+		if c.Team == combat.Party && b.f.Distance(c.Pos, leader) > 2 {
+			t.Errorf("%s starts %d steps from the leader", c.Name, b.f.Distance(c.Pos, leader))
+		}
 	}
 	if o := h.playBattle(b); o != combat.Victory {
 		t.Fatalf("the fight with the bandits: %v", o)
