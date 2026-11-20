@@ -3,12 +3,16 @@
 
 elder:
   start: hello
+  starts:
+    - {if: [flag quest.meadow_slimes.clear, "!flag slime_job_done"], node: reward}
+    - {if: [flag met_elder], node: back}
   nodes:
     hello:
       speaker: Elder Maren
       lines:
         - Welcome to Brookhaven, travellers.
         - It is rare to see a company as large as yours on our little road.
+      effects: [set met_elder]
       choices:
         - text: What is this place?
           next: place
@@ -26,6 +30,21 @@ elder:
       lines:
         - Hilde, our smith, has been grumbling about something missing.
         - Her forge is the red-roofed house to the north-west.
+        - And slimes have taken over the east field of Willow Meadow. Nobody dares mow it.
+        - Clear them out and the village will see you right.
+      effects: [set slime_job]
+      next: hello_again
+    reward:
+      speaker: Elder Maren
+      lines:
+        - The east field is clear? And the wisp gone too?
+        - Well done. Here, from the village purse.
+      effects: [set slime_job_done]
+      next: hello_again
+    back:
+      speaker: Elder Maren
+      lines:
+        - Back again, travellers? Brookhaven must be growing on you.
       next: hello_again
     hello_again:
       speaker: Elder Maren
@@ -63,20 +82,41 @@ locked_door:
 
 smith:
   start: main
+  starts:
+    - {if: [flag quest.hilde_delivery.done], node: done}
+    - {if: [item crate], node: handover}
+    - {if: [flag hilde_job], node: waiting}
   nodes:
     main:
       speaker: Hilde
       lines:
         - Mind the anvil. And the barrels. And my temper.
-        - My good hammer went missing somewhere in the meadow.
+        - My delivery never came. Iron bars and a new hammer head, from Marbridge.
+        - The carter swears he was robbed on the meadow road. Folk have seen rough sorts by the old cellar out there.
       choices:
-        - text: We will keep an eye out.
+        - text: We'll get it back for you.
           next: thanks
         - text: Not our problem.
     thanks:
       speaker: Hilde
       lines:
-        - Hmph. Thank you.
+        - Hmph. Thank you. The cellar's hatch is in the north-west corner of Willow Meadow.
+        - Take care. Whoever took it won't hand it over with a smile.
+      effects: [set hilde_job]
+    waiting:
+      speaker: Hilde
+      lines:
+        - No crate yet? The hatch is in the north-west corner of the meadow.
+    handover:
+      speaker: Hilde
+      lines:
+        - That's my crate! Mark's still on it, and the hammer head's all there.
+        - You've earned this. And if you ever need something forged, you know where I am.
+      effects: [take crate, set crate_back]
+    done:
+      speaker: Hilde
+      lines:
+        - Mind the anvil. The new hammer rings like a bell, by the way.
 
 lina:
   start: main

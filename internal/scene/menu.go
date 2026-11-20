@@ -3,6 +3,7 @@ package scene
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"runtime"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -14,7 +15,8 @@ import (
 )
 
 // Menu is the pause menu, opened with Menu (or Cancel) while exploring:
-// Resume, Map (the world map), Party, Save, Load and, on desktop, Quit. The world stands still while
+// Resume, Map (the world map), Party, Quests (the journal), Items, Save,
+// Load and, on desktop, Quit. The world stands still while
 // it is open. Save and Load list the slots with where and when.
 type Menu struct {
 	e      *Explore
@@ -32,12 +34,15 @@ const (
 	menuMain menuPage = iota
 	menuSave
 	menuLoad
+	menuItems
+	menuQuests
 )
 
 type menuItem struct {
-	text string
-	do   func(m *Menu, ctx *Context)
-	off  bool // shown greyed out, can't be chosen
+	text  string
+	do    func(m *Menu, ctx *Context)
+	off   bool   // shown greyed out, can't be chosen
+	about string // shown under the menu while the cursor is on it
 }
 
 // NewMenu creates the pause menu over the exploration scene.
@@ -45,6 +50,34 @@ func NewMenu(e *Explore, store save.Store) *Menu { return &Menu{e: e, store: sto
 
 func (m *Menu) items() []menuItem {
 	switch m.page {
+	case menuQuests:
+		var out []menuItem
+		for _, q := range m.e.quests.Journal(m.e.story) {
+			it := menuItem{text: q.Quest.Name, about: "Completed."}
+			if q.Done {
+				it.text += " (done)"
+			} else if q.Stage != nil {
+				it.about = q.Stage.Text
+			}
+			out = append(out, it)
+		}
+		if len(out) == 0 {
+			out = append(out, menuItem{text: "- none yet -", off: true})
+		}
+		return append(out, menuItem{text: "Back", do: func(m *Menu, ctx *Context) { m.open(menuMain) }})
+	case menuItems:
+		var out []menuItem
+		for _, it := range m.e.itemList() {
+			text, about := it.name, it.text
+			if it.n > 1 {
+				text = fmt.Sprintf("%s x%d", it.name, it.n)
+			}
+			out = append(out, menuItem{text: text, about: about})
+		}
+		if len(out) == 0 {
+			out = append(out, menuItem{text: "- nothing -", off: true})
+		}
+		return append(out, menuItem{text: "Back", do: func(m *Menu, ctx *Context) { m.open(menuMain) }})
 	case menuSave, menuLoad:
 		var out []menuItem
 		for k, s := range m.slots {
@@ -65,6 +98,8 @@ func (m *Menu) items() []menuItem {
 		{text: "Resume", do: func(m *Menu, ctx *Context) { ctx.Pop() }},
 		{text: "Map", do: func(m *Menu, ctx *Context) { ctx.Pop(); ctx.Push(NewWorldMap(m.e)) }},
 		{text: "Party", do: func(m *Menu, ctx *Context) { ctx.Pop(); ctx.Push(NewPartyScreen(m.e)) }},
+		{text: "Quests", do: func(m *Menu, ctx *Context) { m.open(menuQuests) }},
+		{text: "Items", do: func(m *Menu, ctx *Context) { m.open(menuItems) }},
 		{text: "Save", off: m.store == nil, do: func(m *Menu, ctx *Context) { m.open(menuSave) }},
 		{text: "Load", off: m.store == nil, do: func(m *Menu, ctx *Context) { m.open(menuLoad) }},
 	}
@@ -77,6 +112,12 @@ func (m *Menu) items() []menuItem {
 // open switches to a page.
 func (m *Menu) open(p menuPage) {
 	m.page, m.cursor, m.msg = p, 0, ""
+	if p == menuItems || p == menuQuests {
+		if its := m.items(); its[0].off {
+			m.cursor = 1 // nothing to list: on Back
+		}
+		return
+	}
 	if p != menuMain {
 		m.slots = save.List(m.store)
 		if p == menuLoad {
@@ -177,7 +218,9 @@ func (m *Menu) Update(ctx *Context) {
 		for i, r := range rows {
 			if p.In(r) && !its[i].off {
 				m.cursor = i
-				its[i].do(m, ctx)
+				if its[i].do != nil {
+					its[i].do(m, ctx)
+				}
 				return
 			}
 		}
@@ -190,7 +233,7 @@ func (m *Menu) Update(ctx *Context) {
 			return
 		}
 	}
-	if in.Pressed(input.Confirm) && m.cursor < len(its) && !its[m.cursor].off {
+	if in.Pressed(input.Confirm) && m.cursor < len(its) && !its[m.cursor].off && its[m.cursor].do != nil {
 		its[m.cursor].do(m, ctx)
 	}
 }
@@ -199,7 +242,7 @@ func (m *Menu) Update(ctx *Context) {
 func (m *Menu) Draw(dst *ebiten.Image) {
 	box, rows := m.rects()
 	gfx.Box(dst, box)
-	title := map[menuPage]string{menuMain: "Menu", menuSave: "Save to", menuLoad: "Load from"}[m.page]
+	title := map[menuPage]string{menuMain: "Menu", menuSave: "Save to", menuLoad: "Load from", menuItems: "Items", menuQuests: "Quests"}[m.page]
 	gfx.Text(dst, title, box.Min.X+boxPad, box.Min.Y+boxPad-1, gfx.ColorAccent)
 	for i, it := range m.items() {
 		r := rows[i]
@@ -213,10 +256,21 @@ func (m *Menu) Draw(dst *ebiten.Image) {
 		}
 		gfx.Text(dst, it.text, r.Min.X+boxPad+6, r.Min.Y-1, col)
 	}
-	if m.msg != "" {
-		w := gfx.TextWidth(m.msg) + 2*boxPad
-		r := image.Rect(box.Min.X, box.Max.Y+2, box.Min.X+w, box.Max.Y+2+gfx.LineHeight+2*boxPad-2)
+	// Under the menu: a message, or what the entry under the cursor is.
+	msg, col := m.msg, color.Color(gfx.ColorAccent)
+	if its := m.items(); msg == "" && m.cursor < len(its) {
+		msg, col = its[m.cursor].about, gfx.ColorInk
+	}
+	if msg != "" {
+		lines := gfx.Wrap(msg, dst.Bounds().Dx()-2*boxMargin-2*boxPad)
+		w := 0
+		for _, l := range lines {
+			w = max(w, gfx.TextWidth(l))
+		}
+		r := image.Rect(box.Min.X, box.Max.Y+2, box.Min.X+w+2*boxPad, box.Max.Y+2+len(lines)*gfx.LineHeight+2*boxPad-2)
 		gfx.Box(dst, r)
-		gfx.Text(dst, m.msg, r.Min.X+boxPad, r.Min.Y+boxPad-2, gfx.ColorAccent)
+		for i, l := range lines {
+			gfx.Text(dst, l, r.Min.X+boxPad, r.Min.Y+boxPad-2+i*gfx.LineHeight, col)
+		}
 	}
 }

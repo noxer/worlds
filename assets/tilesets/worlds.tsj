@@ -1424,6 +1424,86 @@
    ]
   },
   {
+   "id": 162,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "lever off"
+    }
+   ]
+  },
+  {
+   "id": 163,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "lever on"
+    }
+   ]
+  },
+  {
+   "id": 164,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plate"
+    }
+   ]
+  },
+  {
+   "id": 165,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "plate down"
+    }
+   ]
+  },
+  {
+   "id": 166,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "block"
+    }
+   ]
+  },
+  {
+   "id": 167,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "door closed"
+    }
+   ]
+  },
+  {
+   "id": 168,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "door open"
+    }
+   ]
+  },
+  {
+   "id": 169,
+   "properties": [
+    {
+     "name": "name",
+     "type": "string",
+     "value": "hatch"
+    }
+   ]
+  },
+  {
    "id": 64,
    "properties": [
     {

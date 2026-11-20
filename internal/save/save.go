@@ -41,6 +41,14 @@ type State struct {
 
 	// Places the party has been to (settlement IDs: tier, cell x, cell y).
 	Visited [][3]int64 `json:"visited"`
+
+	// The story: the flags that are set (enemies beaten among them) and
+	// the items carried.
+	Flags []string       `json:"flags,omitempty"`
+	Items map[string]int `json:"items,omitempty"`
+
+	// Puzzle blocks moved from where they started: "<map>/<name>" to x, y.
+	Blocks map[string][2]int64 `json:"blocks,omitempty"`
 }
 
 // Encode returns s as JSON.

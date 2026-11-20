@@ -3,14 +3,19 @@
 package content
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
+	"sort"
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/noxer/worlds/internal/combat"
 	"github.com/noxer/worlds/internal/dialog"
 	"github.com/noxer/worlds/internal/gen"
 	"github.com/noxer/worlds/internal/infra"
+	"github.com/noxer/worlds/internal/quest"
+	"github.com/noxer/worlds/internal/story"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -31,7 +36,10 @@ type WorldFile struct {
 // Content is everything loaded from the assets.
 type Content struct {
 	World   *world.World
-	Infra   *infra.Infra // settlements and networks; nil without a relief generator
+	Infra   *infra.Infra          // settlements and networks; nil without a relief generator
+	Combat  *combat.Rules         // the rules of fights; nil if there is no combat.yaml
+	Items   map[string]story.Item // the kinds of items, by id
+	Quests  quest.Book            // the quests
 	Dialogs dialog.Library
 	Start   world.Spawn
 }
@@ -82,7 +90,76 @@ func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Content{World: w, Infra: in, Dialogs: lib, Start: start}, nil
+	// The items, and the wording of every dialog's conditions and effects.
+	items := map[string]story.Item{}
+	if data, err := fs.ReadFile(fsys, "items.yaml"); err == nil {
+		if err := yaml.Unmarshal(data, &items); err != nil {
+			return nil, fmt.Errorf("items.yaml: %w", err)
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("items.yaml: %w", err)
+	}
+	for id, it := range items {
+		if it.Name == "" {
+			return nil, fmt.Errorf("items.yaml: item %q has no name", id)
+		}
+	}
+	if err := checkStory(lib, items); err != nil {
+		return nil, err
+	}
+	// The quests.
+	var quests quest.Book
+	if data, err := fs.ReadFile(fsys, "quests.yaml"); err == nil {
+		known := func(item string) bool { _, ok := items[item]; return ok }
+		if quests, err = quest.Load(data, known); err != nil {
+			return nil, fmt.Errorf("quests.yaml: %w", err)
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("quests.yaml: %w", err)
+	}
+	// The rules of fights, if the game has any.
+	var rules *combat.Rules
+	if data, err := fs.ReadFile(fsys, "combat.yaml"); err == nil {
+		if rules, err = combat.LoadRules(data); err != nil {
+			return nil, fmt.Errorf("combat.yaml: %w", err)
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("combat.yaml: %w", err)
+	}
+	return &Content{World: w, Infra: in, Dialogs: lib, Start: start, Combat: rules, Items: items, Quests: quests}, nil
+}
+
+// checkStory checks the wording of the dialogs' conditions and effects,
+// and that the items they mention exist.
+func checkStory(lib dialog.Library, items map[string]story.Item) error {
+	ids := make([]string, 0, len(lib))
+	for id := range lib {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	var errs []error
+	known := func(id, item string) {
+		if _, ok := items[item]; item != "" && !ok {
+			errs = append(errs, fmt.Errorf("dialog %q: unknown item %q", id, item))
+		}
+	}
+	for _, id := range ids {
+		for _, c := range lib[id].Conditions() {
+			item, err := story.CheckCondition(c)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("dialog %q: condition %w", id, err))
+			}
+			known(id, item)
+		}
+		for _, e := range lib[id].Effects() {
+			item, err := story.CheckEffect(e)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("dialog %q: effect %w", id, err))
+			}
+			known(id, item)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // loadInfra returns the infrastructure of the world's generator, if any.

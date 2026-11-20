@@ -10,6 +10,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
+	"github.com/noxer/worlds/internal/combat"
 	"github.com/noxer/worlds/internal/dialog"
 	"github.com/noxer/worlds/internal/entity"
 	"github.com/noxer/worlds/internal/geom"
@@ -17,8 +18,10 @@ import (
 	"github.com/noxer/worlds/internal/infra"
 	"github.com/noxer/worlds/internal/input"
 	"github.com/noxer/worlds/internal/nav"
+	"github.com/noxer/worlds/internal/quest"
 	"github.com/noxer/worlds/internal/save"
 	"github.com/noxer/worlds/internal/sim"
+	"github.com/noxer/worlds/internal/story"
 	"github.com/noxer/worlds/internal/world"
 )
 
@@ -41,6 +44,8 @@ type NPC struct {
 	schedule sim.Schedule // daily routine; empty: stays put
 	active   bool         // in the party's reach (always true without schedule)
 	ambient  bool         // part of the crowd (see crowd.go)
+	enemy    string       // the kind of enemy it is (combat rules); "": no enemy
+	defeated bool         // beaten in a fight: gone
 	path     []nav.Move
 	wait     int
 }
@@ -82,8 +87,18 @@ type Explore struct {
 
 	visited       map[infra.ID]infra.Settlement // places the party has been to
 	pendingNotice string                        // shown when the fade is over
-	restoreRiding bool                          // ride on after the fade (a loaded game)
-	lastMain      world.Pos                     // the party's last place outside (for the world map)
+	story         *story.State                  // flags and items (see storystate.go)
+	puzzle        puzzles                       // levers, plates, blocks, doors (see puzzle.go)
+	pickups       []*pickup                     // things to take (see pickup.go)
+	items         map[string]story.Item         // the kinds of items, by id
+	quests        quest.Book                    // the quests (see questlog.go)
+	toasts        []toast                       // banners waiting to be shown; the first is on show
+	toastAge      int                           // ticks the first banner has been shown
+	combat        *combat.Rules
+	pendingBattle *NPC       // an enemy that starts a fight on the next tick
+	camLock       *world.Pos // the camera stays on this tile (a fight) instead of the leader
+	restoreRiding bool       // ride on after the fade (a loaded game)
+	lastMain      world.Pos  // the party's last place outside (for the world map)
 	saves         save.Store
 	fade          int // >0 fading out, <0 fading in
 	warp          *world.Warp
@@ -107,9 +122,12 @@ type ExploreConfig struct {
 	Dialogs dialog.Library
 	Party   *entity.Party
 	Start   world.Spawn
-	Clock   sim.Clock    // game time at the start
-	Infra   *infra.Infra // settlements, for the crowd (nil: nobody about)
-	Saves   save.Store   // where the menu saves and loads (nil: no saving)
+	Clock   sim.Clock             // game time at the start
+	Infra   *infra.Infra          // settlements, for the crowd (nil: nobody about)
+	Saves   save.Store            // where the menu saves and loads (nil: no saving)
+	Combat  *combat.Rules         // the rules of fights (nil: enemies just stand there)
+	Items   map[string]story.Item // the kinds of items, by id
+	Quests  quest.Book            // the quests
 }
 
 // NewExplore creates the exploration scene and spawns NPCs from all maps.
@@ -123,6 +141,10 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		clock:   cfg.Clock,
 		infra:   cfg.Infra,
 		saves:   cfg.Saves,
+		combat:  cfg.Combat,
+		story:   story.New(),
+		items:   cfg.Items,
+		quests:  cfg.Quests,
 		crowd:   newCrowd(),
 
 		vehicleState: newVehicleState(),
@@ -131,13 +153,19 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		bumps:        map[world.Pos]string{},
 	}
 	for _, o := range e.w.Objects() {
+		if ok, err := e.addPiece(o); ok {
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
 		switch o.Type {
 		case "npc":
 			if o.Tile.Empty() {
 				return nil, fmt.Errorf("%v: npc %q must be a tile object", o.Pos, o.Name)
 			}
 			facing, _ := world.ParseDir(o.Props.String("facing"))
-			n := &NPC{Dialog: o.Props.String("dialog"), active: true}
+			n := &NPC{Dialog: o.Props.String("dialog"), enemy: o.Props.String("enemy"), active: true}
 			n.Name = o.Name
 			n.Sprite = entity.Sprite{Sheet: e.w.Tilesets().Get(o.Tile.Set()).Name, Index: o.Tile.Index()}
 			n.Place(o.Pos, facing)
@@ -148,9 +176,21 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 				}
 				n.schedule, n.active = sch, false // placed when in reach
 			}
+			if n.enemy != "" {
+				// An enemy beaten is remembered by its name.
+				for _, m := range e.npcs {
+					if m.enemy != "" && m.Name == n.Name {
+						return nil, fmt.Errorf("%v: two enemies are called %q", o.Pos, o.Name)
+					}
+				}
+			}
 			e.npcs = append(e.npcs, n)
 		case "sign":
 			e.signs[o.Pos] = o.Props.String("dialog")
+		case "pickup":
+			if err := e.addPickup(o); err != nil {
+				return nil, err
+			}
 		}
 		if id := o.Props.String("bump"); id != "" {
 			if e.dialogs[id] == nil {
@@ -164,6 +204,9 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 				}
 			}
 		}
+	}
+	if err := e.wirePuzzles(); err != nil {
+		return nil, err
 	}
 	for _, pf := range e.w.Prefabs() {
 		for _, o := range pf.Objects {
@@ -272,6 +315,14 @@ func (e *Explore) Update(ctx *Context) {
 		e.updateCamera(ctx)
 		return
 	}
+	if n := e.pendingBattle; n != nil {
+		e.pendingBattle = nil
+		if b := newBattle(e, n); b != nil {
+			e.cancelPath()
+			ctx.Push(b)
+			return
+		}
+	}
 	if in.Pressed(input.Menu) || in.Pressed(input.Cancel) {
 		e.cancelPath()
 		ctx.Push(NewMenu(e, e.saves))
@@ -293,12 +344,25 @@ func (e *Explore) Update(ctx *Context) {
 		e.lastMain = l.Pos
 	}
 	arrived := e.party.Update()
+	e.updatePuzzles()
 	e.updateNPCs()
 	e.updateCrowd()
 	e.updateVehicles()
 	leader := e.party.Leader()
+	if arrived || e.clock.Ticks()%20 == 0 {
+		e.lookOut()
+	}
+	if e.clock.Ticks()%questsEvery == 0 {
+		e.updateQuests()
+	}
+	e.tickToasts()
 	if arrived {
 		if wp := e.w.WarpAt(leader.Pos); wp != nil {
+			if e.hasGoal && leader.Pos == e.goal {
+				// The door was where the party was going: through it, the
+				// walk is over (going on would lead back out to it).
+				e.cancelPath()
+			}
 			e.warp = wp
 			e.fade = fadeTicks
 			return
@@ -327,6 +391,13 @@ type notice struct {
 
 // bump shows the bump message of the object at p, if it has one.
 func (e *Explore) bump(p world.Pos) {
+	if e.puzzleBump(p) {
+		return
+	}
+	if n := e.npcAt(p); n != nil && n.enemy != "" && e.combat != nil {
+		e.pendingBattle = n // walking into an enemy attacks it
+		return
+	}
 	if e.vehicleBump(p) {
 		return
 	}
@@ -352,6 +423,9 @@ func (e *Explore) updateFade() {
 			facing := e.party.Leader().Facing
 			if e.warp.HasFacing {
 				facing = e.warp.Facing
+			}
+			if from := e.party.Leader().Pos.Map; from != e.warp.To.Map {
+				e.resetBlocks(from)
 			}
 			e.party.PlaceAll(e.warp.To, facing)
 			e.refreshReach()           // while the screen is black
@@ -403,6 +477,10 @@ func (e *Explore) tryStep(d world.Dir) bool {
 	leader := e.party.Leader()
 	leader.Facing = d
 	to, ok := e.w.Neighbor(leader.Pos, d)
+	if b := e.pieceAt(to, pzBlock); ok && b != nil && !e.riding && e.pushBlock(b, d) {
+		e.party.Step(e.w, d, to, e.ticksFor) // after the crate
+		return true
+	}
 	if !ok || !e.walkable(to) {
 		if ok && !e.w.Solid(to) && !e.blocked(to) {
 			switch t := e.w.Terrain(to); {
@@ -482,6 +560,9 @@ func (e *Explore) canArrive(p world.Pos) bool {
 func (e *Explore) tryGoTo(target world.Pos) bool {
 	leader := e.party.Leader()
 	_, isSign := e.signs[target]
+	if e.pieceAt(target, pzLever) != nil || e.pickupAt(target) != nil {
+		isSign = true // tapping a lever or a pickup walks up to it and uses it
+	}
 	if _, ok := e.w.Bump(target); ok {
 		isSign = true // tapping a generated door walks up to it
 	}
@@ -568,11 +649,22 @@ func (e *Explore) followPath(ctx *Context) {
 
 // talk starts the conversation with whoever or whatever is at p.
 func (e *Explore) talk(ctx *Context, p world.Pos) {
+	if l := e.pieceAt(p, pzLever); l != nil {
+		e.pullLever(l)
+		return
+	}
+	if pk := e.pickupAt(p); pk != nil {
+		e.take(pk)
+		return
+	}
 	if e.vehicleTalk(ctx, p) {
 		return
 	}
 	id := ""
-	if n := e.npcAt(p); n != nil {
+	if n := e.npcAt(p); n != nil && n.enemy != "" && e.combat != nil {
+		e.pendingBattle = n
+		return
+	} else if n != nil {
 		id = n.Dialog
 		if d, ok := e.w.DirBetween(p, e.party.Leader().Pos); ok {
 			n.Facing = d
@@ -587,7 +679,7 @@ func (e *Explore) talk(ctx *Context, p world.Pos) {
 		return
 	}
 	e.notice = nil
-	ctx.Push(NewDialogBox(dialog.NewRunner(d), nil))
+	e.converse(ctx, d)
 }
 
 // pixel returns the top-left pixel of an actor in its map's coordinates
@@ -612,6 +704,9 @@ func (e *Explore) updateCamera(ctx *Context) {
 	e.viewW, e.viewH = int64(ctx.W), int64(ctx.H)
 	l := e.party.Leader()
 	x, y := e.pixel(l)
+	if c := e.camLock; c != nil {
+		x, y = c.X*tile, c.Y*tile
+	}
 	e.camX = x + tile/2 - int64(ctx.W)/2
 	e.camY = y + tile/2 - int64(ctx.H)/2
 	if w, h, wraps := e.w.Size(l.Pos.Map); !wraps {
@@ -648,6 +743,9 @@ func (e *Explore) pixelAt(a *entity.Actor, alpha float64, riding bool) (x, y flo
 func (e *Explore) cameraAt(alpha float64) (cx, cy float64) {
 	l := e.party.Leader()
 	x, y, _ := e.pixelAt(l, alpha, true) // the camera ignores the hop
+	if c := e.camLock; c != nil {
+		x, y = float64(c.X*tile), float64(c.Y*tile)
+	}
 	cx = x + tile/2 - float64(e.viewW)/2
 	cy = y + tile/2 - float64(e.viewH)/2
 	if w, h, wraps := e.w.Size(l.Pos.Map); !wraps {
@@ -752,7 +850,10 @@ func (e *Explore) Draw(dst *ebiten.Image) {
 	if e.debug {
 		e.drawDebug(dst)
 	}
-	drawButton(dst, cornerButton(dst.Bounds().Dx(), 0), iconMenu)
+	e.drawToast(dst)
+	if e.camLock == nil { // not in a fight, where there is no menu
+		drawButton(dst, cornerButton(dst.Bounds().Dx(), 0), iconMenu)
+	}
 	if e.fade != 0 {
 		a := float64(fadeTicks-abs(e.fade)) / fadeTicks
 		if e.fade < 0 {
@@ -869,6 +970,8 @@ func (e *Explore) drawActors(screen *ebiten.Image, m world.MapRef, s, offX, offY
 		add(a, len(e.party.Members)-i, vehicle) // leader on top when stacked after a warp
 	}
 	ds = append(ds, e.vehicleDrawables(m, alpha)...)
+	ds = append(ds, e.puzzleDrawables(m, alpha)...)
+	ds = append(ds, e.pickupDrawables(m, alpha)...)
 	sort.SliceStable(ds, func(i, j int) bool {
 		if ds[i].y != ds[j].y {
 			return ds[i].y < ds[j].y

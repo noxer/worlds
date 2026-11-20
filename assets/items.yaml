@@ -1,0 +1,11 @@
+# The items of the game, by id (what "give", "take" and "item" in dialogs
+# and quests refer to): the name shown, and a line about it.
+honey_cake:
+  name: Honey cake
+  text: Sticky, sweet, baked in Brookhaven.
+coin:
+  name: Coin
+  text: Brookhaven silver. Good anywhere a road leads.
+crate:
+  name: Hilde's crate
+  text: Iron bars and a new hammer head, stamped with Hilde's mark.

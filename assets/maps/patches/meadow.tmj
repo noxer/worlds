@@ -11,7 +11,7 @@
  "tilewidth": 16,
  "tileheight": 16,
  "nextlayerid": 5,
- "nextobjectid": 4,
+ "nextobjectid": 9,
  "layers": [
   {
    "id": 1,
@@ -568,7 +568,7 @@
     17,
     0,
     0,
-    0,
+    776,
     0,
     0,
     0,
@@ -1533,8 +1533,8 @@
      "type": "npc",
      "rotation": 0,
      "visible": true,
-     "x": 272,
-     "y": 208,
+     "x": 176,
+     "y": 192,
      "width": 16,
      "height": 16,
      "gid": 244,
@@ -1568,6 +1568,119 @@
       }
      ],
      "id": 3
+    },
+    {
+     "id": 4,
+     "name": "slime_1",
+     "type": "npc",
+     "gid": 241,
+     "x": 304,
+     "y": 176,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "enemy",
+       "type": "string",
+       "value": "slime"
+      },
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "left"
+      }
+     ]
+    },
+    {
+     "id": 5,
+     "name": "slime_2",
+     "type": "npc",
+     "gid": 241,
+     "x": 336,
+     "y": 192,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "enemy",
+       "type": "string",
+       "value": "slime"
+      },
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "left"
+      }
+     ]
+    },
+    {
+     "id": 6,
+     "name": "wisp_1",
+     "type": "npc",
+     "gid": 254,
+     "x": 336,
+     "y": 160,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "enemy",
+       "type": "string",
+       "value": "wisp"
+      },
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "down"
+      }
+     ]
+    },
+    {
+     "id": 7,
+     "name": "to_cellar",
+     "type": "warp",
+     "x": 48,
+     "y": 32,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "to_map",
+       "type": "string",
+       "value": "cellar"
+      },
+      {
+       "name": "to_spawn",
+       "type": "string",
+       "value": "entrance"
+      }
+     ]
+    },
+    {
+     "id": 8,
+     "name": "cellar_door",
+     "type": "spawn",
+     "x": 48,
+     "y": 48,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "down"
+      }
+     ]
     }
    ]
   }
@@ -1588,6 +1701,10 @@
   {
    "firstgid": 463,
    "source": "../../tilesets/water.tsj"
+  },
+  {
+   "firstgid": 607,
+   "source": "../../tilesets/worlds.tsj"
   }
  ],
  "properties": [
