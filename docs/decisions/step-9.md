@@ -110,3 +110,35 @@ the top of `internal/scene/health.go`).
 - **The action bar wraps** onto a second row on narrow screens. On a phone
   in portrait it was already too wide for Ari before items, and that is
   fixed too.
+
+## 9.3: shops
+
+- **Prices** live on the items (`price:` in `items.yaml`):
+  - honey cake 3, herb tonic 8, smelling salts 15.
+  - A shop **buys anything with a price for half of it**. Items without a
+    price (coins, Hilde's crate) can't be sold, which keeps quest items
+    safe.
+- **Shops** are data (`assets/shops.yaml`), each with a name and what it
+  sells.
+  - A dialog opens one with the action `shop <id>`, the same way the inn
+    uses `rest`. So any NPC can become a shopkeeper.
+  - Content loading checks that each shop a dialog names exists, and that
+    everything it sells has a price.
+- **Brookhaven Stores:**
+  - A new building (a copy of the red house, north of the square, where a
+    bush stood) with a sign.
+  - Inside is Oskar behind his counter, with shelves and barrels
+    (`tools/art/store.py`).
+  - It sells the three healing items.
+- **The shop screen** looks like the pause menu:
+  - one item per row with its price, and the coins at the top;
+  - Confirm buys one;
+  - "Sell..." switches to the party's sellable items;
+  - the item's description shows underneath.
+- **Hilde's forge is moved to 9.5.** Before equipment exists she has
+  nothing to sell that the store doesn't. She opens it with weapons and
+  armour once her quest is done.
+- **Signs:** the inn and the store each get a signpost tile next to the
+  door. The inn's sign was invisible in 9.1, and that is fixed.
+- **Not done:** shops don't run out of stock, and prices don't vary by
+  town. Both are easy to add later if wanted.

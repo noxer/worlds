@@ -1,0 +1,6 @@
+# The shops, by id: a dialog opens one with the action "shop <id>". A shop
+# sells the items listed, at their price (items.yaml), and buys anything
+# with a price for half of it.
+store:
+  name: Brookhaven Stores
+  sells: [honey_cake, herb_tonic, smelling_salts]

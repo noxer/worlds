@@ -92,6 +92,7 @@ type Explore struct {
 	wounds        map[string]int                // hit points missing, by member (see health.go)
 	pickups       []*pickup                     // things to take (see pickup.go)
 	items         map[string]story.Item         // the kinds of items, by id
+	shops         map[string]story.Shop         // the shops, by id
 	quests        quest.Book                    // the quests (see questlog.go)
 	toasts        []toast                       // banners waiting to be shown; the first is on show
 	toastAge      int                           // ticks the first banner has been shown
@@ -128,6 +129,7 @@ type ExploreConfig struct {
 	Saves   save.Store            // where the menu saves and loads (nil: no saving)
 	Combat  *combat.Rules         // the rules of fights (nil: enemies just stand there)
 	Items   map[string]story.Item // the kinds of items, by id
+	Shops   map[string]story.Shop // the shops, by id
 	Quests  quest.Book            // the quests
 }
 
@@ -145,6 +147,7 @@ func NewExplore(cfg ExploreConfig) (*Explore, error) {
 		combat:  cfg.Combat,
 		story:   story.New(),
 		items:   cfg.Items,
+		shops:   cfg.Shops,
 		quests:  cfg.Quests,
 		crowd:   newCrowd(),
 

@@ -12,13 +12,6 @@
  "tileheight": 16,
  "nextlayerid": 5,
  "nextobjectid": 5,
- "properties": [
-  {
-   "name": "inn",
-   "type": "bool",
-   "value": true
-  }
- ],
  "tilesets": [
   {
    "firstgid": 1,

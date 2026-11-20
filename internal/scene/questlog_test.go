@@ -30,6 +30,9 @@ func (h *harness) speakWith(name string, picks ...string) {
 			for k := 0; k < 600 && h.top() != Scene(h.e); k++ {
 				box, ok := h.top().(*DialogBox)
 				if !ok {
+					if _, shop := h.top().(*Shop); shop && len(picks) == 0 {
+						return // the dialog opened a shop
+					}
 					h.t.Fatalf("talking to %s: top is %T", name, h.top())
 				}
 				if cs := box.choices(); len(cs) > 0 && box.typed() {

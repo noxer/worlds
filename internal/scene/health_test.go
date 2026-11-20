@@ -1,6 +1,7 @@
 package scene
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/noxer/worlds/internal/combat"
@@ -269,5 +270,51 @@ func TestItemsFromTheMenu(t *testing.T) {
 	}
 	if m := h.top().(*Menu); m.msg != "Cato: Honey cake, 5 HP back." {
 		t.Errorf("message %q", m.msg)
+	}
+}
+
+// TestStore: Oskar's store sells, and buys back for half.
+func TestStore(t *testing.T) {
+	h := newBattleHarness(t)
+	h.e.story.Give("coin", 20)
+	h.e.story.Give("crate", 1)
+	h.speakWith("shopkeeper", "Let's trade")
+	s, ok := h.top().(*Shop)
+	if !ok {
+		t.Fatalf("no shop (top: %T)", h.top())
+	}
+	pick := func(prefix string) {
+		t.Helper()
+		for i, r := range s.rows() {
+			if strings.HasPrefix(r.text, prefix) {
+				s.cursor = i
+				h.press(input.Confirm)
+				return
+			}
+		}
+		t.Fatalf("no row %q in %v", prefix, s.rows())
+	}
+	pick("Herb tonic")
+	pick("Herb tonic")
+	if h.e.story.Count("herb_tonic") != 2 || h.e.story.Count("coin") != 4 {
+		t.Fatalf("after buying two tonics: %d tonics, %d coins", h.e.story.Count("herb_tonic"), h.e.story.Count("coin"))
+	}
+	pick("Smelling salts")
+	if h.e.story.Count("smelling_salts") != 0 || s.msg != "You can't afford that." {
+		t.Fatalf("bought salts without the coins (%q)", s.msg)
+	}
+	pick("Sell")
+	for _, r := range s.rows() {
+		if strings.HasPrefix(r.text, "Hilde") || strings.HasPrefix(r.text, "Coin") {
+			t.Errorf("%q for sale", r.text)
+		}
+	}
+	pick("Herb tonic")
+	if h.e.story.Count("herb_tonic") != 1 || h.e.story.Count("coin") != 8 {
+		t.Fatalf("after selling a tonic: %d tonics, %d coins", h.e.story.Count("herb_tonic"), h.e.story.Count("coin"))
+	}
+	pick("Leave")
+	if h.top() != Scene(h.e) {
+		t.Fatalf("still in the shop: %T", h.top())
 	}
 }

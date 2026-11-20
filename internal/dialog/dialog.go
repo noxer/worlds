@@ -112,6 +112,19 @@ func (d *Dialog) Effects() []string {
 	return out
 }
 
+// Actions returns the actions (Do) of every choice, in node order.
+func (d *Dialog) Actions() []string {
+	var out []string
+	for _, id := range d.nodeIDs() {
+		for _, c := range d.Nodes[id].Choices {
+			if c.Do != "" {
+				out = append(out, c.Do)
+			}
+		}
+	}
+	return out
+}
+
 func (d *Dialog) nodeIDs() []string {
 	ids := make([]string, 0, len(d.Nodes))
 	for id := range d.Nodes {

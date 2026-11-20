@@ -159,3 +159,27 @@ innkeeper:
       speaker: Marta
       lines:
         - Then off with you, unless you fancy sleeping in the hay. Come back when your purse is heavier.
+
+store_sign:
+  start: main
+  nodes:
+    main:
+      lines:
+        - "BROOKHAVEN STORES  -  Tonics, salts, cakes. We buy too."
+
+shopkeeper:
+  start: main
+  nodes:
+    main:
+      speaker: Oskar
+      lines:
+        - Come in, come in. Tonics for the road, cakes for the soul. Buying or selling?
+      choices:
+        - text: Let's trade.
+          do: shop store
+        - text: Just looking.
+          next: bye
+    bye:
+      speaker: Oskar
+      lines:
+        - Look all you like. Touching is free too, mostly.

@@ -50,7 +50,6 @@ obj("exit", "warp", 4, 8, [("to_map", "string", "main"), ("to_spawn", "string", 
 m = {"type": "map", "version": "1.10", "tiledversion": "1.11.0", "orientation": "orthogonal",
      "renderorder": "right-down", "infinite": False, "compressionlevel": -1,
      "width": W, "height": H, "tilewidth": 16, "tileheight": 16, "nextlayerid": 5, "nextobjectid": len(objs) + 1,
-     "properties": [{"name": "inn", "type": "bool", "value": True}],
      "tilesets": [{"firstgid": DUNGEON, "source": "../../tilesets/tinydungeon.tsj"}],
      "layers": [
          {"id": 1, "name": "ground", "type": "tilelayer", "visible": True, "opacity": 1, "x": 0, "y": 0,

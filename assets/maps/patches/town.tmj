@@ -11,7 +11,7 @@
  "tilewidth": 16,
  "tileheight": 16,
  "nextlayerid": 5,
- "nextobjectid": 16,
+ "nextobjectid": 19,
  "layers": [
   {
    "id": 1,
@@ -216,7 +216,7 @@
     1,
     1,
     1,
-    2,
+    44,
     2,
     1,
     1,
@@ -246,7 +246,7 @@
     1,
     2,
     1,
-    1,
+    44,
     1,
     1,
     1,
@@ -276,7 +276,7 @@
     1,
     1,
     1,
-    1,
+    44,
     3,
     1,
     2,
@@ -767,10 +767,10 @@
     68,
     67,
     0,
-    0,
-    29,
-    0,
-    0,
+    65,
+    66,
+    68,
+    67,
     0,
     0,
     0,
@@ -797,10 +797,10 @@
     91,
     80,
     0,
-    0,
-    0,
-    0,
-    0,
+    77,
+    89,
+    91,
+    80,
     0,
     0,
     0,
@@ -830,7 +830,7 @@
     0,
     0,
     0,
-    0,
+    84,
     0,
     0,
     0,
@@ -1051,7 +1051,7 @@
     85,
     86,
     76,
-    0,
+    84,
     17,
     0,
     0,
@@ -1350,10 +1350,10 @@
     54,
     55,
     0,
-    0,
-    0,
-    0,
-    0,
+    53,
+    54,
+    54,
+    55,
     0,
     0,
     0,
@@ -2165,6 +2165,65 @@
        "name": "dialog",
        "type": "string",
        "value": "inn_sign"
+      }
+     ]
+    },
+    {
+     "id": 16,
+     "name": "to_store",
+     "type": "warp",
+     "x": 192,
+     "y": 80,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "to_map",
+       "type": "string",
+       "value": "store"
+      },
+      {
+       "name": "to_spawn",
+       "type": "string",
+       "value": "entrance"
+      }
+     ]
+    },
+    {
+     "id": 17,
+     "name": "store_door",
+     "type": "spawn",
+     "x": 192,
+     "y": 96,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "facing",
+       "type": "string",
+       "value": "down"
+      }
+     ]
+    },
+    {
+     "id": 18,
+     "name": "store_sign",
+     "type": "sign",
+     "x": 208,
+     "y": 96,
+     "width": 16,
+     "height": 16,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "dialog",
+       "type": "string",
+       "value": "store_sign"
       }
      ]
     }

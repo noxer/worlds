@@ -1,6 +1,9 @@
 # The items of the game, by id (what "give", "take" and "item" in dialogs
 # and quests refer to): the name shown, and a line about it.
 #
+# price: what a shop asks for it (shops.yaml); shops buy anything with a
+# price for half of it. Without a price it can't be bought or sold.
+#
 # use: what using the item does to a member of the party (it is used up):
 # heal: hit points back; revive: in a fight, gets someone who is down back
 # on their feet (with heal hit points). Items are used from the menu's
@@ -9,14 +12,17 @@ honey_cake:
   name: Honey cake
   text: Sticky, sweet, baked in Brookhaven. Gives back 5 HP.
   use: {heal: 5}
+  price: 3
 herb_tonic:
   name: Herb tonic
   text: Bitter, green, and it works. Gives back 12 HP.
   use: {heal: 12}
+  price: 8
 smelling_salts:
   name: Smelling salts
   text: One sniff and the fallen are back on their feet, with 4 HP. Only in a fight.
   use: {heal: 4, revive: true}
+  price: 15
 coin:
   name: Coin
   text: Brookhaven silver. Good anywhere a road leads.

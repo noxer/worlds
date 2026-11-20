@@ -1274,8 +1274,10 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       cake, herb tonic, smelling salts); the menu's Items page uses one on
       a member; in a fight the bar's Items (1 AP, oneself or a friend
       next to one; `combat.Treatment`); the bar wraps on narrow screens;
-   3. shops: buy and sell; a general store in Brookhaven, Hilde's forge
-      after her quest;
+   3. **done:** shops (`assets/shops.yaml`, `scene/shop.go`, opened by the
+      dialog action `shop <id>`): buy at an item's `price`, sell anything
+      priced for half; Brookhaven Stores (Oskar; `tools/art/store.py`).
+      Hilde's forge comes with equipment (5);
    4. experience and levels, the stats rising by themselves;
    5. equipment: a weapon and an armour per member.
 

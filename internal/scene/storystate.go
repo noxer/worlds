@@ -34,7 +34,7 @@ func (e *Explore) converse(ctx *Context, d *dialog.Dialog) {
 	note := &storyNote{st: e.story}
 	run := dialog.NewRunnerWith(d, note)
 	ctx.Push(NewDialogBox(run, func() {
-		e.dialogActions(run)
+		e.dialogActions(ctx, run)
 		if text := e.changesText(note.changes); text != "" {
 			e.say(text)
 		}

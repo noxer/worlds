@@ -5,5 +5,5 @@ package assets
 
 import "embed"
 
-//go:embed world.yaml combat.yaml items.yaml quests.yaml tiles tilesets maps dialog
+//go:embed world.yaml combat.yaml items.yaml quests.yaml shops.yaml tiles tilesets maps dialog
 var FS embed.FS

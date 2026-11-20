@@ -31,7 +31,7 @@ func newBattleHarness(t *testing.T) *harness {
 		}
 	}
 	e, err := NewExplore(ExploreConfig{World: c.World, Sheets: gfx.NewSheets(assets.FS), Dialogs: c.Dialogs,
-		Party: party, Start: c.Start, Infra: c.Infra, Combat: c.Combat, Items: c.Items})
+		Party: party, Start: c.Start, Infra: c.Infra, Combat: c.Combat, Items: c.Items, Shops: c.Shops})
 	if err != nil {
 		t.Fatal(err)
 	}

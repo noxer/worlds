@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 
@@ -39,6 +40,7 @@ type Content struct {
 	Infra   *infra.Infra          // settlements and networks; nil without a relief generator
 	Combat  *combat.Rules         // the rules of fights; nil if there is no combat.yaml
 	Items   map[string]story.Item // the kinds of items, by id
+	Shops   map[string]story.Shop // the shops, by id
 	Quests  quest.Book            // the quests
 	Dialogs dialog.Library
 	Start   world.Spawn
@@ -110,6 +112,28 @@ func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 	if err := checkStory(lib, items); err != nil {
 		return nil, err
 	}
+	// The shops (opened by the dialog action "shop <id>").
+	shops := map[string]story.Shop{}
+	if data, err := fs.ReadFile(fsys, "shops.yaml"); err == nil {
+		if err := yaml.Unmarshal(data, &shops); err != nil {
+			return nil, fmt.Errorf("shops.yaml: %w", err)
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("shops.yaml: %w", err)
+	}
+	for id, sh := range shops {
+		if sh.Name == "" {
+			return nil, fmt.Errorf("shops.yaml: shop %q has no name", id)
+		}
+		for _, it := range sh.Sells {
+			if items[it].Price <= 0 {
+				return nil, fmt.Errorf("shops.yaml: %s sells %q, which isn't an item with a price", id, it)
+			}
+		}
+	}
+	if err := checkShops(lib, shops); err != nil {
+		return nil, err
+	}
 	// The quests.
 	var quests quest.Book
 	if data, err := fs.ReadFile(fsys, "quests.yaml"); err == nil {
@@ -129,11 +153,26 @@ func LoadWith(fsys fs.FS, opt Options) (*Content, error) {
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("combat.yaml: %w", err)
 	}
-	return &Content{World: w, Infra: in, Dialogs: lib, Start: start, Combat: rules, Items: items, Quests: quests}, nil
+	return &Content{World: w, Infra: in, Dialogs: lib, Start: start, Combat: rules, Items: items, Quests: quests, Shops: shops}, nil
 }
 
 // checkStory checks the wording of the dialogs' conditions and effects,
 // and that the items they mention exist.
+// checkShops checks that the shops dialogs open ("shop <id>") exist.
+func checkShops(lib dialog.Library, shops map[string]story.Shop) error {
+	var errs []error
+	for id, d := range lib {
+		for _, a := range d.Actions() {
+			if name, ok := strings.CutPrefix(a, "shop "); ok {
+				if _, known := shops[name]; !known {
+					errs = append(errs, fmt.Errorf("dialog %q: unknown shop %q", id, name))
+				}
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
 func checkStory(lib dialog.Library, items map[string]story.Item) error {
 	ids := make([]string, 0, len(lib))
 	for id := range lib {

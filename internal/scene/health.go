@@ -2,6 +2,7 @@ package scene
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/noxer/worlds/internal/dialog"
 	"github.com/noxer/worlds/internal/geom"
@@ -150,12 +151,16 @@ func (e *Explore) camp() {
 }
 
 // dialogActions carries out the actions a story dialog asked for (see
-// converse).
-func (e *Explore) dialogActions(run *dialog.Runner) {
+// converse): "rest" (a night at the inn), "shop <id>" (opens a shop).
+func (e *Explore) dialogActions(ctx *Context, run *dialog.Runner) {
 	for _, a := range run.Actions() {
-		switch a {
-		case "rest":
+		switch {
+		case a == "rest":
 			e.sleepAtInn("Morning. Marta's knock wakes you; the room smells of bread.")
+		case strings.HasPrefix(a, "shop "):
+			if sh, ok := e.shops[strings.TrimPrefix(a, "shop ")]; ok {
+				ctx.Push(NewShop(e, sh))
+			}
 		}
 	}
 }

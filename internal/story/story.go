@@ -217,6 +217,25 @@ type Item struct {
 	Name string `yaml:"name"`
 	Text string `yaml:"text"` // a line of description
 	Use  *Use   `yaml:"use"`  // what using it does; nil if it can't be used
+	// Price is what a shop asks for it; it buys it back for half. 0: it
+	// can't be bought or sold.
+	Price int `yaml:"price"`
+}
+
+// SellPrice is what a shop pays for an item: half its price, at least 1;
+// 0 if it can't be sold.
+func (it Item) SellPrice() int {
+	if it.Price <= 0 {
+		return 0
+	}
+	return max(it.Price/2, 1)
+}
+
+// Shop is a shop's stock: the items it sells, at their prices, in order.
+// It buys whatever has a price.
+type Shop struct {
+	Name  string   `yaml:"name"`
+	Sells []string `yaml:"sells"` // item ids
 }
 
 // Use is what an item does to the party member it is used on (and it is
