@@ -1,7 +1,9 @@
 package scene
 
 import (
+	"fmt"
 	"image"
+	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
@@ -34,6 +36,7 @@ func (s *PartyScreen) rects() (box image.Rectangle, rows []image.Rectangle) {
 	for _, m := range s.e.party.Members {
 		w = max(w, gfx.TextWidth(m.Name+"  leads"))
 	}
+	w += gfx.TextWidth("   HP 00/00")
 	w = max(w+2*boxPad+28, gfx.TextWidth(partyHint)+2*boxPad)
 	h := gfx.LineHeight + 4 + n*partyRowH + gfx.LineHeight + 2*boxPad
 	box = image.Rect(boxMargin, boxMargin, boxMargin+w, boxMargin+h)
@@ -140,6 +143,14 @@ func (s *PartyScreen) Draw(dst *ebiten.Image) {
 			name += "  leads"
 		}
 		gfx.Text(dst, name, r.Min.X+boxPad+26, r.Min.Y+3, col)
+		if cur, mx := s.e.hp(m.Name); mx > 0 {
+			hp := fmt.Sprintf("HP %d/%d", cur, mx)
+			var hcol color.Color = col
+			if cur < mx && i != s.cursor {
+				hcol = battleHPFoe // hurt
+			}
+			gfx.Text(dst, hp, r.Max.X-boxPad-gfx.TextWidth(hp), r.Min.Y+3, hcol)
+		}
 	}
 	gfx.Text(dst, partyHint, box.Min.X+boxPad, box.Max.Y-boxPad-gfx.LineHeight+1, gfx.ColorMuted)
 	drawButton(dst, cornerButton(dst.Bounds().Dx(), 0), iconClose)

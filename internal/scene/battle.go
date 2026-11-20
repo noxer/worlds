@@ -162,6 +162,7 @@ func newBattle(e *Explore, n *NPC) *Battle {
 		m.Place(p, m.Facing)
 		c := e.combat.Combatant(m.Name, m.Name, combat.Party)
 		c.Pos = p
+		c.HP, _ = e.hp(m.Name) // wounds carry over
 		cs = append(cs, c)
 		b.actors, b.foes = append(b.actors, m), append(b.foes, nil)
 	}
@@ -523,8 +524,8 @@ func (b *Battle) onScreen(p world.Pos) bool {
 }
 
 // finish ends the fight: after a victory the party gathers and walks on;
-// after a defeat it wakes up where the game started, and the enemies are
-// back.
+// after a defeat it wakes up at the inn (see health.go), and the enemies
+// are back.
 func (b *Battle) finish(ctx *Context, o combat.Outcome) {
 	e := b.e
 	e.camLock = nil
@@ -534,6 +535,11 @@ func (b *Battle) finish(ctx *Context, o combat.Outcome) {
 		for _, n := range b.foes {
 			if n != nil {
 				e.story.SetFlag(defeatedFlag(n), true) // they stay gone
+			}
+		}
+		for i, c := range b.f.Combatants() {
+			if b.foes[i] == nil {
+				e.setHP(c.Name, c.HP) // the fallen get up with 1 hit point
 			}
 		}
 		e.party.PlaceAll(l.Pos, l.Facing)
@@ -546,9 +552,7 @@ func (b *Battle) finish(ctx *Context, o combat.Outcome) {
 			n.active, n.defeated = true, false
 		}
 	}
-	e.warp = &world.Warp{To: e.home, Facing: world.Down, HasFacing: true}
-	e.fade = fadeTicks
-	e.pendingNotice = "You come to, back where you started."
+	e.defeated()
 }
 
 var (

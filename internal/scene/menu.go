@@ -15,7 +15,7 @@ import (
 )
 
 // Menu is the pause menu, opened with Menu (or Cancel) while exploring:
-// Resume, Map (the world map), Party, Quests (the journal), Items, Save,
+// Resume, Map (the world map), Party, Quests (the journal), Items, Camp, Save,
 // Load and, on desktop, Quit. The world stands still while
 // it is open. Save and Load list the slots with where and when.
 type Menu struct {
@@ -100,6 +100,15 @@ func (m *Menu) items() []menuItem {
 		{text: "Party", do: func(m *Menu, ctx *Context) { ctx.Pop(); ctx.Push(NewPartyScreen(m.e)) }},
 		{text: "Quests", do: func(m *Menu, ctx *Context) { m.open(menuQuests) }},
 		{text: "Items", do: func(m *Menu, ctx *Context) { m.open(menuItems) }},
+		{text: "Camp", about: fmt.Sprintf("Rest for %d hours: everyone gets back to at least half their hit points.", campHours),
+			do: func(m *Menu, ctx *Context) {
+				if ok, why := m.e.canCamp(); !ok {
+					m.msg = why
+					return
+				}
+				ctx.Pop()
+				m.e.camp()
+			}},
 		{text: "Save", off: m.store == nil, do: func(m *Menu, ctx *Context) { m.open(menuSave) }},
 		{text: "Load", off: m.store == nil, do: func(m *Menu, ctx *Context) { m.open(menuLoad) }},
 	}

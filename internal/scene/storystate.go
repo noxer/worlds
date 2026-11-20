@@ -32,7 +32,9 @@ func (n *storyNote) Apply(effect string) {
 // closes, the party is told what it received or handed over.
 func (e *Explore) converse(ctx *Context, d *dialog.Dialog) {
 	note := &storyNote{st: e.story}
-	ctx.Push(NewDialogBox(dialog.NewRunnerWith(d, note), func() {
+	run := dialog.NewRunnerWith(d, note)
+	ctx.Push(NewDialogBox(run, func() {
+		e.dialogActions(run)
 		if text := e.changesText(note.changes); text != "" {
 			e.say(text)
 		}

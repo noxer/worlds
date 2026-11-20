@@ -49,6 +49,9 @@ type State struct {
 
 	// Puzzle blocks moved from where they started: "<map>/<name>" to x, y.
 	Blocks map[string][2]int64 `json:"blocks,omitempty"`
+	// Wounds is the hit points each member of the party is missing, by
+	// name (members at full health are left out).
+	Wounds map[string]int `json:"wounds,omitempty"`
 }
 
 // Encode returns s as JSON.

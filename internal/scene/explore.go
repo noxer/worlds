@@ -89,6 +89,7 @@ type Explore struct {
 	pendingNotice string                        // shown when the fade is over
 	story         *story.State                  // flags and items (see storystate.go)
 	puzzle        puzzles                       // levers, plates, blocks, doors (see puzzle.go)
+	wounds        map[string]int                // hit points missing, by member (see health.go)
 	pickups       []*pickup                     // things to take (see pickup.go)
 	items         map[string]story.Item         // the kinds of items, by id
 	quests        quest.Book                    // the quests (see questlog.go)

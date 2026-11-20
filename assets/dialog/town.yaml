@@ -126,3 +126,36 @@ lina:
       lines:
         - Busy day! Square in the morning, Hilde's at noon, the pond after.
         - Same every day. You could set a clock by me.
+
+inn_sign:
+  start: main
+  nodes:
+    main:
+      lines:
+        - "THE SLEEPING BEE  -  Beds, broth, and no questions."
+
+innkeeper:
+  start: main
+  nodes:
+    main:
+      speaker: Marta
+      lines:
+        - Welcome to the Sleeping Bee. A bed's five coins, breakfast included.
+      choices:
+        - text: A night's rest, please. (5 coins)
+          if: [item coin 5]
+          effects: [take coin 5]
+          do: rest
+          next: sleep
+        - text: We can't afford it.
+          if: ["!item coin 5"]
+          next: broke
+        - text: Not tonight.
+    sleep:
+      speaker: Marta
+      lines:
+        - Sleep well. I'll knock at seven.
+    broke:
+      speaker: Marta
+      lines:
+        - Then off with you, unless you fancy sleeping in the hay. Come back when your purse is heavier.

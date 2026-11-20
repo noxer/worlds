@@ -1263,9 +1263,13 @@ isn't enough. 32-bit ARM is one reason coordinates are explicitly `int64`.
       its leader when a fight starts instead of staying strung out in its
       marching line. The cellar fight now takes about 3 rounds instead of
       6, with more health left;
-   1. health that carries over between fights; rest at an inn (for coins)
-      or by sleeping; a defeat wakes the party at the inn, some coins
-      lighter;
+   1. **done:** health carries over between fights (`scene/health.go`;
+      the save keeps what each member is missing); the fallen get up with
+      1 HP after a win; the Sleeping Bee, an inn in Brookhaven (5 coins a
+      night, healed by 07:00, the dialog action `rest`); Camp in the menu
+      (8 hours, at least half health, outdoors and with no enemy near); a
+      defeat wakes the party at the inn, a quarter of its coins gone; HP
+      on the party screen. Decisions: `docs/decisions/step-9.md`;
    2. usable items (healing, reviving), from the menu and in a fight;
    3. shops: buy and sell; a general store in Brookhaven, Hilde's forge
       after her quest;

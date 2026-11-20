@@ -3,6 +3,7 @@ package scene
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 
@@ -37,6 +38,7 @@ func (e *Explore) Snapshot() (save.State, error) {
 	}
 	st.Flags, st.Items = e.story.Flags(), e.story.Items()
 	st.Blocks = e.puzzleBlocks()
+	st.Wounds = maps.Clone(e.wounds)
 	ids := make([]infra.ID, 0, len(e.visited))
 	for id := range e.visited {
 		ids = append(ids, id)
@@ -101,6 +103,7 @@ func (e *Explore) Restore(st save.State) error {
 	e.story.Restore(st.Flags, st.Items)
 	e.applyDefeated()
 	e.restorePuzzles(st.Blocks)
+	e.wounds = maps.Clone(st.Wounds)
 	e.restorePickups()
 	e.ride, e.lastTaxi, e.notice, e.pendingNotice = nil, nil, nil, ""
 	e.nearLines, e.ranks = nil, nil
